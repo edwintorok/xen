@@ -27,6 +27,8 @@
 #include <caml/custom.h>
 #include <caml/fail.h>
 #include <caml/callback.h>
+#include <caml/unixsupport.h>
+#include <caml/signals.h>
 
 #define Intf_val(a) ((struct mmap_interface *)Data_abstract_val(a))
 
@@ -35,7 +37,9 @@ static int mmap_interface_init(struct mmap_interface *intf,
                                int len, int offset)
 {
 	intf->len = len;
+	caml_enter_blocking_section();
 	intf->addr = mmap(NULL, len, pflag, mflag, fd, offset);
+	caml_leave_blocking_section();
 	return (intf->addr == MAP_FAILED) ? errno : 0;
 }
 
@@ -62,19 +66,24 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
 	result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
 
 	if (mmap_interface_init(Intf_val(result), Int_val(fd),
-	                        c_pflag, c_mflag,
-	                        Int_val(len), Int_val(offset)))
-		caml_failwith("mmap");
+				c_pflag, c_mflag,
+				Int_val(len), Int_val(offset)))
+		uerror("mmap", Nothing);
 	CAMLreturn(result);
 }
 
 CAMLprim value stub_mmap_final(value intf)
 {
 	CAMLparam1(intf);
+	struct mmap_interface interface = *Intf_val(intf);
 
-	if (Intf_val(intf)->addr != MAP_FAILED)
-		munmap(Intf_val(intf)->addr, Intf_val(intf)->len);
+	/* mark it as freed, in case munmap below fails, so we don't retry it */
 	Intf_val(intf)->addr = MAP_FAILED;
+	if (interface.addr != MAP_FAILED) {
+		caml_enter_blocking_section();
+		munmap(interface.addr, interface.len);
+		caml_leave_blocking_section();
+	}
 
 	CAMLreturn(Val_unit);
 }
