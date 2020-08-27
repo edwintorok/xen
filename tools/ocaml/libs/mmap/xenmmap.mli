@@ -19,10 +19,6 @@ type mmap_interface
 type mmap_prot_flag = RDONLY | WRONLY | RDWR
 type mmap_map_flag = SHARED | PRIVATE
 
-external read : mmap_interface -> int -> int -> string = "stub_mmap_read"
-external write : mmap_interface -> string -> int -> int -> unit
-               = "stub_mmap_write"
-
 val mmap : Unix.file_descr -> mmap_prot_flag -> mmap_map_flag -> int -> int -> t
 val unmap : t -> unit
 
