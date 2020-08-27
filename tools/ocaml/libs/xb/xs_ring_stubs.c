@@ -35,8 +35,6 @@
 #include <sys/mman.h>
 #include "mmap_stubs.h"
 
-#define GET_C_STRUCT(a) ((struct mmap_interface *) a)
-
 /*
  * Bytes_val has been introduced by Ocaml 4.06.1. So define our own version
  * if needed.
@@ -52,12 +50,11 @@ CAMLprim value ml_interface_read(value ml_interface,
 	CAMLparam3(ml_interface, ml_buffer, ml_len);
 	CAMLlocal1(ml_result);
 
-	struct mmap_interface *interface = GET_C_STRUCT(ml_interface);
 	unsigned char *buffer = Bytes_val(ml_buffer);
 	int len = Int_val(ml_len);
 	int result;
 
-	struct xenstore_domain_interface *intf = interface->addr;
+	struct xenstore_domain_interface *intf = Intf_data_val(ml_interface);
 	XENSTORE_RING_IDX cons, prod; /* offsets only */
 	int total_data, data;
 	uint32_t connection;
@@ -111,12 +108,11 @@ CAMLprim value ml_interface_write(value ml_interface,
 	CAMLparam3(ml_interface, ml_buffer, ml_len);
 	CAMLlocal1(ml_result);
 
-	struct mmap_interface *interface = GET_C_STRUCT(ml_interface);
 	const unsigned char *buffer = Bytes_val(ml_buffer);
 	int len = Int_val(ml_len);
 	int result;
 
-	struct xenstore_domain_interface *intf = interface->addr;
+	struct xenstore_domain_interface *intf = Intf_data_val(ml_interface);
 	XENSTORE_RING_IDX cons, prod;
 	int total_space, space;
 	uint32_t connection;
@@ -166,7 +162,7 @@ exit:
 CAMLprim value ml_interface_set_server_features(value interface, value v)
 {
 	CAMLparam2(interface, v);
-	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	struct xenstore_domain_interface *intf = Intf_data_val(interface);
 	if (intf == (void*)MAP_FAILED)
 		caml_failwith("Interface closed");
 
@@ -178,7 +174,7 @@ CAMLprim value ml_interface_set_server_features(value interface, value v)
 CAMLprim value ml_interface_get_server_features(value interface)
 {
 	CAMLparam1(interface);
-	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	struct xenstore_domain_interface *intf = Intf_data_val(interface);
 
 	CAMLreturn(Val_int (intf->server_features));
 }
@@ -186,7 +182,7 @@ CAMLprim value ml_interface_get_server_features(value interface)
 CAMLprim value ml_interface_close(value interface)
 {
 	CAMLparam1(interface);
-	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	struct xenstore_domain_interface *intf = Intf_data_val(interface);
 	int i;
 
 	intf->req_cons = intf->req_prod = intf->rsp_cons = intf->rsp_prod = 0;
