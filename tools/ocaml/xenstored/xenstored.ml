@@ -446,6 +446,7 @@ let main () =
 
 	let store = Store.create () in
 	let eventchn = Event.init () in
+	let gnttab = Gnt.Gnttab.interface_open () in
 	let next_frequent_ops = ref 0. in
 	let advance_next_frequent_ops () =
 		next_frequent_ops := (Unix.gettimeofday () +. !Define.conflict_max_history_seconds)
@@ -453,7 +454,7 @@ let main () =
 	let delay_next_frequent_ops_by duration =
 		next_frequent_ops := !next_frequent_ops +. duration
 	in
-	let domains = Domains.init eventchn advance_next_frequent_ops in
+	let domains = Domains.init eventchn gnttab advance_next_frequent_ops in
 
 	(* For things that need to be done periodically but more often
 	 * than the periodic_ops function *)
