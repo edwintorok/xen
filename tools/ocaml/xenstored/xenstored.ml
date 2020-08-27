@@ -166,9 +166,8 @@ let from_channel_f_compat chan global_f socket_f domain_f watch_f store_f =
 					global_f ~rw
 				| "socket" :: fd :: [] ->
 					socket_f ~fd:(int_of_string fd)
-				| "dom" :: domid :: mfn :: port :: []->
+				| "dom" :: domid :: _mfn :: port :: []->
 					domain_f (int_of_string domid)
-					         (Nativeint.of_string mfn)
 					         (int_of_string port)
 				| "watch" :: domid :: path :: token :: [] ->
 					watch_f (int_of_string domid)
@@ -208,10 +207,10 @@ let from_channel_compat ~live store cons doms chan =
 		else
 			warn "Ignoring invalid socket FD %d" fd
 	in
-	let domain_f domid mfn port =
+	let domain_f domid port =
 		let ndom =
 			if domid > 0 then
-				Domains.create doms domid mfn port
+				Domains.create doms domid port
 			else
 				Domains.create0 doms
 			in
@@ -270,8 +269,7 @@ let from_channel_bin ~live store cons doms chan =
 			Connections.find_domain cons 0
 		| LR.Domain d ->
 			debug "Recreating domain %d, port %d" d.id d.remote_port; 
-			(* FIXME: gnttab *)
-			Domains.create doms d.id 0n d.remote_port
+			Domains.create doms d.id d.remote_port
 			|> Connections.add_domain cons;
 			Connections.find_domain cons d.id
 		| LR.Socket fd ->

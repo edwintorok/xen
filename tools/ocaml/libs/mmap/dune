@@ -3,6 +3,16 @@
   (language c)
   (names xenmmap_stubs))
  (name xenmmap)
+ (modules xenmmap)
  (public_name xen.mmap)
  (libraries unix)
  (install_c_headers mmap_stubs))
+
+(library
+ (foreign_stubs
+  (language c)
+  (names gnttab_stubs))
+ (name xengnt)
+ (modules gnt)
+ (wrapped false) 
+ (libraries unix xen.mmap))

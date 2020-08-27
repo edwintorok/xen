@@ -2,9 +2,7 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-OBJS = xenmmap
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-LIBS = xenmmap.cma xenmmap.cmxa
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
 
@@ -12,15 +10,26 @@ bins: $(PROGRAMS)
 
 libs: $(LIBS)
 
-xenmmap_OBJS = $(OBJS)
+# gnt is an internal library, not installed
+gnt_OBJS = gnt
+gnt_C_OBJS = gnttab_stubs
+gnt_LIBS = gnt.cma gnt.cmxa
+LIBS_gnt = $(LDLIBS_libxengnttab)
+CFLAGS += $(CFLAGS_libxengnttab)
+
+xenmmap_OBJS = xenmmap
 xenmmap_C_OBJS = xenmmap_stubs
-OCAML_LIBRARY = xenmmap
+xenmmap_LIBS = xenmmap.cma xenmmap.cmxa
+
+OCAML_LIBRARY = xenmmap gnt
+OBJS = $(xenmmap_OBJS) $(gnt_OBJS)
+LIBS = $(xenmmap_LIBS) $(gnt_LIBS)
 
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenmmap
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenmmap META $(INTF) $(LIBS) *.a *.so *.cmx
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenmmap META *xenmmap*.cmi $(xenmmap_LIBS) *xenmmap*.a *xenmmap*.so *xenmmap*.cmx
 
 .PHONY: uninstall
 uninstall:

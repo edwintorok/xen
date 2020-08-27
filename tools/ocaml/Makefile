@@ -43,6 +43,7 @@ C_INCLUDE_PATH=$(XEN_libxenctrl)/include:$(XEN_libxengnttab)/include:$(XEN_libxe
 # in the parent directory (so it couldn't copy/use Config.mk)
 .PHONY: dune-pre
 dune-pre:
+	$(MAKE) clean
 	$(MAKE) -s -C ../../ build-tools-public-headers
 	$(MAKE) -s -C libs/xs paths.ml
 	$(MAKE) -s -C libs/xc xenctrl_abi_check.h

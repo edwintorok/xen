@@ -169,7 +169,8 @@ let () =
 let create ?(live_update = false) () =
   let store = Store.create () in
   let cons = Connections.create () in
-  let doms = Domains.init (Event.init ()) ignore in
+  let gnt = Gnt.Gnttab.interface_open () in (* dummy *)
+  let doms = Domains.init (Event.init ()) gnt ignore in
   let dom0 = Domains.create0 doms in
   let txidtbl = Hashtbl.create 47 in
   Connections.add_domain cons dom0 ;
