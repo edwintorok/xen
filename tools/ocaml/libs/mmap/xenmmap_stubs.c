@@ -28,6 +28,7 @@
 #include <caml/fail.h>
 #include <caml/callback.h>
 #include <caml/unixsupport.h>
+#include <caml/signals.h>
 
 #define Wsize_bsize_round(n) (Wsize_bsize( (n) + sizeof(value) - 1 ))
 
@@ -69,7 +70,9 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
 		caml_invalid_argument("negative offset");
 	length = Int_val(len);
 
+	caml_enter_blocking_section();
 	addr = mmap(NULL, length, c_pflag, c_mflag, Int_val(fd), Int_val(offset));
+	caml_leave_blocking_section();
 	if (MAP_FAILED == addr)
 		uerror("mmap", Nothing);
 
@@ -80,10 +83,15 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
 CAMLprim value stub_mmap_final(value intf)
 {
 	CAMLparam1(intf);
+	struct mmap_interface interface = *Intf_val(intf);
 
-	if (Intf_val(intf)->addr != MAP_FAILED)
-		munmap(Intf_val(intf)->addr, Intf_val(intf)->len);
+	/* mark it as freed, in case munmap below fails, so we don't retry it */
 	Intf_val(intf)->addr = MAP_FAILED;
+	if (interface.addr != MAP_FAILED) {
+		caml_enter_blocking_section();
+		munmap(interface.addr, interface.len);
+		caml_leave_blocking_section();
+	}
 
 	CAMLreturn(Val_unit);
 }
