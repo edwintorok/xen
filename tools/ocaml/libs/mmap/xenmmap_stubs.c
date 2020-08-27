@@ -27,16 +27,18 @@
 #include <caml/custom.h>
 #include <caml/fail.h>
 #include <caml/callback.h>
+#include <caml/unixsupport.h>
 
 #define Wsize_bsize_round(n) (Wsize_bsize( (n) + sizeof(value) - 1 ))
 
-static int mmap_interface_init(struct mmap_interface *intf,
-                               int fd, int pflag, int mflag,
-                               int len, int offset)
+value stub_mmap_alloc(void *addr, size_t len)
 {
-	intf->len = len;
-	intf->addr = mmap(NULL, len, pflag, mflag, fd, offset);
-	return (intf->addr == MAP_FAILED) ? errno : 0;
+	CAMLparam0();
+	CAMLlocal1(result);
+	result = caml_alloc(Wsize_bsize_round(sizeof(struct mmap_interface)), Abstract_tag);
+	Intf_val(result)->addr = addr;
+	Intf_val(result)->len = len;
+	CAMLreturn(result);
 }
 
 CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
@@ -45,6 +47,8 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
 	CAMLparam5(fd, pflag, mflag, len, offset);
 	CAMLlocal1(result);
 	int c_pflag, c_mflag;
+	void* addr;
+	size_t length;
 
 	switch (Int_val(pflag)) {
 	case 0: c_pflag = PROT_READ; break;
@@ -59,12 +63,17 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
 	default: caml_invalid_argument("maptype");
 	}
 
-	result = caml_alloc(Wsize_bsize_round(sizeof(struct mmap_interface)), Abstract_tag);
+	if (Int_val(len) < 0)
+		caml_invalid_argument("negative size");
+	if (Int_val(offset) < 0)
+		caml_invalid_argument("negative offset");
+	length = Int_val(len);
 
-	if (mmap_interface_init(Intf_val(result), Int_val(fd),
-	                        c_pflag, c_mflag,
-	                        Int_val(len), Int_val(offset)))
-		caml_failwith("mmap");
+	addr = mmap(NULL, length, c_pflag, c_mflag, Int_val(fd), Int_val(offset));
+	if (MAP_FAILED == addr)
+		uerror("mmap", Nothing);
+
+	result = stub_mmap_alloc(addr, length);
 	CAMLreturn(result);
 }
 
