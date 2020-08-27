@@ -124,10 +124,10 @@ let cleanup doms =
 let resume _doms _domid =
 	()
 
-let create doms domid mfn port =
+let create doms domid port =
 	let mapping = Gnt.(Gnttab.map_exn doms.gnttab { domid; ref = xenstore} true) in
 	let interface = Gnt.Gnttab.Local_mapping.to_pages doms.gnttab mapping in
-	let dom = Domain.make domid mfn port interface doms.eventchn in
+	let dom = Domain.make domid port interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
 	Domain.bind_interdomain dom;
 	dom
@@ -147,7 +147,7 @@ let create0 doms =
 			port, interface
 		)
 		in
-	let dom = Domain.make 0 Nativeint.zero port interface doms.eventchn in
+	let dom = Domain.make 0 port interface doms.eventchn in
 	Hashtbl.add doms.table 0 dom;
 	Domain.bind_interdomain dom;
 	Domain.notify dom;

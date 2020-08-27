@@ -235,10 +235,6 @@ let do_debug con t _domains cons data =
 	| "watches" :: _ ->
 		let watches = Connections.debug cons in
 		Some (watches ^ "\000")
-	| "mfn" :: domid :: _ ->
-		let domid = int_of_string domid in
-		let con = Connections.find_domain cons domid in
-		may (fun dom -> Printf.sprintf "%nd\000" (Domain.get_mfn dom)) (Connection.get_domain con)
 	| _ -> None
 	with _ -> None
 
@@ -554,15 +550,13 @@ let do_introduce con t domains cons data =
 	let dom =
 		if Domains.exist domains domid then begin
 			let edom = Domains.find domains domid in
-			if (Domain.get_mfn edom) = mfn && (Connections.find_domain cons domid) != con then begin
-				(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
-				edom.remote_port <- port;
-				Domain.bind_interdomain edom;
-			end;
+			(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
+			edom.remote_port <- port;
+			Domain.bind_interdomain edom;
 			edom
 		end
 		else try
-			let ndom = Domains.create domains domid mfn port in
+			let ndom = Domains.create domains domid port in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
@@ -571,7 +565,7 @@ let do_introduce con t domains cons data =
 			 Logging.debug "process" "do_introduce: %s (%s)" (Printexc.to_string e) bt;
 			 raise Invalid_Cmd_Args
 	in
-	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
+	if (Domain.get_remote_port dom) <> port then
 		raise Domain_not_match
 
 let do_release con t domains cons data =
