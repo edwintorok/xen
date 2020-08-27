@@ -45,16 +45,18 @@ module Gnttab = struct
     ref: gntref;
   }
 
+  external unmap_exn : interface -> Xenmmap.mmap_interface -> unit = "stub_gnttab_unmap"
+
+  external map_fresh_exn: interface -> gntref -> domid -> bool -> Xenmmap.mmap_interface = "stub_gnttab_map_fresh"
+
   module Local_mapping = struct
     type t = Xenmmap.mmap_interface
 
-    let to_pages t = t
+    let to_pages interface t =
+      Xenmmap.make t ~unmap:(unmap_exn interface)
   end
 
-  external unmap_exn : interface -> Local_mapping.t -> unit = "stub_gnttab_unmap"
-
-  external map_fresh_exn: interface -> gntref -> domid -> bool -> Local_mapping.t = "stub_gnttab_map_fresh"
-
   let map_exn interface grant writable =
-      map_fresh_exn interface grant.ref grant.domid writable
+    map_fresh_exn interface grant.ref grant.domid writable
+
 end

@@ -202,9 +202,8 @@ external domain_set_memmap_limit : handle -> domid -> int64 -> unit
 external domain_memory_increase_reservation :
   handle -> domid -> int64 -> unit
   = "stub_xc_domain_memory_increase_reservation"
-external map_foreign_range :
-  handle -> domid -> int -> nativeint -> Xenmmap.mmap_interface
-  = "stub_map_foreign_range"
+val map_foreign_range :
+  handle -> domid -> int -> nativeint -> Xenmmap.t
 
 external domain_assign_device: handle -> domid -> (int * int * int * int) -> unit
        = "stub_xc_domain_assign_device"

@@ -53,6 +53,7 @@ module Gnttab : sig
     ref: gntref;
     (** id which identifies the specific export in the foreign domain *)
   }
+
   (** A foreign domain must explicitly "grant" us memory and send us the
       "reference". The pair of (foreign domain id, reference) uniquely
       identifies the block of memory. This pair ("grant") is transmitted
@@ -63,7 +64,7 @@ module Gnttab : sig
     type t
     (** Abstract type representing a locally-mapped shared memory page *)
 
-    val to_pages: t -> Xenmmap.mmap_interface
+    val to_pages: interface -> t -> Xenmmap.t
   end
 
   val map_exn : interface -> grant -> bool -> Local_mapping.t

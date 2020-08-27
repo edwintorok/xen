@@ -23,7 +23,7 @@ type t =
 {
 	id: Xenctrl.domid;
 	mfn: nativeint;
-	interface: Xenmmap.mmap_interface;
+	interface: Xenmmap.t;
 	eventchn: Event.t;
 	mutable remote_port: int;
 	mutable port: Xeneventchn.t option;

@@ -28,7 +28,7 @@ let _ =
 
 type backend_mmap =
 {
-	mmap: Xenmmap.mmap_interface;     (* mmaped interface = xs_ring *)
+	mmap: Xenmmap.t;     (* mmaped interface = xs_ring *)
 	eventchn_notify: unit -> unit; (* function to notify through eventchn *)
 	mutable work_again: bool;
 }
@@ -59,7 +59,7 @@ let reconnect t = match t.backend with
 		(* should never happen, so close the connection *)
 		raise End_of_file
 	| Xenmmap backend ->
-		Xs_ring.close backend.mmap;
+		Xs_ring.close Xenmmap.(to_interface backend.mmap);
 		backend.eventchn_notify ();
 		(* Clear our old connection state *)
 		Queue.clear t.pkt_in;
@@ -77,7 +77,7 @@ let read_fd back _con b len =
 
 let read_mmap back _con b len =
 	let s = Bytes.make len '\000' in
-	let rd = Xs_ring.read back.mmap s len in
+	let rd = Xs_ring.read Xenmmap.(to_interface back.mmap) s len in
 	Bytes.blit s 0 b 0 rd;
 	back.work_again <- (rd > 0);
 	if rd > 0 then
@@ -93,7 +93,7 @@ let write_fd back _con b len =
 	Unix.write_substring back.fd b 0 len
 
 let write_mmap back _con s len =
-	let ws = Xs_ring.write_substring back.mmap s len in
+	let ws = Xs_ring.write_substring Xenmmap.(to_interface back.mmap) s len in
 	if ws > 0 then
 		back.eventchn_notify ();
 	ws
@@ -167,7 +167,7 @@ let open_fd fd = newcon (Fd { fd = fd; })
 
 let open_mmap mmap notifyfct =
 	(* Advertise XENSTORE_SERVER_FEATURE_RECONNECTION *)
-	Xs_ring.set_server_features mmap (Xs_ring.Server_features.singleton Xs_ring.Server_feature.Reconnection);
+	Xs_ring.set_server_features (Xenmmap.to_interface mmap) (Xs_ring.Server_features.singleton Xs_ring.Server_feature.Reconnection);
 	newcon (Xenmmap {
 		mmap = mmap;
 		eventchn_notify = notifyfct;
