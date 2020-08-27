@@ -32,6 +32,8 @@
 
 #define Intf_val(a) ((struct mmap_interface *) Data_abstract_val(a))
 
+#define Wsize_bsize_round(n) (Wsize_bsize( (n) + sizeof(value) - 1 ))
+
 static int mmap_interface_init(struct mmap_interface *intf,
                                int fd, int pflag, int mflag,
                                int len, int offset)
@@ -63,7 +65,7 @@ CAMLprim value stub_mmap_init(value fd, value pflag, value mflag,
     default: caml_invalid_argument("maptype");
     }
 
-    result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
+    result = caml_alloc(Wsize_bsize_round(sizeof(struct mmap_interface)), Abstract_tag);
 
     if (mmap_interface_init(Intf_val(result), Int_val(fd),
                             c_pflag, c_mflag,
