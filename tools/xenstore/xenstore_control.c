@@ -42,6 +42,10 @@ static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
         len = add_to_buf(&buf, "-F", len);
     if (len < 0)
         return 1;
+    /* +1 for rounding issues
+     * +1 to give oxenstored a chance to timeout and report back first
+     */
+    to += 2;
 
     for (time_start = time(NULL); time(NULL) - time_start < to;) {
         ret = xs_control_command(xsh, "live-update", buf, len);
@@ -49,6 +53,15 @@ static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
             goto err;
         if (strcmp(ret, "BUSY"))
             break;
+        /* TODO: use task ID for commands, avoid busy loop polling
+here
+         * oxenstored checks BUSY condition internally on every main
+loop iteration anyway.
+         * Avoid flooding xenstored with live-update requests.
+         * The flooding can also cause the evtchn to overflow in
+xenstored which makes
+         * xenstored enter an infinite loop */
+        sleep(1);
     }
 
     if (strcmp(ret, "OK"))
