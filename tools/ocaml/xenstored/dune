@@ -1,0 +1,19 @@
+(executable
+ (modes byte exe)
+ (name xenstored_main)
+ (modules (:standard \ syslog systemd))
+ (public_name oxenstored)
+ (package xenstored)
+ (flags (:standard -w -52))
+ (libraries unix xen.bus xen.mmap xen.ctrl xen.eventchn xenstubs))
+
+(library
+ (foreign_stubs
+  (language c)
+  (names syslog_stubs systemd_stubs select_stubs)
+  (flags (-DHAVE_SYSTEMD)))
+ (modules syslog systemd)
+ (name xenstubs)
+ (wrapped false)
+ (libraries unix)
+ (c_library_flags -lsystemd))

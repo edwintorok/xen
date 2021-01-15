@@ -1,0 +1,7 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names xenbus_stubs xs_ring_stubs))
+ (name xenbus)
+ (public_name xen.bus)
+ (libraries unix xenmmap))
