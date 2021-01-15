@@ -365,7 +365,8 @@ record previously present).
 |              | 0x0001: read                                   |
 |              | 0x0002: written                                |
 |              |                                                |
-|              | The value will be zero for a deleted node      |
+|              | The value will be zero for a recursively       |
+|              | deleted node                                   |
 |              |                                                |
 | `perm-count` | The number (N) of node permission specifiers   |
 |              | (which will be 0 for a node deleted in a       |
