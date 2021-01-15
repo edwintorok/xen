@@ -79,3 +79,22 @@ dune-syntax-check: dune-pre
 .PHONY: build-oxenstored-dune
 dune-build-oxenstored: dune-pre
 	LD_LIBRARY_PATH=$(LIBRARY_PATH) LIBRARY_PATH=$(LIBRARY_PATH) C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release @all
+
+.PHONY: oxenstored-fuzz1 oxenstored-fuzz
+dune-oxenstored-fuzz: dune-pre
+	# --force is needed, otherwise it would cache a successful run
+	sh -c '. /etc/profile && C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release --no-buffer --force @fuzz'
+
+dune-oxenstored-fuzz1: dune-pre
+	sh -c '. /etc/profile && C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release --no-buffer --force @fuzz1'
+
+.PHONY: container-fuzz
+container-fuzz-sanity-test:
+	dune clean
+	podman build -t oxenstored-fuzz .
+	# if UID is 0 then we get EPERM on setrlimit from inside the container
+	# use containerize script which ensures that uid is not 0
+	# (podman/docker run would get us a uid of 0)
+	# Only do a sanity test with 1 core, actually doing fuzzing inside a container is a bad idea
+	# due to FUSE overlayfs overhead
+	CONTAINER=oxenstored-fuzz CONTAINER_NO_PULL=1 DOCKER_CMD=podman ../../automation/scripts/containerize make -C tools/ocaml dune-oxenstored-fuzz1
