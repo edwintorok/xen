@@ -9,3 +9,15 @@
  (flags (:standard -w -52))
  ;;(action (run %{test} -v --seed 364172147))
  (libraries unix xen.bus xen.mmap xenstubs crowbar xen.store fmt fmt.tty))
+
+(rule
+(alias fuzz1)
+(deps xenstored_test.exe)
+(action (run bun -svv ./xenstored_test.exe))
+)
+
+(rule
+(alias fuzz)
+(deps xenstored_test.exe)
+(action (run bun --no-kill ./xenstored_test.exe))
+)

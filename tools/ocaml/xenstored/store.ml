@@ -133,6 +133,7 @@ let of_path_and_name path name =
 	| _ -> path @ [name]
 
 let create path connection_path =
+	Logging.debug "store" "Path.create %S %S" path connection_path;
 	of_string (Utils.path_validate path connection_path)
 
 let to_string t =
