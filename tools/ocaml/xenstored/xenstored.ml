@@ -141,7 +141,8 @@ exception Bad_format of string
 
 let dump_format_header = "$xenstored-dump-format"
 
-let from_channel_f chan global_f socket_f domain_f watch_f store_f =
+(* for backwards compatibility with already released live-update *)
+let from_channel_f_compat chan global_f socket_f domain_f watch_f store_f =
 	let unhexify s = Utils.unhexify s in
 	let getpath s =
 		let u = Utils.unhexify s in
@@ -186,7 +187,7 @@ let from_channel_f chan global_f socket_f domain_f watch_f store_f =
 	done;
 	info "Completed loading xenstore dump"
 
-let from_channel store cons doms chan =
+let from_channel_compat ~live store cons doms chan =
 	(* don't let the permission get on our way, full perm ! *)
 	let op = Store.get_ops store Perms.Connection.full_rights in
 	let rwro = ref (None) in
@@ -226,43 +227,183 @@ let from_channel store cons doms chan =
 		op.Store.write path value;
 		op.Store.setperms path perms
 		in
-	from_channel_f chan global_f socket_f domain_f watch_f store_f;
+	from_channel_f_compat chan global_f socket_f domain_f watch_f store_f;
 	!rwro
 
-let from_file store cons doms file =
-	info "Loading xenstore dump from %s" file;
-	let channel = open_in file in
-	finally (fun () -> from_channel store doms cons channel)
+module LR = Disk.LiveRecord
+
+let from_channel_f_bin chan on_global_data on_connection_data on_watch_data on_transaction_data on_node_data =
+	Disk.BinaryIn.read_header chan;
+	let quit = ref false in
+	let on_end () = quit := true in
+	let errors = ref 0 in
+	while not !quit
+	do
+		try
+			LR.read_record chan ~on_end ~on_global_data ~on_connection_data ~on_watch_data ~on_transaction_data ~on_node_data
+		with exn ->
+			let bt = Printexc.get_backtrace () in
+			incr errors;
+			Logging.warn "xenstored" "restoring: ignoring faulty record (exception: %s): %s" (Printexc.to_string exn) bt
+	done;
+        info "Completed loading xenstore dump";
+	!errors
+
+
+let from_channel_bin ~live store cons doms chan =
+	(* don't let the permission get on our way, full perm ! *)
+	let maintx = Transaction.make ~internal:true Transaction.none store in
+	let fullperm = Perms.Connection.full_rights in
+	let fds = ref None in
+	let allcons = Hashtbl.create 1021 in
+	let contxid_to_op = Hashtbl.create 1021 in
+	let global_f ~rw_sock =
+		(* file descriptors are only valid on a live-reload, a cold restart won't have them *)
+		if live then
+			fds := Some rw_sock
+	in
+	let domain_f ~conid ~conn ~in_data ~out_data ~out_resp_len =
+		let con = match conn with
+		| LR.Domain { LR.id = 0; _ } ->
+			(* Dom0 is precreated *)
+			Connections.find_domain cons 0
+		| LR.Domain d ->
+			debug "Recreating domain %d, port %d" d.id d.remote_port; 
+			(* FIXME: gnttab *)
+			Domains.create doms d.id 0n d.remote_port
+			|> Connections.add_domain cons;
+			Connections.find_domain cons d.id
+		| LR.Socket fd ->
+			debug "Recreating open socket";
+			(* TODO: rw/ro flag *)
+			Connections.add_anonymous cons fd;
+			Connections.find cons fd
+		in
+		Hashtbl.add allcons conid con
+	in
+	let watch_f ~conid ~wpath ~token =
+		let con = Hashtbl.find allcons conid in
+		ignore (Connections.add_watch cons con wpath token);
+		()
+		in
+	let transaction_f ~conid ~txid =
+		let con = Hashtbl.find allcons conid in
+		con.Connection.next_tid <- txid;
+		let id = Connection.start_transaction con store in
+		assert (id = txid);
+		let txn = Connection.get_transaction con txid in
+		Hashtbl.add contxid_to_op (conid, txid) txn
+	in
+	let store_f ~txaccess ~perms ~path ~value =
+		let txn, op = match txaccess with
+		| None -> maintx, LR.W
+		| Some (conid, txid, op) ->
+			 let (txn, _) as r = Hashtbl.find contxid_to_op (conid, txid), op in
+     	 (* make sure this doesn't commit, even as RO *)
+			 Transaction.mark_failed txn;
+			 r
+        in
+	let get_con id =
+		if id < 0 then Connections.find cons (Utils.FD.of_int (-id))
+		else Connections.find_domain cons id
+	in
+	let watch_f id path token =
+		ignore (Connections.add_watch cons (get_con id) path token)
+		in
+		let path = Store.Path.of_string path in
+		try match op with
+		| LR.R ->
+			 Logging.debug "xenstored" "TR %s %S" (Store.Path.to_string path) value;
+			(* these are values read by the tx, potentially
+				 no write access here. Make the tree match. *)
+			Transaction.write txn fullperm path value; 
+			Transaction.setperms txn fullperm path perms;
+		| LR.W | LR.RW ->
+			 Logging.debug "xenstored" "TW %d %s %S" (Transaction.get_id txn) (Store.Path.to_string path) value;
+			 (* We started with empty tree, create parents.
+			    All the implicit mkdirs from the original tx should be explicit already for quota purposes.
+			 *)
+			 Process.create_implicit_path txn fullperm path;
+ 			 Transaction.write txn fullperm path value; 
+			 Transaction.setperms txn fullperm path perms;
+			 Logging.debug "xenstored" "TWdone %s %S" (Store.Path.to_string path) value;
+		| LR.Del ->
+			 Logging.debug "xenstored" "TDel %s " (Store.Path.to_string path);
+			Transaction.rm txn fullperm path
+		with Not_found|Define.Doesnt_exist|Define.Lookup_Doesnt_exist _ -> ()
+		in
+	(* make sure we got a quota entry for Dom0, so that setperms on / doesn't cause quota to be off-by-one *)
+	Transaction.mkdir maintx fullperm (Store.Path.of_string "/local");
+	let errors = from_channel_f_bin chan global_f domain_f watch_f transaction_f store_f in
+	(* do not fire any watches, but this makes a tx RO *)
+(*	Transaction.clear_wops maintx; *)
+	let errors = if not @@ Transaction.commit ~con:"live-update" maintx then begin
+		Logging.warn "xenstored" "live-update: failed to commit main transaction";
+		errors + 1
+	end else errors
+	in
+	!fds, errors
+
+let from_channel = from_channel_bin (* TODO: detect and accept text format *)
+
+let from_file ~live store cons doms file =
+	let channel = open_in_bin file in
+	finally (fun () -> from_channel_bin ~live store doms cons channel)
 	        (fun () -> close_in channel)
 
-let to_channel store cons rw chan =
-	let hexify s = Utils.hexify s in
+let to_channel rw_sock store cons chan =
+	let t = Disk.BinaryOut.write_header chan in
 
-	fprintf chan "%s\n" dump_format_header;
-	let fdopt = function None -> -1 | Some fd ->
-		(* systemd and utils.ml sets it close on exec *)
-		Unix.clear_close_on_exec fd;
-		Utils.FD.to_int fd in
-	fprintf chan "global,%d\n" (fdopt rw);
-
-	(* dump connections related to domains: domid, mfn, eventchn port/ sockets, and watches *)
-	Connections.iter cons (fun con -> Connection.dump con chan);
+	(match rw_sock with
+	| Some rw_sock ->
+		LR.write_global_data t ~rw_sock
+	| _ -> ());
 
 	(* dump the store *)
 	Store.dump_fct store (fun path node ->
-		let name, perms, value = Store.Node.unpack node in
-		let fullpath = Store.Path.to_string (Store.Path.of_path_and_name path name) in
-		let permstr = Perms.Node.to_string perms in
-		fprintf chan "store,%s,%s,%s\n" (hexify fullpath) (hexify permstr) (hexify value)
+		Transaction.write_node t None path node
 	);
+
+	(* dump connections related to domains and sockets; domid, mfn, eventchn port, watches *)
+	Connections.iter cons (fun con -> Connection.dump con store t);
+
+	LR.write_end t;
 	flush chan;
 	()
 
+let validate_f ch =
+	let conids = Hashtbl.create 1021 in
+	let txids = Hashtbl.create 1021 in
+	let global_f ~rw_sock = () in
+	let domain_f ~conid ~conn ~in_data ~out_data ~out_resp_len =
+		Hashtbl.add conids conid ()
+	in
+	let watch_f ~conid ~wpath ~token =
+		Hashtbl.find conids conid
+	in
+	let transaction_f ~conid ~txid =
+		Hashtbl.find conids conid;
+		Hashtbl.add txids (conid, txid) ()
+	in 
+	let store_f ~txaccess ~perms ~path ~value =
+		match txaccess with
+		| None -> ()
+		| Some (conid, txid, _) ->
+			Hashtbl.find conids conid;
+			Hashtbl.find txids (conid, txid)
+	in
+	let errors = from_channel_f_bin ch global_f domain_f watch_f transaction_f store_f in
+	if errors > 0 then
+		failwith (Printf.sprintf "Failed to re-read dump: %d errors" errors)
 
-let to_file store cons fds file =
-	let channel = open_out_gen [ Open_wronly; Open_creat; Open_trunc; ] 0o600 file in
-	finally (fun () -> to_channel store cons fds channel)
-	        (fun () -> close_out channel)
+let to_file fds store cons file =
+	let channel = open_out_gen [ Open_wronly; Open_creat; Open_trunc; Open_binary ] 0o600 file in
+	finally (fun () -> to_channel fds store cons channel)
+					(fun () -> close_out channel);
+	let channel = open_in_bin file in
+	finally (fun () -> validate_f channel)
+	        (fun () -> close_in channel)
+	
 end
 
 let main () =
@@ -329,8 +470,8 @@ let main () =
 
 	let rw_sock =
 	if cf.restart && Sys.file_exists Disk.xs_daemon_database then (
-		let rwro = DB.from_file store domains cons Disk.xs_daemon_database in
-		info "Live reload: database loaded";
+		let rwro, errors = DB.from_file ~live:cf.live_reload store domains cons Disk.xs_daemon_database in
+		info "Live reload: database loaded (%d errors)" errors;
 		Event.bind_dom_exc_virq eventchn;
 		Process.LiveUpdate.completed ();
 		rwro
@@ -367,7 +508,7 @@ let main () =
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
 	if cf.activate_access_log then begin
-		let post_rotate () = DB.to_file store cons (None) Disk.xs_daemon_database in
+		let post_rotate () = DB.to_file None store cons Disk.xs_daemon_database in
 		Logging.init_access_log post_rotate
 	end;
 
@@ -528,7 +669,7 @@ let main () =
 			live_update := Process.LiveUpdate.should_run cons;
 			if !live_update || !quit then begin
 				(* don't initiate live update if saving state fails *)
-				DB.to_file store cons (rw_sock) Disk.xs_daemon_database;
+				DB.to_file rw_sock store cons Disk.xs_daemon_database;
 				quit := true;
 			end
 		with exc ->
