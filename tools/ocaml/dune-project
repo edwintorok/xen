@@ -1,0 +1,24 @@
+(lang dune 2.0)
+
+(name xen)
+
+(formatting disabled)
+
+(generate_opam_files true)
+
+(maintainers "christian.lindig@citrix.com" "dave@recoil.org")
+(source (uri https://xenbits.xen.org/git-http/xen.git))
+(license LGPL-2.1-only)
+
+(package (name xen))
+(package (name xenstore))
+(package
+ (name xenstored)
+ (synopsis "In-memory key-value store for the Xen hypervisor")
+ (depends
+  (ocaml (>= 4.02))
+  base-unix
+  (crowbar :with-test)
+  (fmt :with-test)
+ )
+)
