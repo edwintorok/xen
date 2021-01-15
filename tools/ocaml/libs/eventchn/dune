@@ -1,0 +1,8 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names xeneventchn_stubs))
+ (name xeneventchn)
+ (public_name xen.eventchn)
+ (libraries unix)
+ (c_library_flags -lxenevtchn))

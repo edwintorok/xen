@@ -1,0 +1,21 @@
+opam-version: "2.0"
+synopsis: "In-memory key-value store for the Xen hypervisor"
+maintainer: "lindig@gmail.com"
+authors: "lindig@gmail.com"
+license: "LGPL"
+homepage: "https://github.com/lindig/xen-ocaml-tools"
+bug-reports: "https://github.com/lindig/xen-ocaml-tools/issues"
+depends: [
+  "ocaml"
+  "dune" {build}
+  "base-unix"
+
+  "crowbar" {with-test}
+  "fmt" {with-test}
+
+  "crowbar"
+  "fmt"
+]
+build: ["dune" "build" "-p" name "-j" jobs]
+depexts: ["m4" "libxen-dev" "libsystemd-dev"] {os-distribution = "debian"}
+dev-repo: "git+https://github.com/lindig/xen-ocaml-tools.git"

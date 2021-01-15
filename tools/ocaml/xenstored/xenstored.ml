@@ -265,7 +265,7 @@ let to_file store cons fds file =
 	        (fun () -> close_out channel)
 end
 
-let _ =
+let main () =
 	let cf = do_argv in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
