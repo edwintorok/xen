@@ -292,7 +292,8 @@ module LiveRecord = struct
 	let write_global_data t ~rw_sock =
 		write_record t Type.global_data 8 @@ fun b ->
 		O.w32 b (FD.to_int rw_sock);
-		O.w32 b (-1)
+                (* TODO: this needs a unit test/live update test too! *)
+		O.w32 b 0xFFFF_FFFF
 
 	let read_global_data t ~len f =
 		read_expect t "global_data" 8 len;
