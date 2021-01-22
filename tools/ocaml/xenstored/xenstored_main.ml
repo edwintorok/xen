@@ -1,0 +1,1 @@
+let () = Xenstored.main ()
