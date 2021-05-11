@@ -26,6 +26,7 @@ type config =
 	restart: bool;
 	live_reload: bool;
 	disable_socket: bool;
+	config_test: bool;
 }
 
 let do_argv () =
@@ -38,6 +39,7 @@ let do_argv () =
 	and restart = ref false
 	and live_reload = ref false
 	and disable_socket = ref false
+	and config_test = ref false
 	in
 
 	let speclist =
@@ -55,6 +57,7 @@ let do_argv () =
 		  ("-T", Arg.Set_string tracefile, ""); (* for compatibility *)
 		  ("--restart", Arg.Set restart, "Read database on starting");
 		  ("--live", Arg.Set live_reload, "Read live dump on startup");
+		  ("--config-test", Arg.Set config_test, "Test validity of config file");
 		  ("--disable-socket", Arg.Unit (fun () -> disable_socket := true), "Disable socket");
 		] in
 	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket]" in
@@ -70,4 +73,5 @@ let do_argv () =
 		restart = !restart;
 		live_reload = !live_reload;
 		disable_socket = !disable_socket;
+		config_test = !config_test;
 	}

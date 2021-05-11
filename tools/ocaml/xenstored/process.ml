@@ -121,7 +121,7 @@ let launch_exn t =
 
 let validate_exn t =
 	(* --help must be last to check validity of earlier arguments *)
-	let t' = {t with cmdline= t.cmdline @ ["--help"]} in
+	let t' = {t with cmdline= t.cmdline @ ["--config-test"]} in
 	let cmd = string_of_t t' in
 	debug "Executing %s" cmd ;
 	match Unix.fork () with
