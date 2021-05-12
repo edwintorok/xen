@@ -4,11 +4,6 @@ include $(TOPLEVEL)/common.make
 
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
 
-all: $(INTF) $(LIBS) $(PROGRAMS)
-
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
 
 # gnt is an internal library, not installed
 gnt_OBJS = gnt
@@ -24,6 +19,12 @@ xenmmap_LIBS = xenmmap.cma xenmmap.cmxa
 OCAML_LIBRARY = xenmmap gnt
 OBJS = $(xenmmap_OBJS) $(gnt_OBJS)
 LIBS = $(xenmmap_LIBS) $(gnt_LIBS)
+
+all: $(INTF) $(LIBS) $(PROGRAMS)
+
+bins: $(PROGRAMS)
+
+libs: $(LIBS)
 
 .PHONY: install
 install: $(LIBS) META
