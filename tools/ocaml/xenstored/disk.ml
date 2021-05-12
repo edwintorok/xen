@@ -176,7 +176,7 @@ let write store =
 			output_byte ch i
 
 		let w32 ch v =
-			assert (v >= 0 && v <= 0xFFFF_FFFF);
+			assert (v >= 0 && Int64.of_int v <= 0xFFFF_FFFFL);
 			output_binary_int ch v
 
 		let pos = pos_out
@@ -213,7 +213,7 @@ let write store =
 
 		let r32 t =
 			(* read unsigned 32-bit int *)
-			let r = input_binary_int t land 0xFFFF_FFFF in
+			let r = Int64.logand (Int64.of_int (input_binary_int t)) 0xFFFF_FFFFL |> Int64.to_int in
 			assert (r >= 0);
 			r
 
@@ -293,7 +293,7 @@ module LiveRecord = struct
 		write_record t Type.global_data 8 @@ fun b ->
 		O.w32 b (FD.to_int rw_sock);
                 (* TODO: this needs a unit test/live update test too! *)
-		O.w32 b 0xFFFF_FFFF
+		O.w32 b 0x3FFF_FFFF
 
 	let read_global_data t ~len f =
 		read_expect t "global_data" 8 len;
