@@ -1,0 +1,4 @@
+(library
+ (name xenstore)
+ (public_name xen.store)
+ (libraries unix xenbus))

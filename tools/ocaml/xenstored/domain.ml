@@ -22,8 +22,7 @@ let warn  fmt = Logging.warn  "domain" fmt
 type t =
 {
 	id: Xenctrl.domid;
-	mfn: nativeint;
-	interface: Xenmmap.mmap_interface;
+	interface: Xenmmap.t;
 	eventchn: Event.t;
 	mutable remote_port: int;
 	mutable port: Xeneventchn.t option;
@@ -40,7 +39,6 @@ type t =
 let is_dom0 d = d.id = 0
 let get_id domain = domain.id
 let get_interface d = d.interface
-let get_mfn d = d.mfn
 let get_remote_port d = d.remote_port
 let get_port d = d.port
 
@@ -61,7 +59,7 @@ let string_of_port = function
 | Some x -> string_of_int (Xeneventchn.to_int x)
 
 let dump d chan =
-	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.remote_port
+	fprintf chan "dom,%d,%d\n" d.id d.remote_port
 
 let notify dom = match dom.port with
 | None ->
@@ -87,9 +85,8 @@ let close dom =
 	Xenmmap.unmap dom.interface;
 	()
 
-let make id mfn remote_port interface eventchn = {
+let make id remote_port interface eventchn = {
 	id = id;
-	mfn = mfn;
 	remote_port = remote_port;
 	interface = interface;
 	eventchn = eventchn;

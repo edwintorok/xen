@@ -69,6 +69,8 @@ let remove_domid ~domid perm =
 
 let default0 = create 0 NONE []
 
+let acls t = (t.owner, t.other) :: t.acl
+
 let perm_of_string s =
 	let ty = permty_of_char s.[0]
 	and id = int_of_string (String.sub s 1 (String.length s - 1)) in

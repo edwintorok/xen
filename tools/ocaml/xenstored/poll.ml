@@ -64,4 +64,5 @@ let poll_select in_fds out_fds exc_fds timeout =
 			a r
 
 let () =
-        set_fd_limit (get_sys_fs_nr_open ())
+        if Unix.geteuid () = 0 then
+          set_fd_limit (get_sys_fs_nr_open ())

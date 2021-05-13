@@ -17,6 +17,7 @@
 exception End_of_file
 
 open Stdext
+module LR = Disk.LiveRecord
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
 
@@ -76,6 +77,10 @@ let number_of_transactions con =
 	Hashtbl.length con.transactions
 
 let get_domain con = con.dom
+
+let get_id con = match con.dom with
+| None -> 2*LR.domid_invalid + con.anonid
+| Some dom -> 1 + Domain.get_id dom
 
 let anon_id_next = ref 1
 
@@ -278,6 +283,9 @@ let end_transaction con tid commit =
 let get_transaction con tid =
 	Hashtbl.find con.transactions tid
 
+let iter_transactions con f =
+	Hashtbl.iter f con.transactions
+
 let do_input con = Xenbus.Xb.input con.xb
 let has_input con = Xenbus.Xb.has_in_packet con.xb
 let has_partial_input con = match con.xb.Xenbus.Xb.partial_in with
@@ -336,22 +344,45 @@ let incr_ops con = con.stat_nb_ops <- con.stat_nb_ops + 1
 let stats con =
 	Hashtbl.length con.watches, con.stat_nb_ops
 
-let dump con chan =
-	let id = match con.dom with
-	| Some dom ->
-		let domid = Domain.get_id dom in
-		(* dump domain *)
-		Domain.dump dom chan;
-		domid
-	| None ->
-		let fd = con |> get_fd |> Utils.FD.to_int in
-		Printf.fprintf chan "socket,%d\n" fd;
-		-fd
-	in
-	(* dump watches *)
-	List.iter (fun (path, token) ->
-		Printf.fprintf chan "watch,%d,%s,%s\n" id (Utils.hexify path) (Utils.hexify token)
-		) (list_watches con)
+let serialize_pkt_in buf xb =
+	let open Xenbus.Xb in
+	Queue.iter (fun p -> Buffer.add_string buf (Packet.to_string p)) xb.pkt_in;
+	match xb.partial_in with
+	| NoHdr (to_read, hdrb) ->
+		(* see Xb.input *)
+		let used = Xenbus.Partial.header_size () - to_read in
+		Buffer.add_subbytes buf hdrb 0 used
+	| HaveHdr p ->
+		p |> Packet.of_partialpkt |> Packet.to_string |> Buffer.add_string buf
+
+let serialize_pkt_out buf xb =
+	let open Xenbus.Xb in
+	Buffer.add_string buf xb.partial_out;
+	Queue.iter (fun p -> Buffer.add_string buf (Packet.to_string p)) xb.pkt_out
+
+let dump con store chan =
+	let conid = get_id con in
+	let conn = match con.dom with
+	| None -> LR.Socket (get_fd con)
+	| Some dom -> LR.Domain {
+		id = Domain.get_id dom;
+		target = LR.domid_invalid;  (* TODO: we do not store this info *)
+		remote_port = Domain.get_remote_port dom
+	} in
+	let pkt_in = Buffer.create 4096 in
+	let pkt_out = Buffer.create 4096 in
+	serialize_pkt_in pkt_in con.xb;
+	serialize_pkt_out pkt_out con.xb;
+	LR.write_connection_data chan ~conid ~conn  pkt_in con.xb.partial_out pkt_out;
+
+	con |> list_watches
+	|> List.rev (* preserve order in dump/reload *)
+	|> List.iter (fun (wpath, token) ->
+		LR.write_watch_data chan ~conid ~wpath ~token
+	);
+	let conpath = get_path con in
+	iter_transactions con (fun _ txn ->
+		 Transaction.dump store conpath ~conid txn chan)
 
 let debug con =
 	let domid = get_domstr con in

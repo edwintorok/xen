@@ -1,0 +1,9 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names xenctrl_stubs))
+ (name xenctrl)
+ (public_name xen.ctrl)
+ (libraries unix xenmmap)
+ (c_library_flags -lxenctrl -lxenguest -lxencall -lxenforeignmemory
+   -lxengnttab))

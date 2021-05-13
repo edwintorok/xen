@@ -22,6 +22,7 @@ let xc = Xenctrl.interface_open ()
 
 type domains = {
 	eventchn: Event.t;
+	gnttab: Gnt.Gnttab.interface;
 	table: (Xenctrl.domid, Domain.t) Hashtbl.t;
 
 	(* N.B. the Queue module is not thread-safe but oxenstored is single-threaded. *)
@@ -42,8 +43,9 @@ type domains = {
 	mutable n_penalised: int; (* Number of domains with less than maximum credit *)
 }
 
-let init eventchn on_first_conflict_pause = {
+let init eventchn gnttab on_first_conflict_pause = {
 	eventchn = eventchn;
+	gnttab;
 	table = Hashtbl.create 10;
 	doms_conflict_paused = Queue.create ();
 	doms_with_conflict_penalty = Queue.create ();
@@ -122,9 +124,10 @@ let cleanup doms =
 let resume _doms _domid =
 	()
 
-let create doms domid mfn port =
-	let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
-	let dom = Domain.make domid mfn port interface doms.eventchn in
+let create doms domid port =
+	let mapping = Gnt.(Gnttab.map_exn doms.gnttab { domid; ref = xenstore} true) in
+	let interface = Gnt.Gnttab.Local_mapping.to_pages doms.gnttab mapping in
+	let dom = Domain.make domid port interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
 	Domain.bind_interdomain dom;
 	dom
@@ -144,7 +147,7 @@ let create0 doms =
 			port, interface
 		)
 		in
-	let dom = Domain.make 0 Nativeint.zero port interface doms.eventchn in
+	let dom = Domain.make 0 port interface doms.eventchn in
 	Hashtbl.add doms.table 0 dom;
 	Domain.bind_interdomain dom;
 	Domain.notify dom;

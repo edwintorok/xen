@@ -82,6 +82,7 @@ type t = {
 	start_count: int64;
 	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
+	mutable must_fail: bool;
 	oldroot: Store.Node.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
 	mutable operations: (Packet.request * Packet.response) list;
@@ -89,7 +90,7 @@ type t = {
 	mutable write_lowpath: Store.Path.t option;
 }
 let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
-
+let mark_failed t = t.must_fail <- true
 let counter = ref 0L
 let failed_commits = ref 0L
 let failed_commits_no_culprit = ref 0L
@@ -117,6 +118,8 @@ let trim_short_running_transactions txn =
 		keep
 		!short_running_txns
 
+let invalid_op = Xenbus.Xb.Op.Invalid, []
+
 let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
 	let txn = {
@@ -129,6 +132,7 @@ let make ?(internal=false) id store =
 		operations = [];
 		read_lowpath = None;
 		write_lowpath = None;
+		must_fail = false;
 	} in
 	if id <> none && not internal then (
 		let now = Unix.gettimeofday () in
@@ -139,10 +143,11 @@ let make ?(internal=false) id store =
 let get_store t = t.store
 let get_paths t = t.paths
 
+let is_read_only t = t.paths = [] && not t.must_fail
 let get_root t = Store.get_root t.store
 
-let is_read_only t = t.paths = []
 let add_wop t ty path = t.paths <- (ty, path) :: t.paths
+let clear_wops t = t.paths <- []
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
@@ -151,7 +156,9 @@ let add_operation ~perm t request response =
 	t.operations <- (request, response) :: t.operations
 let get_operations t = List.rev t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
-let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath
+let set_write_lowpath t path =
+	 Logging.debug "transaction" "set_writelowpath (%d) %s" (get_id t)  (Store.Path.to_string path);
+	 t.write_lowpath <- get_lowest path t.write_lowpath
 
 let path_exists t path = Store.path_exists t.store path
 
@@ -200,7 +207,7 @@ let commit ~con t =
 	let has_commited =
 	match t.ty with
 	| No                         -> true
-	| Full (_id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
+	| Full (id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
 		let commit_partial oldroot cstore store =
 			(* get the lowest path of the query and verify that it hasn't
 			   been modified by others transactions. *)
@@ -240,11 +247,16 @@ let commit ~con t =
 				(* we try a partial commit if possible *)
 				commit_partial oldroot cstore store
 			in
+		if t.must_fail then begin
+			Logging.info "transaction" "Transaction %d was marked to fail (by live-update)" id;
+			false
+		end else
 		if !test_eagain && Random.int 3 = 0 then
 			false
 		else
 			try_commit (Store.get_root oldstore) cstore t.store
 		in
+	Logging.info "transaction" "has_commited: %b" has_commited;
 	if has_commited && has_write_ops then
 		Disk.write t.store;
 	if not has_commited
@@ -252,3 +264,102 @@ let commit ~con t =
 	else if not !has_coalesced
 	then Logging.commit ~tid:(get_id t) ~con;
 	has_commited
+
+module LR = Disk.LiveRecord
+
+(* here instead of Store.ml to avoid dependency cycle *)
+let write_node ch txidaccess path node =
+	let value = Store.Node.get_value node in
+	let perms = Store.Node.get_perms node in
+	let path = Store.Path.of_path_and_name path (Symbol.to_string node.Store.Node.name) |> Store.Path.to_string in
+	LR.write_node_data ch ~txidaccess ~path ~value ~perms
+
+let split limit c s =
+	let limit = match limit with None -> 8 | Some x -> x in
+	String.split ~limit c s
+	
+exception Invalid_Cmd_Args
+let split_one_path data conpath =
+	let args = split (Some 2) '\000' data in
+	match args with
+	| path :: "" :: [] -> Store.Path.create path conpath
+	| _                -> raise Invalid_Cmd_Args
+	
+let dump base conpath ~conid txn ch =
+	(* TODO: implicit paths need to be converted to explicit *)
+	let txid = get_id txn in
+	LR.write_transaction_data ch ~conid ~txid;
+	let store = get_store txn in
+	let write_node_mkdir path =
+   let perms, value =	match Store.get_node store path with
+  | None -> Perms.Node.default0, "" (* need to dump mkdir anyway even if later deleted due to implicit path creation *)
+  | Some node -> Store.Node.get_perms node, Store.Node.get_value node (* not always "", e.g. on EEXIST *) in
+  LR.write_node_data ch ~txidaccess:(Some (conid, txid, LR.W)) ~path:(Store.Path.to_string path) ~value ~perms
+in
+	maybe (fun path ->
+		(* if there were any reads make sure the tree matches, remove all contents and write out subtree *)
+		match Store.get_node store path with
+		| None -> (* we've only read nodes that we ended up deleting, nothing to do *) ()
+		| Some node ->
+			write_node ch (Some (conid, txid, LR.Del)) (Store.Path.get_parent path) node;
+			let path = Store.Path.get_parent path in
+			Store.traversal node @@ fun path' node ->
+			write_node ch (Some (conid,txid, LR.R)) (List.append path path') node
+	) txn.read_lowpath;
+	(* we could do something similar for write_lowpath, but that would become 
+	 	 complicated to handle correctly wrt to permissions and quotas if there are nodes
+		 owned by other domains in the subtree.
+	*)
+	let ops = get_operations txn in
+	if ops <> [] then
+		(* mark that we had some operation, these could be failures, etc.
+			 we want to fail the transaction after a live-update,
+			 unless it is completely a no-op
+		 *)
+		let perms = Store.getperms store Perms.Connection.full_rights [] in
+		let value = Store.get_root store |> Store.Node.get_value in
+  	LR.write_node_data ch ~txidaccess:(Some (conid, txid, LR.R)) ~path:"/" ~value ~perms;
+	ListLabels.iter (fun (req, reply) ->
+		Logging.debug "transaction" "dumpop %s" (Xenbus.Xb.Op.to_string req.Packet.ty); 
+		let data = req.Packet.data in
+		let open Xenbus.Xb.Op in
+		match reply with
+		| Packet.Error _ -> ()
+		| _ ->
+		try match req.Packet.ty with
+| Debug
+| Watch
+| Unwatch
+| Transaction_start
+| Transaction_end
+| Introduce
+| Release
+| Watchevent
+| Getdomainpath
+| Error
+| Isintroduced
+| Resume
+| Set_target
+| Reset_watches
+| Invalid
+| Directory
+| (Read|Getperms) -> ()
+| (Write|Setperms) ->
+		(match (split (Some 2) '\000' data) with
+		| path :: _ :: _ ->
+	let path = Store.Path.create path conpath in
+	if req.Packet.ty = Write then
+  write_node_mkdir (Store.Path.get_parent path);(* implicit mkdir *)
+	(match Store.get_node store path with
+	| None -> ()
+	| Some node ->
+	write_node ch (Some (conid, txid, LR.W)) (Store.Path.get_parent path) node)
+	| _ -> raise Invalid_Cmd_Args)
+| Mkdir ->
+	let path = split_one_path data conpath in
+  write_node_mkdir  path;
+| Rm ->
+	let path = split_one_path data conpath |> Store.Path.to_string in
+	LR.write_node_data ch ~txidaccess:(Some (conid, txid, LR.Del)) ~path ~value:"" ~perms:Perms.Node.default0
+	with Invalid_Cmd_Args|Define.Invalid_path|Not_found-> ()
+	 ) ops

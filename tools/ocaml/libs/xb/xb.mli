@@ -59,7 +59,7 @@ exception Noent
 exception Invalid
 exception Reconnect
 type backend_mmap = {
-  mmap : Xenmmap.mmap_interface;
+  mmap : Xenmmap.t;
   eventchn_notify : unit -> unit;
   mutable work_again : bool;
 }
@@ -86,7 +86,7 @@ val output : t -> bool
 val input : t -> bool
 val newcon : backend -> t
 val open_fd : Unix.file_descr -> t
-val open_mmap : Xenmmap.mmap_interface -> (unit -> unit) -> t
+val open_mmap : Xenmmap.t -> (unit -> unit) -> t
 val close : t -> unit
 val is_fd : t -> bool
 val is_mmap : t -> bool
