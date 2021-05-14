@@ -109,13 +109,13 @@ let cleanup doms =
 		) doms.table;
 	List.iter (fun id ->
 		let dom = Hashtbl.find doms.table id in
-		Domain.close dom;
 		Hashtbl.remove doms.table id;
 		if dom.Domain.conflict_credit <= !Define.conflict_burst_limit
 		then (
 			remove_from_queue dom doms.doms_with_conflict_penalty;
 			if (dom.Domain.conflict_credit <= 0.) then remove_from_queue dom doms.doms_conflict_paused
-		)
+                );
+		Domain.close dom
 	) !dead_dom;
 	!notify, !dead_dom
 
