@@ -286,6 +286,43 @@ external version_capabilities: handle -> string =
 type featureset_index = Featureset_raw | Featureset_host | Featureset_pv | Featureset_hvm
 external get_cpu_featureset : handle -> featureset_index -> int64 array = "stub_xc_get_cpu_featureset"
 
+(* order must match the order in Val_cpuid_leaf *)
+type xen_cpuid_leaf = {
+  leaf: int64;
+  subleaf: int64;
+  a: int64;
+  b: int64;
+  c: int64;
+  d: int64;
+}
+
+(* order must match the order in Val_msr_entry *)
+type xen_msr_entry = {
+  idx: int64;
+  flags: int64;
+  value: int64; (* val is a keyword, using 'value' *)
+}
+
+type xen_cpu_policy = {
+  leaves: xen_cpuid_leaf array;
+  msrs: xen_msr_entry array;
+}
+
+(* must match XEN_SYSCTL_cpu_policy* order in xen/include/public/sysctl.h *)
+type xen_cpu_policy_index = Cpu_policy_raw | Cpu_policy_host | Cpu_policy_pv_max | Cpu_policy_hvm_max | Cpu_policy_pv_default | Cpu_policy_hvm_default
+
+let string_of_xen_cpu_policy_index = function
+  | Cpu_policy_raw -> "Raw"
+  | Cpu_policy_host -> "Host"
+  | Cpu_policy_pv_max -> "PV Max"
+  | Cpu_policy_hvm_max -> "HVM Max"
+  | Cpu_policy_pv_default -> "PV default"
+  | Cpu_policy_hvm_default -> "HVM default"
+
+external get_system_cpu_policy: handle -> xen_cpu_policy_index -> xen_cpu_policy = "stub_xc_get_system_cpu_policy"
+
+external cpu_policy_to_featureset: handle -> xen_cpu_policy -> int64 array = "stub_xc_policy_to_featureset"
+
 external watchdog : handle -> int -> int32 -> int
   = "stub_xc_watchdog"
 

@@ -3,7 +3,7 @@ XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
 CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
-CFLAGS += $(APPEND_CFLAGS)
+CFLAGS += $(APPEND_CFLAGS) -Wno-declaration-after-statement
 OCAMLINCLUDE += -I ../mmap
 
 OBJS = xenctrl

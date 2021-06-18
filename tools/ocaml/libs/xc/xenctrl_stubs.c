@@ -34,6 +34,9 @@
 #include <xenctrl.h>
 #include <xen-tools/libs.h>
 
+#include <xen/lib/x86/cpuid.h>
+#include <xen/lib/x86/msr.h>
+
 #include "mmap_stubs.h"
 
 #define PAGE_SHIFT		12
@@ -1214,6 +1217,198 @@ CAMLprim value stub_xc_watchdog(value xch, value domid, value timeout)
 		failwith_xc(_H(xch));
 
 	CAMLreturn(Val_int(ret));
+}
+
+static CAMLprim value Val_cpuid_leaf(const xen_cpuid_leaf_t *leaf)
+{
+    CAMLparam0();
+    CAMLlocal1(result);
+    result = caml_alloc_tuple(6);
+    Store_field(result, 0, caml_copy_int64(leaf->leaf));
+    Store_field(result, 1, caml_copy_int64(leaf->subleaf));
+    Store_field(result, 2, caml_copy_int64(leaf->a));
+    Store_field(result, 3, caml_copy_int64(leaf->b));
+    Store_field(result, 4, caml_copy_int64(leaf->c));
+    Store_field(result, 5, caml_copy_int64(leaf->d));
+
+    CAMLreturn(result);
+}
+
+static CAMLprim void cpuid_leaf_of_val(xen_cpuid_leaf_t *leaf, value v)
+{
+    CAMLparam1(v);
+    leaf->leaf = Int64_val(Field(v, 0));
+    leaf->subleaf = Int64_val(Field(v, 1));
+    leaf->a = Int64_val(Field(v, 2));
+    leaf->b = Int64_val(Field(v, 3));
+    leaf->c = Int64_val(Field(v, 4));
+    leaf->d = Int64_val(Field(v, 5));
+
+    CAMLreturn0;
+}
+
+static CAMLprim value Val_msr_entry(const xen_msr_entry_t *msr)
+{
+    CAMLparam0();
+    CAMLlocal1(result);
+    result = caml_alloc_tuple(3);
+    Store_field(result, 0, caml_copy_int64(msr->idx));
+    Store_field(result, 1, caml_copy_int64(msr->flags));
+    Store_field(result, 2, caml_copy_int64(msr->val));
+    CAMLreturn(result);
+}
+
+#if 0
+static CAMLprim void msr_entry_of_val(xen_msr_entry_t *msr, value v)
+{
+    CAMLparam1(v);
+    msr->idx = Int64_val(Field(v, 0));
+    msr->flags = Int64_val(Field(v, 1));
+    msr->val = Int64_val(Field(v, 2));
+    CAMLreturn0;
+}
+#endif
+
+static CAMLprim value Val_leaves(const xen_cpuid_leaf_t *leaves, uint32_t nr_leaves)
+{
+    CAMLparam0();
+    CAMLlocal1(result);
+    uint32_t i;
+
+    result = caml_alloc(nr_leaves, 0);
+    for (i=0;i<nr_leaves;i++)
+        Store_field(result, i, Val_cpuid_leaf(&leaves[i]));
+
+    CAMLreturn(result);
+}
+
+static CAMLprim value Val_msrs(const xen_msr_entry_t *msrs, uint32_t nr_msrs)
+{
+    CAMLparam0();
+    CAMLlocal1(result);
+
+    result = caml_alloc(nr_msrs, 0);
+    for (unsigned i=0;i<nr_msrs;i++)
+        Store_field(result, i, Val_msr_entry(&msrs[i]));
+    CAMLreturn(result);
+}
+
+static CAMLprim value Val_policy(const xen_cpuid_leaf_t *leaves, uint32_t nr_leaves, const xen_msr_entry_t *msrs, uint32_t nr_msrs)
+{
+    CAMLparam0();
+    CAMLlocal1(result);
+
+    result = caml_alloc_tuple(2);
+    Store_field(result, 0, Val_leaves(leaves, nr_leaves));
+    Store_field(result, 1, Val_msrs(msrs, nr_msrs));
+    CAMLreturn(result);
+}
+
+static void cpuid_policy_of_val(struct cpuid_policy *p, value policy)
+{
+    CAMLparam1(policy);
+    CAMLlocal1(cpu_policy);
+    uint32_t i;
+
+    cpu_policy = Field(policy, 0);
+
+    uint32_t nr_leaves = caml_array_length(cpu_policy);
+    xen_cpuid_leaf_t leaves[nr_leaves];
+    for (i=0;i<nr_leaves;i++)
+        cpuid_leaf_of_val(&leaves[i], Field(cpu_policy, i));
+
+
+    uint32_t err_leaf=0, err_subleaf=0;
+    int rc = x86_cpuid_copy_from_buffer(p, leaves, nr_leaves, &err_leaf, &err_subleaf);
+    if (rc)
+        caml_failwith("Failed to deserialize CPU policy"); /* TODO: err_leaf/err_subleaf */
+
+    CAMLreturn0;
+}
+
+#if 0
+static void msr_policy_of_val(struct msr_policy *p, value policy)
+{
+    CAMLparam1(policy);
+    CAMLlocal1(msr_policy);
+    uint32_t i;
+
+    msr_policy = Field(policy, 1);
+
+    uint32_t nr_msrs = caml_array_length(msr_policy);
+    xen_msr_entry_t msrs[nr_msrs];
+    for (i=0;i<nr_msrs;i++)
+        msr_entry_of_val(&msrs[i], Field(msr_policy, i));
+
+    uint32_t err_msr = 0;
+    int rc = x86_msr_copy_from_buffer(p, msrs, nr_msrs, &err_msr);
+    if (rc)
+        caml_failwith("Failed to deserialize CPU policy"); /* TODO: err_msr */
+
+    CAMLreturn0;
+}
+#endif
+
+CAMLprim value stub_xc_get_system_cpu_policy(value xch, value policy_kind)
+{
+    CAMLparam2(xch, policy_kind);
+    CAMLlocal1(result);
+
+    uint32_t max_leaves = 0, max_msrs = 0;
+
+    if (xc_cpu_policy_get_size(_H(xch), &max_leaves, &max_msrs))
+            failwith_xc(_H(xch));
+
+    xen_cpuid_leaf_t leaves[max_leaves];
+    xen_msr_entry_t msrs[max_msrs];
+    memset(leaves, 0, sizeof(leaves));
+    memset(msrs, 0, sizeof(msrs));
+
+    /* It'd be simpler if we could avoid this allocation here,
+       but the type is private */
+    xc_cpu_policy_t *policy = xc_cpu_policy_init();
+    if (!policy)
+        caml_raise_out_of_memory();
+
+    int rc;
+    rc = xc_cpu_policy_get_system(_H(xch), Int_val(policy_kind), policy) ||
+         xc_cpu_policy_serialise(_H(xch), policy, leaves, &max_leaves, msrs, &max_msrs);
+    xc_cpu_policy_destroy(policy);
+    if (rc)
+        failwith_xc(_H(xch));
+
+    result = Val_policy(leaves, max_leaves, msrs, max_msrs);
+    CAMLreturn(result);
+}
+
+CAMLprim value stub_xc_policy_to_featureset(value xch, value policy)
+{
+    CAMLparam2(xch, policy);
+    CAMLlocal1(result);
+    struct cpuid_policy p;
+
+    memset(&p, 0, sizeof(p));
+    cpuid_policy_of_val(&p, policy);
+
+    uint32_t fs_len;
+    int rc = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
+    if (rc)
+        failwith_xc(_H(xch));
+    /* xenctrl stub is statically linked, xenctrl is dynamically loaded,
+     * the 2 featureset lengths could be different, but fs_len should be the greater one.
+     * */
+    if (fs_len < FEATURESET_NR_ENTRIES)
+        caml_invalid_argument("cpuid_policy_to_featureset");
+
+    uint32_t featureset[fs_len];
+    memset(featureset, 0, sizeof(featureset));
+    cpuid_policy_to_featureset(&p, featureset);
+
+    result = caml_alloc(fs_len, 0);
+    for(unsigned i=0; i<fs_len; i++)
+        Store_field(result, i, caml_copy_int64(featureset[i]));
+
+    CAMLreturn(result);
 }
 
 /*

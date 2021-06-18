@@ -223,6 +223,77 @@ external version_capabilities : handle -> string
 type featureset_index = Featureset_raw | Featureset_host | Featureset_pv | Featureset_hvm
 external get_cpu_featureset : handle -> featureset_index -> int64 array = "stub_xc_get_cpu_featureset"
 
+(** CPUID takes a leaf (EAX) and optional subleaf (ECX) as input and
+    returns feature information bitset in 4 registers (EAX, EBX, ECX, EDX).
+    This record captures one such invocation of CPUID.
+
+    CPU manuals contain tables explaining the available leaves/subleaves and feature bits:
+
+        https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html
+          Intel® 64 and IA-32 architectures software developer's  manual volume 2A: Instruction set reference
+          Chapter 3.2, Table 3-8
+
+        https://developer.amd.com/resources/developer-guides-manuals/
+          AMD64 Architecture Programmer’s Manual Volume 3: General Purpose and System Instructions
+          Appendix D Instruction Subsets and CPUID Feature Flags
+ *)
+type xen_cpuid_leaf = {
+  leaf: int64; (** initial EAX value *)
+  subleaf: int64; (** initial ECX value *)
+  a: int64; (** EAX result *)
+  b: int64; (** EBX result *)
+  c: int64; (** ECX result *)
+  d: int64; (** EDX result *)
+}
+
+(** CPU Model Specific Registers control various aspects of CPU behaviour.
+
+    RDMSR takes ECX as input and returns its result in EDX:EAX.
+    This record captures one invocation of RDMSR.
+
+    CPU manuals document the available MSRs and feature bits
+
+       https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html
+         Intel® 64 and IA-32 architectures software developer's manual volume 4: Model-specific registers
+         Chapter 2, "Model-Specific Registers (MSRs)"
+
+       https://developer.amd.com/resources/developer-guides-manuals/
+         AMD64 Architecture Programmer’s Manual Volume 2: System Programming
+         Appendix A "MSR Cross-Reference"
+ *)
+type xen_msr_entry = {
+  idx: int64; (** MSR register - ECX input *)
+  flags: int64; (** reserved, must be zero *)
+  value: int64; (** EDX:EAX output *)
+}
+
+(** Xen CPU policy contains the CPUID features and MSRs visible in a domain.
+    The order of leaves and MSRs is not important, but entries cannot be duplicated.
+ *)
+type xen_cpu_policy = {
+  leaves: xen_cpuid_leaf array; (** Array of CPUID leaves/ *)
+  msrs: xen_msr_entry array; (** Array of MSRs *)
+}
+
+(** Xen CPU policy to query or set *)
+type xen_cpu_policy_index =
+  | Cpu_policy_raw (** as seen on boot *)
+  | Cpu_policy_host (** features implemented by the host *)
+  | Cpu_policy_pv_max (** maximum PV features that we can accept in a migration: either implemented natively or emulated *)
+  | Cpu_policy_hvm_max (** maximum HVM features that we can accept in a migration: either implemented natively or emulated *)
+  | Cpu_policy_pv_default (** default PV features for newly booted VMs *)
+  | Cpu_policy_hvm_default (** default HVM features for newly booted VMs *)
+
+(** [string_of_xen_cpu_policy_index policy_index] is the name of the [policy_index] policy *)
+val string_of_xen_cpu_policy_index : xen_cpu_policy_index -> string
+
+(** [get_system_cpu_policy xenctrlhandle policy_index] retrieves the [policy_index] policy from the running hypervisor *)
+external get_system_cpu_policy: handle -> xen_cpu_policy_index -> xen_cpu_policy = "stub_xc_get_system_cpu_policy"
+
+(** [cpu_policy_to_featureset xenctrlhandle policy] converts [policy] to a featureset for backwards compatibility
+    (e.g. accepting incoming migrations in xenopsd from a non-policy-aware xenopsd) *)
+external cpu_policy_to_featureset: handle -> xen_cpu_policy -> int64 array = "stub_xc_policy_to_featureset"
+
 external pages_to_kib : int64 -> int64 = "stub_pages_to_kib"
 val pages_to_mib : int64 -> int64
 external watchdog : handle -> int -> int32 -> int
