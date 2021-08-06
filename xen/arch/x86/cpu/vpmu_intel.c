@@ -743,12 +743,36 @@ static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             rdmsrl(msr, *msr_content);
         }
     }
-    else if ( msr == MSR_IA32_MISC_ENABLE )
-    {
+    else if (msr == MSR_IA32_MISC_ENABLE) {
         /* Extension for BTS */
         if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
             *msr_content &= ~MSR_IA32_MISC_ENABLE_BTS_UNAVAIL;
         *msr_content |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+    } else {
+        uint64_t tmp;
+        if ( rdmsr_safe(msr, tmp) )
+            return -EINVAL;
+
+        if ( is_hardware_domain(v) )
+            goto msr_read_ok;
+
+        switch(msr) {
+        case MSR_SMI_COUNT:
+            if ( vpmu_features & XENPMU_FEATURE_IPC_ONLY ) {
+                gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, tmp);
+                *msr_content = 0;
+                return 0;
+            }
+            break;
+        default:
+            ASSERT_UNREACHABLE();
+            *msr_content = 0;
+            return 0;
+        }
+
+msr_read_ok:
+        *msr_content = tmp;
+        vmx_clear_msr_intercept(v, msr, VMX_MSR_R);
     }
 
     return 0;

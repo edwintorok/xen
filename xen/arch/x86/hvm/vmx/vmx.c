@@ -3297,10 +3297,12 @@ static int cf_check vmx_msr_read_intercept(
     case MSR_IA32_DS_AREA:
     case MSR_CORE_PERF_GLOBAL_STATUS_SET:
     case MSR_IA32_PERF_GLOBAL_INUSE:
+    case MSR_SMI_COUNT:
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;
 
+        /* FALLTHROUGH */
     default:
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
