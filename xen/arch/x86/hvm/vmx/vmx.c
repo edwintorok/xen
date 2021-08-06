@@ -3302,6 +3302,7 @@ static int cf_check vmx_msr_read_intercept(
     case MSR_TEMPERATURE_TARGET:
     case MSR_IA32_MPERF...MSR_IA32_APERF:
     case MSR_IA32_PERF_CAPABILITIES:
+    case MSR_IA32_THERM_CONTROL: /* RAZ */
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;

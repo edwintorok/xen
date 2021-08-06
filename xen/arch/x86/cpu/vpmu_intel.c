@@ -779,6 +779,10 @@ static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             else
                 tmp = 0;
             break;
+        case MSR_IA32_THERM_STATUS...MSR_IA32_THERM_CONTROL:
+            gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, tmp);
+            *msr_content = 0;
+            return 0;
         default:
             ASSERT_UNREACHABLE();
             *msr_content = 0;
