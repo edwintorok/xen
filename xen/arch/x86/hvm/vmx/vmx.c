@@ -3289,8 +3289,8 @@ static int cf_check vmx_msr_read_intercept(
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
         /* Perhaps vpmu will change some bits. */
         /* FALLTHROUGH */
-    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
+    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR_LAST:
+    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL_LAST:
     case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
@@ -3579,8 +3579,8 @@ static int cf_check vmx_msr_write_intercept(
             goto gp_fault;
         break;
 
-    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(7):
+    case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR_LAST:
+    case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL_LAST:
     case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
