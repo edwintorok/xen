@@ -321,6 +321,10 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_IA32_THERM_STATUS:
         if ( cp->x86_vendor != X86_VENDOR_INTEL )
             goto gp_fault;
+        if ( vpmu_available(v) && (vpmu_features & XENPMU_FEATURE_FREQ) &&
+            !rdmsr_safe(msr, *val) )
+            break;
+        gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0", msr);
         *val = 0;
         break;
 

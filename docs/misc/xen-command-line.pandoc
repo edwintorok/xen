@@ -2639,7 +2639,7 @@ provide access to a wealth of low level processor information.
 
     When enabled, guests have full access to all performance counter settings,
     including model specific functionality.  This is a superset of the
-    functionality offered by `ipc` and/or `arch`, but a subset of the
+    functionality offered by `ipc` and/or `arch` and `freq`, but a subset of the
     functionality offered by `bts`.
 
     Xen's watchdog functionality is implemented using performance counters.
@@ -2659,6 +2659,10 @@ provide access to a wealth of low level processor information.
 *   The `arch` option allows access to the pre-defined architectural events.
 
 *   The `rtm-abort` boolean has been superseded.  Use `tsx=0` instead.
+
+*   The `freq` option enables monitoring the CPU's frequency, and information
+    on why it did / did not change, such as turbo state, and temperature.
+    Intel-only.
 
 *Warning:*
 As the virtualisation is not 100% safe, don't use the vpmu flag on

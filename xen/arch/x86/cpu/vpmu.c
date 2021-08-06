@@ -72,6 +72,8 @@ static int __init cf_check parse_vpmu_params(const char *s)
             opt_vpmu_enabled = val;
             if ( !val )
                 vpmu_features = 0;
+            else
+                vpmu_features = XENPMU_FEATURES_TURBO;
         }
         else if ( !cmdline_strcmp(s, "bts") )
             vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
@@ -79,6 +81,8 @@ static int __init cf_check parse_vpmu_params(const char *s)
             vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
         else if ( !cmdline_strcmp(s, "arch") )
             vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+        else if ( !cmdline_strcmp(s, "freq") )
+            vpmu_features |= XENPMU_FEATURES_FREQ;
         else if ( (val = parse_boolean("rtm-abort", s, ss)) >= 0 )
             printk(XENLOG_WARNING
                    "'rtm-abort=<bool>' superseded.  Use 'tsx=<bool>' instead\n");

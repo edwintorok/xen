@@ -3298,6 +3298,8 @@ static int cf_check vmx_msr_read_intercept(
     case MSR_CORE_PERF_GLOBAL_STATUS_SET:
     case MSR_IA32_PERF_GLOBAL_INUSE:
     case MSR_SMI_COUNT:
+    case MSR_TURBO_RATIO_LIMIT...MSR_TURBO_RATIO_LIMIT2:
+    case MSR_TEMPERATURE_TARGET:
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;
