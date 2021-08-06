@@ -1115,9 +1115,37 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             *res = EMPTY_LEAF;
         else
         {
-            /* Report at most v3 since that's all we currently emulate. */
-            if ( (res->a & 0xff) > 3 )
-                res->a = (res->a & ~0xff) | 3;
+            struct {
+                uint8_t version;
+                uint8_t general_nr;
+                uint8_t general_width;
+                uint8_t arch_nr;
+            } eax;
+
+            BUILD_BUG_ON(sizeof(eax) == sizeof(res->a));
+            memcpy(&eax, &res->a, sizeof(eax));
+
+            /* Report at most VPMU_VERSION_MAX since that's all we currently emulate. */
+            if ( eax.version >  VPMU_VERSION_MAX) {
+                gdprintk(XENLOG_WARNING, "Limiting PMU version to %d (actual %d)", VPMU_VERSION_MAX, eax.version);
+                eax.version = VPMU_VERSION_MAX;
+            }
+
+            if ( eax.general_nr > MSR_P6_PERFCTR_MAX) {
+                gdprintk(XENLOG_WARNING "Limiting general purpose PMU count to %d (actual %d)", MSR_P6_PERFCTR_MAX, eax.general_nr);
+                eax.general_nr = MSR_P6_PERFCTR_MAX;
+            }
+
+            if ( vpmu.features & (XENPMU_FEATURE_IPC_ONLY |
+                                 XENPMU_FEATURE_ARCH_ONLY) ) {
+                unsigned limit = ( vpmu.features & XENPMU_FEATURE_ARCH_ONLY ) ? VPMU_ARCH_EVENTS_MAX : VPMU_IPC_EVENTS_MAX;
+                if (limit < eax.arch_nr) {
+                    gdprintk(XENLOG_WARNING "Limiting architectural PMU events to %d (actual %d)", eax.arch_nr);
+                    eax.arch_nr = limit;
+                }
+            }
+            memcpy(&res->a, &eax, sizeof(res->a));
+
         }
         break;
 
