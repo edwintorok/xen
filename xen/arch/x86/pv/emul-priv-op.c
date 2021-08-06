@@ -998,6 +998,9 @@ static int cf_check read_msr(
         }
         /* fall through */
     default:
+        if ( is_hwdom_pinned_vcpu(curr) && !rdmsr_safe(reg, *val) )
+            return X86EMUL_OKAY;
+
         if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, tmp) )
         {
             *val = 0;

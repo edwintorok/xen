@@ -1969,6 +1969,9 @@ static int cf_check svm_msr_read_intercept(
         break;
 
     default:
+        if ( is_hwdom_pinned_vcpu(v) && !rdmsr_safe(msr, *msr_content) )
+            break;
+
         if ( d->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
         {
             *msr_content = 0;
