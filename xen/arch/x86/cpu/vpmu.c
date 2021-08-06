@@ -161,8 +161,10 @@ int vpmu_do_msr(unsigned int msr, uint64_t *msr_content, bool is_write)
     return ret;
 
  nop:
-    if ( !is_write && (msr != MSR_IA32_MISC_ENABLE) )
+    if ( !is_write && (msr != MSR_IA32_MISC_ENABLE) ) {
+        dprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, *msr_content);
         *msr_content = 0;
+    }
 
     return 0;
 }
