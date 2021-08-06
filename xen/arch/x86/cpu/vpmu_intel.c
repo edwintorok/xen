@@ -928,19 +928,10 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     if ( current_cpu_data.cpuid_level >= 0xa )
         version = MASK_EXTR(cpuid_eax(0xa), PMU_VERSION_MASK);
 
-    switch ( version )
-    {
-    case 4:
-    case 5:
+    if (version > PMU_VERSION_MAX) {
         printk(XENLOG_INFO "VPMU: PMU version %u is not fully supported. "
-               "Emulating version 3\n", version);
-        /* FALLTHROUGH */
-
-    case 2:
-    case 3:
-        break;
-
-    default:
+               "Emulating version %d\n", version, PMU_VERSION_MAX);
+    } else if (version < 2) {
         printk(XENLOG_WARNING "VPMU: PMU version %u is not supported\n",
                version);
         return ERR_PTR(-EINVAL);
