@@ -766,6 +766,7 @@ static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             break;
         case MSR_TURBO_RATIO_LIMIT...MSR_TURBO_RATIO_LIMIT2:
         case MSR_TEMPERATURE_TARGET:
+        case MSR_IA32_MPERF...MSR_IA32_APERF:
             if ( !(vpmu_features & XENPMU_FEATURE_FREQ) ) {
                 gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, tmp);
                 *msr_content = 0;
