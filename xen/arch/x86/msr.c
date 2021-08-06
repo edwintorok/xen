@@ -334,6 +334,14 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = 0;
         break;
 
+    case MSR_IA32_PERF_CAPABILITIES:
+        if ( cp->x86_vendor != X86_VENDOR_INTEL )
+            goto gp_fault;
+        if ( !cp->basic.pdcm || rdmsr_safe(msr, *val) )
+            goto gp_fault;
+        *val &= (MSR_IA32_PERF_CAP_LBR_FORMAT | MSR_IA32_PERF_CAP_FREEZE_WHILE_SMM | MSR_IA32_PERF_CAP_FULLWIDTH_PMC);
+        break;
+
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )
             goto gp_fault;
