@@ -666,6 +666,7 @@ static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 case 0x412e:	/* Last Level Cache Misses */
                 case 0x00c4:	/* Branch Instructions Retired */
                 case 0x00c5:	/* All Branch Mispredict Retired */
+                case 0x01a4:	/* Topdown Slots */
                     blocked = 0;
                     break;
                }
