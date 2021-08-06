@@ -83,6 +83,8 @@ static int __init cf_check parse_vpmu_params(const char *s)
             vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
         else if ( !cmdline_strcmp(s, "temp") )
             vpmu_features |= XENPMU_FEATURE_TEMP;
+        else if ( !cmdline_strcmp(s, "topo") )
+            vpmu_features |= XENPMU_FEATURE_TOPO;
         else if ( (val = parse_boolean("rtm-abort", s, ss)) >= 0 )
             printk(XENLOG_WARNING
                    "'rtm-abort=<bool>' superseded.  Use 'tsx=<bool>' instead\n");

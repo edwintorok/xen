@@ -278,7 +278,8 @@ static void recalculate_misc(struct cpuid_policy *p)
     p->basic.raw[0x8] = EMPTY_LEAF;
 
     /* TODO: Rework topology logic. */
-    memset(p->topo.raw, 0, sizeof(p->topo.raw));
+    if ( vpmu_mode == XENPMU_MODE_ALL || (vpmu_features & XENPMU_FEATURE_TOPO) )
+        memset(p->topo.raw, 0, sizeof(p->topo.raw));
 
     p->basic.raw[0xc] = EMPTY_LEAF;
 
