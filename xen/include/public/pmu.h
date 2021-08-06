@@ -93,10 +93,14 @@ DEFINE_XEN_GUEST_HANDLE(xen_pmu_params_t);
  *                              Architectural Performance Events exposed by
  *                              cpuid and listed in the Intel developer's manual
  *                              (ignored on AMD).
+ * - XENPMU_FEATURE_TEMP :      Expose temperatures.
+ *                              (ignored on AMD).
  */
 #define XENPMU_FEATURE_INTEL_BTS  (1<<0)
 #define XENPMU_FEATURE_IPC_ONLY   (1<<1)
 #define XENPMU_FEATURE_ARCH_ONLY  (1<<2)
+#define XENPMU_FEATURE_TEMP       (1<<3)
+#define XENPMU_FEATURE_TOPO       (1<<4)
 
 /*
  * Shared PMU data between hypervisor and PV(H) domains.
