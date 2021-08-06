@@ -287,6 +287,10 @@ static void recalculate_misc(struct cpuid_policy *p)
 
     p->extd.raw[0x8].d = 0;
 
+    if ( vpmu_mode == XENPMU_MODE_OFF ||
+        (vpmu_features & (XENPMU_FEATURE_IPC_ONLY | XENPMU_FEATURE_ARCH_ONLY)) )
+            p->basic.pdcm = 0;
+
     switch ( p->x86_vendor )
     {
     case X86_VENDOR_INTEL:

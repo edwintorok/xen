@@ -234,6 +234,7 @@
 #define MSR_IA32_PERF_CAPABILITIES	0x00000345
 /* Lower 6 bits define the format of the address in the LBR stack */
 #define MSR_IA32_PERF_CAP_LBR_FORMAT	0x3f
+#define MSR_IA32_PERF_CAP_FULLWIDTH	(1ULL << 13)
 
 #define MSR_IA32_BNDCFGS		0x00000d90
 #define IA32_BNDCFGS_ENABLE		0x00000001
