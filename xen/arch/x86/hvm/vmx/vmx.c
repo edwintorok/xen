@@ -3503,6 +3503,10 @@ static int cf_check vmx_msr_write_intercept(
                           IA32_DEBUGCTLMSR_BTS_OFF_USR);
         }
 
+        if (v->arch.basic.pmu_version >= 2 && cpu_has(&current_cpu_data, X86_FEATURE_PDCM)) {
+            rsvd &= ~(IA32_DEBUGCTLMSR_FREEZE_LBRS | IA32_DEBUGCTL_MSR_FREEZE_PERFMON);
+        }
+
         if ( cp->feat.rtm )
             rsvd &= ~IA32_DEBUGCTLMSR_RTM;
 
