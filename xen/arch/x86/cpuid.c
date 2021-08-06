@@ -307,9 +307,10 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.raw[0x8].c = 0;
 
         /* TODO: should be based on policy too! */
-        if ( (vpmu_features & XENPMU_FEATURE_FREQ) &&
-             cpu_has_aperfmperf )
-            p->basic.raw[0x6].c |= CPUID6_ECX_APERFMPERF_CAPABILITY;
+        if ( (vpmu_features & XENPMU_FEATURE_FREQ) ) {
+            p->basic.aperfmperf = cpu_has_aperfmperf;
+            p->basic.turbo = boot_cpu_has(X86_FEATURE_TURBO);
+        }
 
         break;
 

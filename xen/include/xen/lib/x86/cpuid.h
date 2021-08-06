@@ -18,6 +18,8 @@
 #define FEATURESET_e21a  11 /* 0x80000021.eax      */
 #define FEATURESET_7b1   12 /* 0x00000007:1.ebx    */
 #define FEATURESET_7d2   13 /* 0x00000007:2.edx    */
+#define FEATURESET_06a   14 /* 0x80000006.eax      */
+#define FEATURESET_06c   15 /* 0x80000006.ecx      */
 
 struct cpuid_leaf
 {
@@ -139,7 +141,19 @@ struct cpuid_policy
             uint64_t :64, :64; /* Leaf 0x3 - PSN. */
             uint64_t :64, :64; /* Leaf 0x4 - Structured Cache. */
             uint64_t :64, :64; /* Leaf 0x5 - MONITOR. */
-            uint64_t :64, :64; /* Leaf 0x6 - Therm/Perf. */
+
+            /* Leaf 0x6 - Therm/Perf. */
+            union {
+                uint32_t _06a;
+                struct { DECL_BITFIELD(6a); };
+            };
+            uint32_t :32; /* ebx */
+            union {
+                uint32_t _06c;
+                struct { DECL_BITFIELD(6c); };
+            };
+            uint32_t :32; /* edx */
+
             uint64_t :64, :64; /* Leaf 0x7 - Structured Features. */
             uint64_t :64, :64; /* Leaf 0x8 - rsvd */
             uint64_t :64, :64; /* Leaf 0x9 - DCA */
@@ -341,8 +355,14 @@ static inline void cpuid_policy_to_featureset(
     fs[FEATURESET_7d0] = p->feat._7d0;
     fs[FEATURESET_7a1] = p->feat._7a1;
     fs[FEATURESET_e21a] = p->extd.e21a;
+<<<<<<< HEAD
     fs[FEATURESET_7b1] = p->feat._7b1;
     fs[FEATURESET_7d2] = p->feat._7d2;
+||||||| parent of d4716cecc7 (Add mperfaperf to policy)
+=======
+    fs[FEATURESET_06a] = p->feat._06a;
+    fs[FEATURESET_06c] = p->feat._06c;
+>>>>>>> d4716cecc7 (Add mperfaperf to policy)
 }
 
 /* Fill in a CPUID policy from a featureset bitmap. */
@@ -361,8 +381,14 @@ static inline void cpuid_featureset_to_policy(
     p->feat._7d0  = fs[FEATURESET_7d0];
     p->feat._7a1  = fs[FEATURESET_7a1];
     p->extd.e21a  = fs[FEATURESET_e21a];
+<<<<<<< HEAD
     p->feat._7b1  = fs[FEATURESET_7b1];
     p->feat._7d2  = fs[FEATURESET_7d2];
+||||||| parent of d4716cecc7 (Add mperfaperf to policy)
+=======
+    p->feat._06a  = fs[FEATURESET_06a];
+    p->feat._06c  = fs[FEATURESET_06c];
+>>>>>>> d4716cecc7 (Add mperfaperf to policy)
 }
 
 static inline uint64_t cpuid_policy_xcr0_max(const struct cpuid_policy *p)

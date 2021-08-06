@@ -311,6 +311,13 @@ XEN_CPUFEATURE(RRSBA_CTRL,         13*32+ 2) /*   MSR_SPEC_CTRL.RRSBA_DIS_* */
 XEN_CPUFEATURE(BHI_CTRL,           13*32+ 4) /*   MSR_SPEC_CTRL.BHI_DIS_S */
 XEN_CPUFEATURE(MCDT_NO,            13*32+ 5) /*A  MCDT_NO */
 
+/* Intel-defined CPU features, CPUID level 0x00000006:eax, word 12 */
+XEN_CPUFEATURE(TURBO,	    13*32+ 1) /*A   Intel Turbo Boost Technology available */
+
+/* Intel-defined CPU features, CPUID level 0x00000006:ecx, word 13 */
+XEN_CPUFEATURE(APERFMPERF,  12*32+ 0) /*A   Hardware Coordination Feedback Capability */
+
+
 #endif /* XEN_CPUFEATURE */
 
 /* Clean up from a default include.  Close the enum (for C). */
