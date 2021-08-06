@@ -342,11 +342,11 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_AMD64_MPERF_RO...MSR_AMD64_APERF_RO:
         if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.efro )
             goto gp_fault;
+        svm_intercept_msr(v, MSR_AMD64_MPERF_RO, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_APERF_RO, MSR_INTERCEPT_WRITE);
         /* fall-through */
     case MSR_IA32_MPERF...MSR_IA32_APERF:
-        if ( cpu_has_aperfmperf &&
-             ( is_hardware_domain(d) || vpmu_available(v) ) &&
-             rdmsr_safe(msr, *val) == 0 )
+        if ( cp->basic.aperfmperf && vpmu_do_rdmsr(msr, val) == 0 )
             break;
         goto gp_fault;
 

@@ -254,6 +254,9 @@ static void core2_vpmu_set_msr_bitmap(struct vcpu *v)
 
     if ( vpmu_version >= 4 )
         vmx_clear_msr_intercept(v, MSR_CORE_PERF_GLOBAL_STATUS, VMX_MSR_R);
+
+    vmx_clear_msr_intercept(v, MSR_IA32_MPERF, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_IA32_APERF, VMX_MSR_RW);
 }
 
 static void core2_vpmu_unset_msr_bitmap(struct vcpu *v)
@@ -279,6 +282,9 @@ static void core2_vpmu_unset_msr_bitmap(struct vcpu *v)
 
     if ( vpmu_version >= 4 )
         vmx_set_msr_intercept(v, MSR_CORE_PERF_GLOBAL_STATUS, VMX_MSR_R);
+
+    vmx_set_msr_intercept(v, MSR_IA32_MPERF, VMX_MSR_RW);
+    vmx_set_msr_intercept(v, MSR_IA32_APERF, VMX_MSR_RW);
 }
 
 static inline void __core2_vpmu_save(struct vcpu *v)
@@ -296,6 +302,12 @@ static inline void __core2_vpmu_save(struct vcpu *v)
 
     if ( !is_hvm_vcpu(v) || vpmu_version >= 4 )
         rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        rdmsrl(MSR_IA32_MPERF, core2_vpmu_cxt->mperf);
+        rdmsrl(MSR_IA32_APERF, core2_vpmu_cxt->aperf);
+    }
 }
 
 static int core2_vpmu_save(struct vcpu *v, bool_t to_guest)
@@ -364,6 +376,12 @@ static inline void __core2_vpmu_load(struct vcpu *v)
             wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, reset);
         if ( global_status )
             wrmsrl(MSR_CORE_PERF_GLOBAL_STATUS_SET, global_status);
+    }
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        wrmsrl(MSR_IA32_MPERF, core2_vpmu_cxt->mperf);
+        wrmsrl(MSR_IA32_APERF, core2_vpmu_cxt->aperf);
     }
 }
 

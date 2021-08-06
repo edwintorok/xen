@@ -169,6 +169,12 @@ static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
         svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_WRITE);
     }
 
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        svm_intercept_msr(v, MSR_IA32_APERF, MSR_INTERCEPT_NONE);
+        svm_intercept_msr(v, MSR_IA32_MPERF, MSR_INTERCEPT_NONE);
+    }
+
     msr_bitmap_on(vpmu);
 }
 
@@ -181,6 +187,12 @@ static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
     {
         svm_intercept_msr(v, counters[i], MSR_INTERCEPT_RW);
         svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_RW);
+    }
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        svm_intercept_msr(v, MSR_IA32_APERF, MSR_INTERCEPT_RW);
+        svm_intercept_msr(v, MSR_IA32_MPERF, MSR_INTERCEPT_RW);
     }
 
     msr_bitmap_off(vpmu);
@@ -203,6 +215,12 @@ static inline void context_load(struct vcpu *v)
     {
         wrmsrl(counters[i], counter_regs[i]);
         wrmsrl(ctrls[i], ctrl_regs[i]);
+    }
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        wrmsrl(MSR_IA32_MPERF, ctxt->mperf);
+        wrmsrl(MSR_IA32_APERF, ctxt->aperf);
     }
 }
 
@@ -278,6 +296,12 @@ static inline void context_save(struct vcpu *v)
     /* No need to save controls -- they are saved in amd_vpmu_do_wrmsr */
     for ( i = 0; i < num_counters; i++ )
         rdmsrl(counters[i], counter_regs[i]);
+
+    if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_APERFMPERF) )
+    {
+        rdmsrl(MSR_IA32_MPERF, ctxt->mperf);
+        rdmsrl(MSR_IA32_APERF, ctxt->aperf);
+    }
 }
 
 static int amd_vpmu_save(struct vcpu *v,  bool_t to_guest)

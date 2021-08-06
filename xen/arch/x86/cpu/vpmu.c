@@ -466,6 +466,9 @@ static int vpmu_arch_initialise(struct vcpu *v)
     if ( !vpmu_available(v) )
         return 0;
 
+    if ( v->domain->arch.cpuid->basic.aperfmperf )
+        vpmu_set(vpmu, VPMU_CPU_HAS_APERFMPERF);
+
     switch ( vendor )
     {
     case X86_VENDOR_AMD:

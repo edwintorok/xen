@@ -27,7 +27,6 @@
 #define CPUID5_ECX_INTERRUPT_BREAK      0x2
 
 #define CPUID_PM_LEAF                    6
-#define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1

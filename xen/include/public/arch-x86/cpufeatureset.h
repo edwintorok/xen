@@ -286,6 +286,10 @@ XEN_CPUFEATURE(FSRCS,        10*32+12) /*A  Fast Short REP CMPSB/SCASB */
 /* AMD-defined CPU features, CPUID level 0x80000021.eax, word 11 */
 XEN_CPUFEATURE(LFENCE_DISPATCH,    11*32+ 2) /*A  LFENCE always serializing */
 
+/* Intel-defined CPU features, CPUID level 0x00000006:ecx, word 12 */
+XEN_CPUFEATURE(APERFMPERF,  12*32+ 0) /*A   Hardware Coordination Feedback Capability */
+
+
 #endif /* XEN_CPUFEATURE */
 
 /* Clean up from a default include.  Close the enum (for C). */
