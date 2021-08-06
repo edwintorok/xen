@@ -79,7 +79,7 @@ static bool_t __read_mostly full_width_write;
 #define ARCH_CNTR_PIN_CONTROL (1ULL << 19)
 
 /* Number of general-purpose and fixed performance counters */
-static unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
+unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
 
 /* Masks used for testing whether and MSR is valid */
 #define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21) | ARCH_CNTR_PIN_CONTROL)

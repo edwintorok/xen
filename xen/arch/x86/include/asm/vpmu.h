@@ -85,6 +85,8 @@ struct vpmu_struct {
 #define VPMU_CPU_HAS_DS                     0x1000 /* Has Debug Store */
 #define VPMU_CPU_HAS_BTS                    0x2000 /* Has Branch Trace Store */
 
+#define VPMU_VERSION_MAX                    0x3
+
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {
     vpmu->flags |= mask;
@@ -129,6 +131,8 @@ static inline int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
 extern unsigned int vpmu_mode;
 extern unsigned int vpmu_features;
+extern unsigned int arch_pmc_cnt;
+extern unsigned int fixed_pmc_cnt;
 
 /* Context switch */
 static inline void vpmu_switch_from(struct vcpu *prev)

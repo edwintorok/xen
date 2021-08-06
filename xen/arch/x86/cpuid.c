@@ -1094,9 +1094,42 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             *res = EMPTY_LEAF;
         else
         {
-            /* Report at most v3 since that's all we currently emulate. */
-            if ( (res->a & 0xff) > 3 )
-                res->a = (res->a & ~0xff) | 3;
+            union {
+                uint32_t eax;
+                struct {
+                    uint8_t version;
+                    uint8_t general_nr;
+                    uint8_t general_width;
+                    uint8_t arch_nr;
+                };
+            } u;
+            u.eax = res->a;
+
+            /* Report at most VPMU_VERSION_MAX since that's all we currently emulate. */
+            if ( u.version >  VPMU_VERSION_MAX ) {
+                gdprintk(XENLOG_WARNING, "Limiting PMU version to %d (actual %d)", VPMU_VERSION_MAX, u.version);
+                u.version = VPMU_VERSION_MAX;
+            }
+
+            if ( u.general_nr > arch_pmc_cnt ) {
+                gdprintk(XENLOG_WARNING, "Limiting general purpose PMU count to %d (actual %d)", arch_pmc_cnt, u.general_nr);
+                u.general_nr = arch_pmc_cnt;
+            }
+
+            if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY |
+                                  XENPMU_FEATURE_ARCH_ONLY) ) {
+                unsigned limit = ( vpmu_features & XENPMU_FEATURE_ARCH_ONLY ) ? 7 : 3;
+                if (limit < u.arch_nr) {
+                    gdprintk(XENLOG_WARNING, "Limiting architectural PMU events to %d (actual %d)", limit, u.arch_nr);
+                    u.arch_nr = limit;
+                }
+            }
+
+            res->a = u.eax;
+
+            /* We only implement 3 fixed function counters */
+            if ( (res->d & 0x1f) > fixed_pmc_cnt )
+                res->d = (res->d & ~0x1f) | fixed_pmc_cnt;
         }
         break;
 
