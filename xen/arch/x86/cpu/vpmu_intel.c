@@ -192,6 +192,7 @@ static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
     case MSR_CORE_PERF_GLOBAL_CTRL:
     case MSR_CORE_PERF_GLOBAL_STATUS:
     case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+    case MSR_IA32_PERF_GLOBAL_INUSE:
         *type = MSR_TYPE_GLOBAL;
         return 1;
 
@@ -570,6 +571,10 @@ static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
         return -EINVAL;
+    case MSR_CORE_PERF_GLOBAL_INUSE:
+        gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
+                 "MSR_PERF_GLOBAL_INUSE(0x392)!\n");
+        return -EINVAL;
     case MSR_IA32_PEBS_ENABLE:
         if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY |
                               XENPMU_FEATURE_ARCH_ONLY) )
@@ -721,6 +726,10 @@ static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             else
                 rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, *msr_content);
             break;
+        case MSR_CORE_PERF_GLOBAL_INUSE:
+            if ( v->domain->arch.cpuid->basic.pmu_version < 4 )
+                return -EINVAL;
+            /* FALLTHROUGH */
         default:
             rdmsrl(msr, *msr_content);
         }
