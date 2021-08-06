@@ -999,9 +999,15 @@ static int cf_check read_msr(
         }
         /* fall through */
     default:
-        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, tmp) )
+        if ( (currd->arch.msr_relaxed || is_hwdom_pinned_vcpu(v)) &&
+             !rdmsr_safe(reg, tmp) )
         {
-            *val = 0;
+            if (currd->arch.msr_relaxed) {
+                gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, tmp);
+                *val = 0;
+            } else {
+                *val = tmp;
+            }
             return X86EMUL_OKAY;
         }
 
