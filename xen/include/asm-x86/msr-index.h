@@ -488,8 +488,11 @@
 #define MSR_IA32_PSR_MBA_MASK(n)	(0x00000d50 + (n))
 
 /* Intel Model 6 */
+#define MSR_P6_PERFCTR_MAX		8
 #define MSR_P6_PERFCTR(n)		(0x000000c1 + (n))
 #define MSR_P6_EVNTSEL(n)		(0x00000186 + (n))
+#define MSR_P6_PERFCTR_LAST		MSR_P6_PERFCTR(MSR_P6_PERFCTR_MAX-1)
+#define MSR_P6_EVNTSEL_LAST		MSR_P6_EVNTSEL(MSR_P6_PERFCTR_MAX-1)
 
 /* P4/Xeon+ specific */
 #define MSR_IA32_MCG_EAX		0x00000180
