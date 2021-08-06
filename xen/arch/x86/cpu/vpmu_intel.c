@@ -957,6 +957,13 @@ int __init core2_vpmu_init(void)
          */
         global_ovf_ctrl_mask &= ~(1ULL << 61);
 
+    if ( version >= 4)
+        /* On PMU version 4 bits 58 and 59 are defined in
+         * IA32_PERF_GLOBAL_STATUS_RESET (same MSR as IA32_PERF_GLOBAL_STATUS).
+         * Also allow clearing overflow for processor trace, even if we don't support it yet.
+         * */
+        global_ovf_ctrl_mask &= ~((3ULL << 58) | (1ULL << 55));
+
     regs_sz = (sizeof(struct xen_pmu_intel_ctxt) - regs_off) +
               sizeof(uint64_t) * fixed_pmc_cnt +
               sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt;
