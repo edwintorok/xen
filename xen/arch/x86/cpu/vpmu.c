@@ -465,6 +465,8 @@ static int vpmu_arch_initialise(struct vcpu *v)
     if ( !vpmu_available(v) || vpmu_mode == XENPMU_MODE_OFF )
         return 0;
 
+    if ( v->domain->arch.cpuid->basic.aperfmperf )
+        vpmu_set(vpmu, VPMU_CPU_HAS_APERFMPERF);
     if ( !opt_vpmu_enabled )
     {
         if ( vpmu_mode != XENPMU_MODE_OFF )

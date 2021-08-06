@@ -272,6 +272,8 @@ static void recalculate_misc(struct cpuid_policy *p)
 
     p->basic.raw[0x5] = EMPTY_LEAF; /* MONITOR not exposed to guests. */
     p->basic.raw[0x6] = EMPTY_LEAF; /* Therm/Power not exposed to guests. */
+    /* will be hidden in recalculate_cpuid_policy if vpmu is off */
+    p->basic.aperfmperf = cpu_has_aperfmperf;
 
     p->basic.raw[0x8] = EMPTY_LEAF;
 
@@ -384,6 +386,7 @@ static void __init calculate_host_policy(void)
     /* When vPMU is disabled, drop it from the host policy. */
     if ( vpmu_mode == XENPMU_MODE_OFF ) {
         p->basic.raw[0xa] = EMPTY_LEAF;
+        p->basic.raw[0x6] = EMPTY_LEAF;
         p->basic.pdcm = 0;
     }
 
@@ -756,11 +759,14 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( vpmu_mode == XENPMU_MODE_OFF ||
          ((vpmu_mode & XENPMU_MODE_ALL) && !is_hardware_domain(d)) )
+    {
         p->basic.raw[0xa] = EMPTY_LEAF;
+        p->basic.raw[0x6] = EMPTY_LEAF;
         p->basic.pdcm = 0;
     }
     if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY | XENPMU_FEATURE_ARCH_ONLY) )
         p->basic.pdcm = 0;
+    }
 
     if ( !p->extd.svm )
         p->extd.raw[0xa] = EMPTY_LEAF;

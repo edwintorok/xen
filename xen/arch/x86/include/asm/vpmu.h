@@ -85,6 +85,8 @@ struct vpmu_struct {
 #define VPMU_CPU_HAS_DS                     0x1000 /* Has Debug Store */
 #define VPMU_CPU_HAS_BTS                    0x2000 /* Has Branch Trace Store */
 
+#define VPMU_CPU_HAS_APERFMPERF             0x400 /* APERF/MPERF */
+
 #define VPMU_VERSION_MAX                    0x5
 #define VPMU_VERSION_MAX_SUPPORTED          0x5
 

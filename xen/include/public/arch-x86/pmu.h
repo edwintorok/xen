@@ -24,7 +24,6 @@
 #define __XEN_PUBLIC_ARCH_X86_PMU_H__
 
 /* x86-specific PMU definitions */
-
 /* AMD PMU registers and structures */
 struct xen_pmu_amd_ctxt {
     /*
@@ -33,6 +32,8 @@ struct xen_pmu_amd_ctxt {
      */
     uint32_t counters;
     uint32_t ctrls;
+    uint64_t mperf;
+    uint64_t aperf;
 
     /* Counter MSRs */
     uint64_t regs[XEN_FLEX_ARRAY_DIM];
@@ -65,6 +66,8 @@ struct xen_pmu_intel_ctxt {
     uint64_t ds_area;
     uint64_t pebs_enable;
     uint64_t debugctl;
+    uint64_t mperf;
+    uint64_t aperf;
 
     /* Fixed and architectural counter MSRs */
     uint64_t regs[XEN_FLEX_ARRAY_DIM];

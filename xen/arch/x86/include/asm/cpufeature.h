@@ -23,7 +23,6 @@
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
 #define CPUID_PM_LEAF                    6
-#define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1
