@@ -946,6 +946,12 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     }
 
     fixed_pmc_cnt = core2_get_fixed_pmc_count();
+#define PERF_FIXED_CTR_MAX (MSR_CORE_PERF_FIXED_CTRn - MSR_CORE_PERF_FIXED_CTR0 + 1)
+    if ( fixed_pmc_cnt > PERF_FIXED_CTR_MAX )
+    {
+        printk(XENLOG_INFO "VPMU: limiting fixed perf counters to %d\n", PERF_FIXED_CTR_MAX);
+        fixed_pmc_cnt = PERF_FIXED_CTR_MAX;
+    }
 
     if ( cpu_has_pdcm )
     {
