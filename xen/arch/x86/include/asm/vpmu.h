@@ -135,6 +135,8 @@ extern unsigned int vpmu_features;
 extern unsigned int arch_pmc_cnt;
 extern unsigned int fixed_pmc_cnt;
 
+extern bool unsafe_vpmu_uncore_passthrough;
+
 /* Context switch */
 static inline void vpmu_switch_from(struct vcpu *prev)
 {
@@ -184,6 +186,8 @@ static inline int vpmu_allocate_context(struct vcpu *v)
 
 #define VPMU_IPC_EVENTS_MAX DEFCOUNT(VPMU_IPC_EVENTS)
 #define VPMU_ARCH_EVENTS_MAX DEFCOUNT(VPMU_ARCH_EVENTS)
+
+extern bool __read_mostly opt_unsafe_vpmu_uncore_passthrough;
 
 #endif /* __ASM_X86_HVM_VPMU_H_*/
 

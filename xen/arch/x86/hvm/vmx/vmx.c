@@ -3517,6 +3517,10 @@ static int cf_check vmx_msr_write_intercept(
             rsvd &= ~(IA32_DEBUGCTLMSR_FREEZE_LBRS_ON_PMI | IA32_DEBUGCTLMSR_FREEZE_PERFMON_ON_PMI | IA32_DEBUGCTLMSR_FREEZE_WHILE_SMM);
         }
 
+        if (opt_unsafe_vpmu_uncore_passthrough) {
+            rsvd &= ~IA32_DEBUGCTLMSR_ENABLE_UNCORE_PMI;
+        }
+
         if ( cp->feat.rtm )
             rsvd &= ~IA32_DEBUGCTLMSR_RTM;
 
