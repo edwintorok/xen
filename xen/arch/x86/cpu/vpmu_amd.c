@@ -417,9 +417,7 @@ static int cf_check amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         vpmu_reset(vpmu, VPMU_FROZEN);
     }
 
-    rdmsrl(msr, *msr_content);
-
-    return 0;
+    return rdmsr_safe(msr, *msr_content);
 }
 
 static void cf_check amd_vpmu_destroy(struct vcpu *v)
