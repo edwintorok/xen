@@ -3405,6 +3405,10 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                           IA32_DEBUGCTLMSR_BTS_OFF_USR);
         }
 
+        if (cp->basic.pmu_version >= 2 && cpu_has(&current_cpu_data, X86_FEATURE_PDCM)) {
+            rsvd &= ~(IA32_DEBUGCTLMSR_FREEZE_LBRS_ON_PMI | IA32_DEBUGCTLMSR_FREEZE_PERFMON_ON_PMI);
+        }
+
         if ( cp->feat.rtm )
             rsvd &= ~IA32_DEBUGCTLMSR_RTM;
 
