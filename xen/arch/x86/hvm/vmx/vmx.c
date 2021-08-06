@@ -3316,6 +3316,7 @@ static int cf_check vmx_msr_read_intercept(
 
         if ( curr->domain->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
         {
+            gdprintk(XENLOG_WARNING, "RDMSR 0x%08x overriden to 0 (actual %016"PRIx64")", msr, tmp);
             *msr_content = 0;
             break;
         }
