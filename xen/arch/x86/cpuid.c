@@ -1146,6 +1146,10 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             }
             memcpy(&res->a, &eax, sizeof(res->a));
 
+#define PERF_FIXED_MAX (MSR_CORE_PERF_FIXED_CTR_LAST - MSR_CORE_PERF_FIXED_CTR0 + 1)
+            /* We only implement 3 fixed function counters */
+            if ( (res->d & 0x1f) > PERF_FIXED_MAX)
+                res->d = (res->d & ~0x1f) | PERF_FIXED_MAX;
         }
         break;
 
