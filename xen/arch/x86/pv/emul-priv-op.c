@@ -964,11 +964,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
 
-    case MSR_IA32_PERF_CAPABILITIES:
-        /* No extra capabilities are supported. */
-        *val = 0;
-        return X86EMUL_OKAY;
-
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR_LAST:
     case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL_LAST:
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTRn:
