@@ -643,15 +643,7 @@ static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 blocked = 1;
                 switch ( umaskevent )
                 {
-                /*
-                 * See the Pre-Defined Architectural Performance Events table
-                 * from the Intel 64 and IA-32 Architectures Software
-                 * Developer's Manual, Volume 3B, System Programming Guide,
-                 * Part 2.
-                 */
-                case 0x003c:	/* UnHalted Core Cycles */
-                case 0x013c:	/* UnHalted Reference Cycles */
-                case 0x00c0:	/* Instructions Retired */
+                VPMU_IPC_EVENTS(DEFCASE)
                     blocked = 0;
                     break;
                 }
@@ -662,11 +654,7 @@ static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 /* Additional counters beyond IPC only; blocked already set. */
                 switch ( umaskevent )
                 {
-                case 0x4f2e:	/* Last Level Cache References */
-                case 0x412e:	/* Last Level Cache Misses */
-                case 0x00c4:	/* Branch Instructions Retired */
-                case 0x00c5:	/* All Branch Mispredict Retired */
-                case 0x01a4:	/* Topdown Slots */
+                VPMU_ARCH_EVENTS(DEFCASE)
                     blocked = 0;
                     break;
                }
