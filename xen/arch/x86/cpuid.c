@@ -1054,7 +1054,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
             if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY |
                                   XENPMU_FEATURE_ARCH_ONLY) ) {
-                unsigned limit = ( vpmu_features & XENPMU_FEATURE_ARCH_ONLY ) ? 7 : 3;
+                unsigned limit = ( vpmu_features & XENPMU_FEATURE_ARCH_ONLY ) ? 8 : 3;
                 if (limit < u.arch_nr) {
                     gdprintk(XENLOG_WARNING, "Limiting architectural PMU events to %d (actual %d)", limit, u.arch_nr);
                     u.arch_nr = limit;
