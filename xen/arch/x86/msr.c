@@ -325,6 +325,9 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_IA32_THERM_STATUS:
         if ( cp->x86_vendor != X86_VENDOR_INTEL )
             goto gp_fault;
+        if ( vpmu_available(v) && (vpmu_features & XENPMU_FEATURE_TEMP) &&
+            !rdmsr_safe(msr, *val) )
+            break;
         rdmsr_as_zero_ptr(msr, val);
         break;
 
