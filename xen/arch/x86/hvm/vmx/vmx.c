@@ -3213,6 +3213,9 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( vmx_read_guest_msr(curr, msr, msr_content) == 0 )
             break;
 
+        if ( is_hwdom_pinned_vcpu(curr) && !rdmsr_safe(msr, *msr_content) )
+            return X86EMUL_OKAY;
+
         if ( is_last_branch_msr(msr) )
         {
             *msr_content = 0;

@@ -1967,6 +1967,9 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     default:
+        if ( is_hwdom_pinned_vcpu(v) && !rdmsr_safe(msr, *msr_content) )
+            break;
+
         if ( d->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
         {
             *msr_content = 0;
