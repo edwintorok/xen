@@ -157,5 +157,32 @@ static inline int vpmu_allocate_context(struct vcpu *v)
 }
 #endif
 
+/*
+ * See the Pre-Defined Architectural Performance Events table
+ * from the Intel 64 and IA-32 Architectures Software
+ * Developer's Manual, Volume 3B, System Programming Guide,
+ * Part 2.
+ */
+#define VPMU_IPC_EVENTS(DEF) \
+    DEF(0x003c)	/* UnHalted Core Cycles */\
+    DEF(0x013c)	/* UnHalted Reference Cycles */\
+    DEF(0x00c0)	/* Instructions Retired */\
+
+
+#define VPMU_ARCH_EVENTS(DEF) \
+    VPMU_IPC_EVENTS(DEF)\
+    DEF(0x4f2e)	/* Last Level Cache References */\
+    DEF(0x412e)	/* Last Level Cache Misses */\
+    DEF(0x00c4)	/* Branch Instructions Retired */\
+    DEF(0x00c5)	/* All Branch Mispredict Retired */\
+    DEF(0x01a4)	/* Topdown Slots */\
+
+#define DEFCASE(x) case (x):
+#define DEFSUM(x) +1
+#define DEFCOUNT(X) (0+X(DEFSUM))
+
+#define VPMU_IPC_EVENTS_MAX DEFCOUNT(VPMU_IPC_EVENTS)
+#define VPMU_ARCH_EVENTS_MAX DEFCOUNT(VPMU_ARCH_EVENTS)
+
 #endif /* __ASM_X86_HVM_VPMU_H_*/
 
