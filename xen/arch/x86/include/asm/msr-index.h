@@ -234,6 +234,7 @@
 #define MSR_IA32_PERF_CAPABILITIES	0x00000345
 /* Lower 6 bits define the format of the address in the LBR stack */
 #define MSR_IA32_PERF_CAP_LBR_FORMAT	0x3f
+#define MSR_IA32_PERF_CAP_FREEZESMM	(1ULL << 12)
 #define MSR_IA32_PERF_CAP_FULLWIDTH	(1ULL << 13)
 
 #define MSR_IA32_BNDCFGS		0x00000d90
@@ -268,6 +269,7 @@
 #define IA32_DEBUGCTLMSR_BTS_OFF_USR	(1<<10) /* BTS off if CPL > 0 */
 #define IA32_DEBUGCTLMSR_FREEZE_LBRS	(1<<11) /* LBR stack frozen on PMI */
 #define IA32_DEBUGCTLMSR_FREEZE_PERFMON	(1<<12) /*  Global counter control ENABLE bit frozen on PMI */
+#define IA32_DEBUGCTLMSR_FREEZE_SMM	(1<<14) /* Freeze perfmon while in SMM */
 #define IA32_DEBUGCTLMSR_RTM		(1<<15) /* RTM debugging enable */
 
 #define MSR_IA32_LASTBRANCHFROMIP	0x000001db

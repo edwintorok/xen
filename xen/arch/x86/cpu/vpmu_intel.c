@@ -775,7 +775,7 @@ static int cf_check core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             break;
         case MSR_IA32_PERF_CAPABILITIES:
             if (v->domain.arch.cpuid->pdcm)
-                tmp &= (MSR_IA32_PERF_CAP_LBR_FORMAT | MSR_IA32_PERF_CAP_FULLWIDTH);
+                tmp &= (MSR_IA32_PERF_CAP_LBR_FORMAT | MSR_IA32_PERF_CAP_FREEZESMM | MSR_IA32_PERF_CAP_FULLWIDTH);
             else
                 tmp = 0;
             break;
