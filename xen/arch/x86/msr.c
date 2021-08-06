@@ -328,6 +328,14 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = 0;
         break;
 
+    case MSR_IA32_PACKAGE_THERM_STATUS:
+    case MSR_IA32_PACKAGE_THERM_INTERRUPT:
+        if ( cp->x86_vendor != X86_VENDOR_INTEL )
+            goto gp_fault;
+        if (cp->basic.turbo && !rdmsr_safe(msr, *val))
+            break;
+        goto gp_fault;
+
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )
             goto gp_fault;
