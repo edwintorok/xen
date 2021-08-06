@@ -3189,7 +3189,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         /* FALLTHROUGH */
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR_LAST:
     case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL_LAST:
-    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTRn:
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
     case MSR_IA32_DS_AREA:
@@ -3483,7 +3483,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR_LAST:
     case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL_LAST:
-    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
+    case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTRn:
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
     case MSR_IA32_DS_AREA:
