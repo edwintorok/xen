@@ -3201,6 +3201,8 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
     case MSR_IA32_DS_AREA:
+    case MSR_CORE_PERF_GLOBAL_STATUS_SET:
+    case MSR_CORE_PERF_GLOBAL_INUSE:
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;
@@ -3499,6 +3501,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_CORE_PERF_FIXED_CTR_CTRL...MSR_CORE_PERF_GLOBAL_OVF_CTRL:
     case MSR_IA32_PEBS_ENABLE:
     case MSR_IA32_DS_AREA:
+    case MSR_CORE_PERF_GLOBAL_STATUS_SET:
+    case MSR_CORE_PERF_GLOBAL_INUSE:
          if ( vpmu_do_wrmsr(msr, msr_content, 0) )
             goto gp_fault;
         break;
