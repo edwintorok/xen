@@ -1048,6 +1048,9 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
          */
         global_ovf_ctrl_mask &= ~(1ULL << 61);
 
+    /* Perf metrics is unsupported, but allow clearing overflow flag. */
+    global_ovf_ctrl_mask &= ~(1ULL << 48);
+
     if ( version >= 4)
         /* On PMU version 4 bits 58 and 59 are defined in
          * IA32_PERF_GLOBAL_STATUS_RESET (same MSR as IA32_PERF_GLOBAL_STATUS).
