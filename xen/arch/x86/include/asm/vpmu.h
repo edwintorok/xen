@@ -131,6 +131,7 @@ static inline int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
 extern unsigned int vpmu_mode;
 extern unsigned int vpmu_features;
+extern bool vpmu_uncore_passthrough;
 
 /* Context switch */
 static inline void vpmu_switch_from(struct vcpu *prev)

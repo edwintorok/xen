@@ -3509,6 +3509,10 @@ static int cf_check vmx_msr_write_intercept(
             rsvd &= ~(IA32_DEBUGCTLMSR_FREEZE_LBRS | IA32_DEBUGCTL_MSR_FREEZE_PERFMON);
         }
 
+        if (opt_vpmu_uncore_passthrough) {
+            rsvd &= ~(1ULL << 13);
+        }
+
         if ( cp->feat.rtm )
             rsvd &= ~IA32_DEBUGCTLMSR_RTM;
 

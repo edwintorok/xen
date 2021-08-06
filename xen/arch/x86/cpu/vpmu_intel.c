@@ -841,6 +841,9 @@ static void cf_check core2_vpmu_destroy(struct vcpu *v)
     vpmu_clear(vpmu);
 }
 
+bool opt_vpmu_uncore_passthrough;
+boolean_param("vpmu_uncore_passthrough", opt_vpmu_uncore_passthrough);
+
 static int cf_check vmx_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -853,6 +856,35 @@ static int cf_check vmx_vpmu_initialise(struct vcpu *v)
 
     if ( (arch_pmc_cnt + fixed_pmc_cnt) == 0 )
         return -EINVAL;
+
+    if ( vpmu_available(v) && vopt_vpmu_uncore_passthrough) {
+        static bool_t uncore_warned = 0;
+        if (!uncore_warned) {
+            printk("******************************************************\n");
+            printk("** WARNING: Uncore PMU passthrough is enabled       **\n");
+            printk("** This is NOT security supported, and only works   **\n");
+            printk("** if one guest at a time uses it.                  **\n");
+            printk("** Do NOT use in production!                        **\n");
+            printk("******************************************************\n");
+        }
+        unsigned i;
+        for (i=0x394; i<=0x396;i++) {
+            vmx_clear_msr_intercept(v, i, VMX_MSR_RW);
+        }
+        for (i=0x3B0; i<=0x3B3;i++) {
+            vmx_clear_msr_intercept(v, i, VMX_MSR_RW);
+        }
+        for (i=0x700; i<=0x747;i++) {
+            vmx_clear_msr_intercept(v, i, VMX_MSR_RW);
+        }
+        for (i=0xC00; i<=0xF1B;i++) {
+            vmx_clear_msr_intercept(v, i, VMX_MSR_RW);
+        }
+        for (i=0xF40; i<=0xFDB;i++) {
+            vmx_clear_msr_intercept(v, i, VMX_MSR_RW);
+        }
+        vmx_clear_msr_intercept(v, 0x3B5, VMX_MSR_RW);
+    }
 
     if ( !(vpmu_features & XENPMU_FEATURE_INTEL_BTS) )
         goto func_out;
