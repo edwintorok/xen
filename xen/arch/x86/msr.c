@@ -292,6 +292,13 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = msrs->misc_features_enables.raw;
         break;
 
+    case MSR_SMI_COUNT:
+        if ( cp->x86_vendor != X86_VENDOR_INTEL )
+            goto gp_fault;
+        if ( is_hardware_domain(d) && !rdmsr_safe(msr, *val) )
+            break;
+        return X86EMUL_UNHANDLEABLE;
+
     case MSR_P5_MC_ADDR:
     case MSR_P5_MC_TYPE:
     case MSR_IA32_MCG_CAP     ... MSR_IA32_MCG_CTL:      /* 0x179 -> 0x17b */

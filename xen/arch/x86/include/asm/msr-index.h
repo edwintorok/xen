@@ -649,6 +649,9 @@
 #define MSR_NHL_LBR_SELECT		0x000001c8
 #define MSR_NHL_LASTBRANCH_TOS		0x000001c9
 
+/* Nehalem and newer other MSRs */
+#define MSR_SMI_COUNT                       0x00000034
+
 /* Skylake (and newer) last-branch recording */
 #define MSR_SKL_LASTBRANCH_0_FROM_IP	0x00000680
 #define MSR_SKL_LASTBRANCH_0_TO_IP	0x000006c0
