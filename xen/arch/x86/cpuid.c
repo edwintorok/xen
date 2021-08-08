@@ -300,6 +300,14 @@ static void recalculate_misc(struct cpuid_policy *p)
 
         p->extd.raw[0x1b] = EMPTY_LEAF; /* IBS - not supported. */
         p->extd.raw[0x1c] = EMPTY_LEAF; /* LWP - not supported. */
+
+        /* These are not implemented yet, hide from CPUID.
+         * When they become implemented, make them available when full vpmu is on */
+        p->extd.irperf = 0;
+        p->extd.perfctrextnb = 0;
+        p->extd.perfctrextl2i = 0;
+
+        p->extd.perfctrextcore = vpmu_mode != XENPMU_MODE_OFF;
         break;
     }
 }

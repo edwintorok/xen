@@ -1157,6 +1157,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         {
             vpmu_msr = true;
+            /* fall-through */
     case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
     case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
             if ( vpmu_msr || (boot_cpu_data.x86_vendor &
