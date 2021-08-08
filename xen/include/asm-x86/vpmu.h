@@ -82,6 +82,7 @@ struct vpmu_struct {
 #define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
 
 #define VPMU_VERSION_MAX                    0x3
+#define VPMU_VERSION_MAX_SUPPORTED          0x5
 
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {
