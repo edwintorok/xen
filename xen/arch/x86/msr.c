@@ -323,15 +323,18 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR)) )
             goto gp_fault;
 
-        *val = 0;
-        if ( likely(!is_cpufreq_controller(d)) || rdmsr_safe(msr, *val) == 0 )
+        if ( likely(!is_cpufreq_controller(d)) ) {
+            rdmsr_as_zero_ptr(msr, val);
             break;
+        } else if ( rdmsr_safe(msr, *val) == 0 ) {
+            break;
+        }
         goto gp_fault;
 
     case MSR_IA32_THERM_STATUS:
         if ( cp->x86_vendor != X86_VENDOR_INTEL )
             goto gp_fault;
-        *val = 0;
+        rdmsr_as_zero_ptr(msr, val);
         break;
 
     case MSR_IA32_PERF_CAPABILITIES:

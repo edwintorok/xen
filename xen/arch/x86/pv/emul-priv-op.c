@@ -954,7 +954,7 @@ static int cf_check read_msr(
             break;
         if ( unlikely(is_cpufreq_controller(currd)) )
             goto normal;
-        *val = 0;
+        rdmsr_as_zero_ptr(reg, val);
         return X86EMUL_OKAY;
 
     case MSR_FAM10H_MMIO_CONF_BASE:
@@ -965,7 +965,7 @@ static int cf_check read_msr(
     case MSR_AMD64_NB_CFG:
         if ( is_hwdom_pinned_vcpu(curr) )
             goto normal;
-        *val = 0;
+        rdmsr_as_zero_ptr(reg, val);
         return X86EMUL_OKAY;
 
     case MSR_IA32_MISC_ENABLE:
@@ -1001,11 +1001,8 @@ static int cf_check read_msr(
         if ( is_hwdom_pinned_vcpu(curr) && !rdmsr_safe(reg, *val) )
             return X86EMUL_OKAY;
 
-        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, tmp) )
-        {
-            *val = 0;
+        if ( currd->arch.msr_relaxed && !rdmsr_safe_as_zero_ptr(reg, val) )
             return X86EMUL_OKAY;
-        }
 
         warn = true;
         break;
