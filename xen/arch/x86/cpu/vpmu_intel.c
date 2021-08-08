@@ -830,7 +830,7 @@ static int cf_check vmx_vpmu_initialise(struct vcpu *v)
     static bool_t ds_warned;
 
     if ( v->domain->arch.cpuid->basic.pmu_version <= 1 ||
-         v->domain->arch.cpuid->basic.pmu_version >= 6 )
+         v->domain->arch.cpuid->basic.pmu_version >= VPMU_VERSION_MAX_SUPPORTED )
         return -EINVAL;
 
     if ( (arch_pmc_cnt + fixed_pmc_cnt) == 0 )
@@ -910,22 +910,14 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     if ( current_cpu_data.cpuid_level >= 0xa )
         version = MASK_EXTR(cpuid_eax(0xa), PMU_VERSION_MASK);
 
-    switch ( version )
-    {
-    case 4:
-    case 5:
-        printk(XENLOG_INFO "VPMU: PMU version %u is not fully supported. "
-               "Emulating version 3\n", version);
-        /* FALLTHROUGH */
-
-    case 2:
-    case 3:
-        break;
-
-    default:
+    if ( version <= 1 ||
+         version > VPMU_VERSION_MAX_SUPPORTED ) {
         printk(XENLOG_WARNING "VPMU: PMU version %u is not supported\n",
                version);
         return ERR_PTR(-EINVAL);
+    } else if ( version > VPMU_VERSION_MAX ) {
+        printk(XENLOG_INFO "VPMU: PMU version %u is not fully supported. "
+               "Emulating version %d\n", version, VPMU_VERSION_MAX);
     }
 
     if ( current_cpu_data.x86 != 6 )
