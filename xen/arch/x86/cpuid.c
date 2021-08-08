@@ -340,6 +340,13 @@ static void recalculate_misc(struct cpuid_policy *p)
         p->extd.raw[0x1e] = EMPTY_LEAF; /* TopoExt APIC ID/Core/Node */
         p->extd.raw[0x1f] = EMPTY_LEAF; /* SEV */
         p->extd.raw[0x20] = EMPTY_LEAF; /* Platform QoS */
+
+        /* These are not implemented yet, hide from CPUID.
+         * When they become implemented, make them available when full vpmu is on */
+        p->extd.irperf = 0;
+        p->extd.perfctrextnb = 0;
+        p->extd.perfctrextl2i = 0;
+
         break;
     }
 }
@@ -389,6 +396,7 @@ static void __init calculate_host_policy(void)
         p->basic.raw[0xa] = EMPTY_LEAF;
         p->basic.raw[0x6] = EMPTY_LEAF;
         p->basic.pdcm = 0;
+        p->extd.perfctrextcore = 0;
     }
 
     if ( p->extd.svm )
@@ -764,6 +772,7 @@ void recalculate_cpuid_policy(struct domain *d)
         p->basic.raw[0xa] = EMPTY_LEAF;
         p->basic.raw[0x6] = EMPTY_LEAF;
         p->basic.pdcm = 0;
+        p->extd.perfctrextcore = 0;
     }
     if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY | XENPMU_FEATURE_ARCH_ONLY) )
         p->basic.pdcm = 0;

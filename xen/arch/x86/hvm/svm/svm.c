@@ -1940,6 +1940,7 @@ static int cf_check svm_msr_read_intercept(
     case MSR_AMD_FAM15H_EVNTSEL3:
     case MSR_AMD_FAM15H_EVNTSEL4:
     case MSR_AMD_FAM15H_EVNTSEL5:
+    /* TODO: IRPerfCnt, L2I_* and NB_* support */
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gpf;
         break;

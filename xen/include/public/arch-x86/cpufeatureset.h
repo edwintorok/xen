@@ -183,7 +183,10 @@ XEN_CPUFEATURE(FMA4,          3*32+16) /*A  4 operands MAC instructions */
 XEN_CPUFEATURE(NODEID_MSR,    3*32+19) /*   NodeId MSR */
 XEN_CPUFEATURE(TBM,           3*32+21) /*A  trailing bit manipulations */
 XEN_CPUFEATURE(TOPOEXT,       3*32+22) /*   topology extensions CPUID leafs */
+XEN_CPUFEATURE(PERFCTREXTCORE, 3*32+23) /*A! Extended core performance event-select registers */
+XEN_CPUFEATURE(PERFCTREXTNB,  3*32+24) /*   Extended Northbridge performance counters */
 XEN_CPUFEATURE(DBEXT,         3*32+26) /*A  data breakpoint extension */
+XEN_CPUFEATURE(PERFCTREXTL2I, 3*32+28) /*   Extended L2 cache performance counters */
 XEN_CPUFEATURE(MONITORX,      3*32+29) /*   MONITOR extension (MONITORX/MWAITX) */
 
 /* Intel-defined CPU features, CPUID level 0x0000000D:1.eax, word 4 */
@@ -253,6 +256,7 @@ XEN_CPUFEATURE(EFRO,          7*32+10) /*   APERF/MPERF Read Only interface */
 
 /* AMD-defined CPU features, CPUID level 0x80000008.ebx, word 8 */
 XEN_CPUFEATURE(CLZERO,        8*32+ 0) /*A  CLZERO instruction */
+XEN_CPUFEATURE(IRPERF,        8*32+ 1) /* Instruction Retired Performance Counter */
 XEN_CPUFEATURE(RSTR_FP_ERR_PTRS, 8*32+ 2) /*A  (F)X{SAVE,RSTOR} always saves/restores FPU Error pointers */
 XEN_CPUFEATURE(WBNOINVD,      8*32+ 9) /*   WBNOINVD instruction */
 XEN_CPUFEATURE(IBPB,          8*32+12) /*A  IBPB support only (no IBRS, used by AMD) */
