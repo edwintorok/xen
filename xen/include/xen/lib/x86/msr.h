@@ -19,7 +19,10 @@ struct msr_policy
     union {
         uint32_t raw;
         struct {
-            uint32_t :31;
+            uint32_t :28;
+            bool programmable_ratio_turbo:1;
+            bool programmable_tdp_turbo:1;
+            bool programmable_tj_offset:1;
             bool cpuid_faulting:1;
         };
     } platform_info;
