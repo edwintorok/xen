@@ -67,6 +67,9 @@ static void __init calculate_host_policy(void)
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
     mp->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
+    mp->platform_info.programmable_ratio_turbo = 0;
+    mp->platform_info.programmable_tdp_turbo = 0;
+    mp->platform_info.programmable_tj_offset = 0;
 
     /* Temporary, until we have known_features[] for feature bits in MSRs. */
     mp->arch_caps.raw &=
