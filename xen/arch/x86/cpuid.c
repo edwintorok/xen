@@ -1068,7 +1068,8 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             res->a = u.eax;
 
             /* We only implement 3 fixed function counters */
-            if ( (res->d & 0x1f) > fixed_pmc_cnt )
+            res->c &= ~((1 << fixed_pmc_cnt) - 1);
+            if ( (res->d & 0x1f) > fixed_pmc_cnt)
                 res->d = (res->d & ~0x1f) | fixed_pmc_cnt;
         }
         break;
