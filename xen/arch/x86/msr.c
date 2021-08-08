@@ -336,6 +336,17 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val &= (MSR_IA32_PERF_CAP_LBR_FORMAT | MSR_IA32_PERF_CAP_FREEZE_WHILE_SMM | MSR_IA32_PERF_CAP_FULLWIDTH_PMC);
         break;
 
+    case MSR_AMD64_MPERF_RO...MSR_AMD64_APERF_RO:
+        if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.efro )
+            goto gp_fault;
+        /* fall-through */
+    case MSR_IA32_MPERF...MSR_IA32_APERF:
+        if ( cpu_has_aperfmperf &&
+             ( is_hardware_domain(d) || vpmu_available(v) ) &&
+             rdmsr_safe(msr, *val) == 0 )
+            break;
+        goto gp_fault;
+
     case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
         if ( !is_hvm_domain(d) || v != curr )
             goto gp_fault;
