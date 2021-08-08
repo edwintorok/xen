@@ -974,6 +974,10 @@ static int cf_check read_msr(
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
 
+    case MSR_TEMPERATURE_TARGET:
+    case MSR_TURBO_RATIO_LIMIT...MSR_TURBO_RATIO_LIMIT2:
+        goto normal;
+
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR_LAST:
     case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL_LAST:
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTRn:
