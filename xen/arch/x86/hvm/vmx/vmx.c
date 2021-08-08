@@ -3128,7 +3128,6 @@ static int is_last_branch_msr(u32 ecx)
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *curr = current;
-    uint64_t tmp;
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
@@ -3218,15 +3217,12 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
         if ( is_last_branch_msr(msr) )
         {
-            *msr_content = 0;
+            rdmsr_as_zero_ptr(msr, msr_content);
             break;
         }
 
-        if ( curr->domain->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
-        {
-            *msr_content = 0;
+        if ( curr->domain->arch.msr_relaxed && !rdmsr_safe_as_zero_ptr(msr, msr_content) )
             break;
-        }
 
         gdprintk(XENLOG_WARNING, "RDMSR 0x%08x unimplemented\n", msr);
         goto gp_fault;

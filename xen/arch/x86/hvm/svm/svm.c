@@ -1796,7 +1796,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     const struct domain *d = v->domain;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     const struct nestedsvm *nsvm = &vcpu_nestedsvm(v);
-    uint64_t tmp;
 
     switch ( msr )
     {
@@ -1896,7 +1895,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
          * has been migrated from an Intel host. The value zero is not
          * particularly meaningful, but at least avoids the guest crashing!
          */
-        *msr_content = 0;
+        rdmsr_as_zero_ptr(msr, msr_content);
         break;
 
     case MSR_IA32_DEBUGCTLMSR:
@@ -1948,7 +1947,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_K8_TOP_MEM2:
     case MSR_K8_VM_CR:
     case MSR_AMD64_EX_CFG:
-        *msr_content = 0;
+        rdmsr_as_zero_ptr(msr, msr_content);
         break;
 
     case MSR_K8_VM_HSAVE_PA:
@@ -1970,11 +1969,8 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( is_hwdom_pinned_vcpu(v) && !rdmsr_safe(msr, *msr_content) )
             break;
 
-        if ( d->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
-        {
-            *msr_content = 0;
+        if ( d->arch.msr_relaxed && !rdmsr_safe_as_zero_ptr(msr, msr_content) )
             break;
-        }
 
         gdprintk(XENLOG_WARNING, "RDMSR 0x%08x unimplemented\n", msr);
         goto gpf;

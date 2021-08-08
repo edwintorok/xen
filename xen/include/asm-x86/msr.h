@@ -54,6 +54,24 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
     val = lo_ | ((uint64_t)hi_ << 32); \
     rc_; })
 
+static inline void rdmsr_as_zero_ptr(unsigned int msr, uint64_t *valptr)
+{
+    /* we haven't read the actual value, just always set to 0 */
+    gdprintk(XENLOG_WARNING, "RDMSR 0x%08x RAZ", msr);
+    *valptr = 0;
+}
+
+static inline int rdmsr_safe_as_zero_ptr(unsigned int msr, uint64_t *valptr)
+{
+    uint64_t tmp;
+    int rc = rdmsr_safe(msr, tmp);
+    if ( !rc ) {
+        gdprintk(XENLOG_WARNING, "RDMSR 0x%08x RAZ (actual 0x%016"PRIx64")", msr, tmp);
+        *valptr = 0;
+    }
+    return rc;
+}
+
 /* wrmsr with exception handling */
 static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 {
