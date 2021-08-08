@@ -946,6 +946,16 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     }
 
     arch_pmc_cnt = core2_get_arch_pmc_count();
+    if ( arch_pmc_cnt > 4 &&
+         vpmu_mode != XENPMU_MODE_ALL )
+    {
+        /* Architectural PMCs 0-3 are Thread scoped, but 4+ are Core scoped.
+         * We can only allow using them if we know that we have at most one guest using a PMU
+         * on all siblings threads on a core. */
+        printk(XENLOG_INFO "VPMU: limiting architectural PMCs to 4\n");
+        arch_pmc_cnt = 4;
+    }
+
     fixed_pmc_cnt = core2_get_fixed_pmc_count();
 
     if ( cpu_has_pdcm )
