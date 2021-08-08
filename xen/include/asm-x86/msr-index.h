@@ -13,6 +13,16 @@
  * Blocks of related constants should be sorted by MSR index.  The constant
  * names should be as concise as possible, and the bit names may have an
  * abbreviated name.  Exceptions will be considered on a case-by-case basis.
+ *
+ * References:
+ * - https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html
+ *    Intel(R) 64 and IA-32 architectures SDM volume 4: Model-specific registers
+ *    Chapter 2, "Model-Specific Registers (MSRs)"
+ *
+ * - https://developer.amd.com/resources/developer-guides-manuals/
+ *    AMD64 Architecture Programmer’s Manual Volume 2: System Programming
+ *    Appendix A "MSR Cross-Reference"
+ *
  */
 
 #define MSR_APIC_BASE                       0x0000001b
