@@ -3180,6 +3180,15 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( !nvmx_msr_read_intercept(msr, msr_content) )
             goto gp_fault;
         break;
+
+    case MSR_TEMPERATURE_TARGET:
+    case MSR_TURBO_RATIO_LIMIT...MSR_TURBO_RATIO_LIMIT2:
+        if ( !rdmsr_safe(msr, *msr_content) )
+            break;
+        /* RO for guests, MSR_PLATFORM_INFO bits set accordingly in msr.c to indicate lack of write
+         * support. */
+        goto gp_fault;
+
     case MSR_IA32_MISC_ENABLE:
         rdmsrl(MSR_IA32_MISC_ENABLE, *msr_content);
         /* Debug Trace Store is not supported. */
