@@ -80,6 +80,7 @@ static bool_t __read_mostly full_width_write;
 
 /* Number of general-purpose and fixed performance counters */
 unsigned int __read_mostly arch_pmc_cnt, fixed_pmc_cnt;
+static unsigned int __read_mostly vpmu_version;
 
 /* Masks used for testing whether and MSR is valid */
 #define ARCH_CTRL_MASK  (~((1ull << 32) - 1) | (1ull << 21) | ARCH_CNTR_PIN_CONTROL)
@@ -249,6 +250,9 @@ static void core2_vpmu_set_msr_bitmap(struct vcpu *v)
 
     vmx_clear_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR_CTRL, VMX_MSR_R);
     vmx_clear_msr_intercept(v, MSR_IA32_DS_AREA, VMX_MSR_R);
+
+    if ( vpmu_version >= 4 )
+        vmx_clear_msr_intercept(v, MSR_CORE_PERF_GLOBAL_STATUS, VMX_MSR_R);
 }
 
 static void core2_vpmu_unset_msr_bitmap(struct vcpu *v)
@@ -271,6 +275,9 @@ static void core2_vpmu_unset_msr_bitmap(struct vcpu *v)
 
     vmx_set_msr_intercept(v, MSR_CORE_PERF_FIXED_CTR_CTRL, VMX_MSR_R);
     vmx_set_msr_intercept(v, MSR_IA32_DS_AREA, VMX_MSR_R);
+
+    if ( vpmu_version >= 4 )
+        vmx_set_msr_intercept(v, MSR_CORE_PERF_GLOBAL_STATUS, VMX_MSR_R);
 }
 
 static inline void __core2_vpmu_save(struct vcpu *v)
@@ -286,7 +293,7 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     for ( i = 0; i < arch_pmc_cnt; i++ )
         rdmsrl(MSR_IA32_PERFCTR0 + i, xen_pmu_cntr_pair[i].counter);
 
-    if ( !is_hvm_vcpu(v) )
+    if ( !is_hvm_vcpu(v) || vpmu_version >= 4 )
         rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, core2_vpmu_cxt->global_status);
 }
 
@@ -347,6 +354,15 @@ static inline void __core2_vpmu_load(struct vcpu *v)
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, core2_vpmu_cxt->global_ovf_ctrl);
         core2_vpmu_cxt->global_ovf_ctrl = 0;
         wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
+    }
+
+    if ( vpmu_version >= 4 ) {
+        const uint64_t global_status = core2_vpmu_cxt->global_status;
+        const uint64_t reset = (~global_status) & global_ovf_ctrl_mask ;
+        if ( reset )
+            wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, reset);
+        if ( global_status )
+            wrmsrl(MSR_CORE_PERF_GLOBAL_STATUS_SET, global_status);
     }
 }
 
@@ -922,6 +938,7 @@ int __init core2_vpmu_init(void)
         printk(XENLOG_INFO "VPMU: PMU version %u is not fully supported. "
                "Emulating version %d\n", version, VPMU_VERSION_MAX);
     }
+    vpmu_version = version;
 
     if ( current_cpu_data.x86 != 6 )
     {
