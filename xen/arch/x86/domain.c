@@ -893,6 +893,11 @@ int arch_domain_create(struct domain *d,
 
     spec_ctrl_init_domain(d);
 
+    /* TODO: when vpmu is under toolstack control handle it there */
+    if ( vpmu_mode != XENPMU_MODE_OFF && vpmu_mode != XENPMU_MODE_ALL &&
+         !(vpmu_features & (XENPMU_FEATURE_IPC_ONLY | XENPMU_FEATURE_ARCH_ONLY)) )
+        d->arch.msr_relaxed = 1;
+
     return 0;
 
  fail:
