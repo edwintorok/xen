@@ -778,7 +778,6 @@ void recalculate_cpuid_policy(struct domain *d)
     }
     if ( vpmu_features & (XENPMU_FEATURE_IPC_ONLY | XENPMU_FEATURE_ARCH_ONLY) )
         p->basic.pdcm = 0;
-    }
 
     if ( !p->extd.svm )
         p->extd.raw[0xa] = EMPTY_LEAF;
