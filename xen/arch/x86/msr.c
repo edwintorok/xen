@@ -466,7 +466,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         goto gp_fault;
 
     case MSR_AMD64_IBSDCPHYSAD:
-    case MSR_AMD64_IBSFETCHPHYAD:
+    case MSR_AMD64_IBSFETCHPHYSAD:
     case MSR_AMD64_IBSOPDATA2:
         if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs ) {
             if ( !is_hardware_domain(d) ) {
