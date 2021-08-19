@@ -797,7 +797,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         svm_intercept_msr(msr, MSR_AMD64_IBSOPRIP, MSR_INTERCEPT_WRITE);
         svm_intercept_msr(msr, MSR_AMD64_IBSOPDATA, MSR_INTERCEPT_WRITE);
         svm_intercept_msr(msr, MSR_AMD64_IBSOPDATA3, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(msr, MSR_AMD64_IBSOPDCLINAD, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSDCLINAD, MSR_INTERCEPT_WRITE);
         svm_intercept_msr(msr, MSR_AMD64_IBSBRTARGET, MSR_INTERCEPT_WRITE);
         goto gp_fault;
 
