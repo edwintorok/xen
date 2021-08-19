@@ -481,7 +481,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_AMD64_IBSOPCTL:
     case MSR_AMD64_IBSOPRIP:
     case MSR_AMD64_IBSOPDATA:
-    case MSR_AMD64_IBSOPDCLINAD:
+    case MSR_AMD64_IBSDCLINAD:
     case MSR_AMD64_IBSBRTARGET:
         if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs &&
              rdmsr_safe(msr, *val) == 0 )
