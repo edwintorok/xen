@@ -472,7 +472,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
             if ( !is_hardware_domain(d) ) {
                 *val = 0;
                 break;
-            } else if ( rdmsr_safe(msr, *msr_content) == 0 )
+            } else if ( rdmsr_safe(msr, *val) == 0 )
                 break;
         }
 
