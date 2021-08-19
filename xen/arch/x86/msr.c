@@ -791,14 +791,14 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
     case MSR_AMD64_IBSOPCTL:
         if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.ibs ||
-             (val & ~IBSOPCTL_MASK) || wrmsr_safe(msr, val) != 0 )
+             (val & ~IBSOPTCTL_MASK) || wrmsr_safe(msr, val) != 0 )
             goto gp_fault;
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSOPCTL, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSOPRIP, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSOPDATA, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSOPDATA3, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSDCLINAD, MSR_INTERCEPT_WRITE);
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSBRTARGET, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSOPCTL, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSOPRIP, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSOPDATA, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSOPDATA3, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSDCLINAD, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSBRTARGET, MSR_INTERCEPT_WRITE);
         goto gp_fault;
 
     default:
