@@ -786,7 +786,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.ibs ||
              (val & ~IBSFETCHCTL_MASK) || wrmsr_safe(msr, val) != 0 )
             goto gp_fault;
-        svm_intercept_msr(v, msr, MSR_AMD64_IBSFETCHLINAD, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(v, MSR_AMD64_IBSFETCHLINAD, MSR_INTERCEPT_WRITE);
         break;
 
     case MSR_AMD64_IBSOPCTL:
