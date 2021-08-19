@@ -6823,7 +6823,9 @@ void vcpu_next_update(struct pcpu_info *p, struct vcpu_data *next, tsc_t tsc)
                     p->current->d->did,
                     p->current->vid,
                     runstate_name[p->current->runstate.state]);
-            error(ERR_ASSERT, NULL);
+            runstate_update(p->current, RUNSTATE_LOST, tsc);
+            p->current = NULL;
+            //error(ERR_ASSERT, NULL);
         }
     }
 
