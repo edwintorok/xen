@@ -709,6 +709,13 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             wrmsr_tsc_aux(val);
         break;
 
+    case MSR_K8_HWCR:
+        if ( !(cp->x86_vendor & X86_VENDOR_AMD) ||
+             (val & ~K8_HWCR_IRPERF_EN) ||
+             wrmsr_safe(msr, val) != 0 )
+            goto gp_fault;
+        break;
+
     case MSR_AMD64_DE_CFG:
         /*
          * OpenBSD 6.7 will panic if writing to DE_CFG triggers a #GP:
