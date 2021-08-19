@@ -492,7 +492,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs &&
              rdmsr_safe(msr, *val) == 0 ) {
             if ( !is_hardware_domain(d) )
-                *msr_content &= ~IBSOPDATA3_IBSDCPHYADVAL;
+                *val &= ~IBSOPDATA3_IBSDCPHYADVAL;
             break;
         }
         goto gp_fault;
