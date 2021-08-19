@@ -470,7 +470,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_AMD64_IBSOPDATA2:
         if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs ) {
             if ( !is_hardware_domain(d) ) {
-                *msr_content = 0;
+                *val = 0;
                 break;
             } else if ( rdmsr_safe(msr, *msr_content) == 0 )
                 break;
