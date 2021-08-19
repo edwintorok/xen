@@ -455,6 +455,49 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
          * TODO: Implement when we have better topology representation.
     case MSR_INTEL_CORE_THREAD_COUNT:
          */
+
+    case MSR_AMD64_IBSFETCHCTL:
+        if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs &&
+             rdmsr_safe(msr, *msr_content) == 0 ) {
+            if ( !is_hardware_domain(d) )
+                *msr_content &= ~IBSFETCHCTL_IBSPHYADDRVALID;
+            break;
+        }
+        goto gp_fault;
+
+    case MSR_AMD64_IBSOPDCPHYAD:
+    case MSR_AMD64_IBSFETCHPHYAD:
+    case MSR_AMD64_IBSOPDATA2:
+        if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs ) {
+            if ( !is_hardware_domain(d) ) {
+                *msr_content = 0;
+                break;
+            } else if ( rdmsr_safe(msr, *msr_content) == 0 )
+                break;
+        }
+
+        goto gp_fault;
+
+    case MSR_AMD64_IBSOPCTL:
+    case MSR_AMD64_IBSOPRIP:
+    case MSR_AMD64_IBSOPDATA:
+    case MSR_AMD64_IBSOPDCLINAD:
+    case MSR_AMD64_IBSBRTARGET:
+        if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs &&
+             rdmsr_safe(msr, *msr_content) == 0 )
+            break;
+        goto gp_fault;
+
+    case MSR_AMD64_IBSOPDATA3:
+        if ( cp->x86_vendor == X86_VENDOR_AMD && cp->extd.ibs &&
+             rdmsr_safe(msr, *msr_content) == 0 ) {
+            if ( !is_hardware_domain(d) )
+                *msr_content &= ~IBSOPDATA3_IBSDCPHYADVAL;
+            break;
+        }
+        goto gp_fault;
+
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -738,6 +781,25 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( v == curr && (curr->arch.dr7 & DR7_ACTIVE_MASK) )
             wrmsrl(msr, val);
         break;
+
+    case MSR_AMD64_IBSFETCHCTL:
+        if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.ibs ||
+             (val & ~IBSFETCHCTL_MASK) || wrmsr_safe(msr, val) != 0 )
+            goto gp_fault;
+        svm_intercept_msr(msr, MSR_AMD64_IBSFETCHLINAD, MSR_INTERCEPT_WRITE);
+        break;
+
+    case MSR_AMD64_IBSOPCTL:
+        if ( cp->x86_vendor != X86_VENDOR_AMD || !cp->extd.ibs ||
+             (val & ~IBSOPCTL_MASK) || wrmsr_safe(msr, val) != 0 )
+            goto gp_fault;
+        svm_intercept_msr(msr, MSR_AMD64_IBSOPCTL, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSOPRIP, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSOPDATA, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSOPDATA3, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSOPDCLINAD, MSR_INTERCEPT_WRITE);
+        svm_intercept_msr(msr, MSR_AMD64_IBSBRTARGET, MSR_INTERCEPT_WRITE);
+        goto gp_fault;
 
     default:
         return X86EMUL_UNHANDLEABLE;
