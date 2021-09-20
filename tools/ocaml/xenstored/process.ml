@@ -121,7 +121,7 @@ let launch_exn t =
 
 let validate_exn t =
 	(* --help must be last to check validity of earlier arguments *)
-	let t' = {t with cmdline= t.cmdline @ ["--help"]} in
+	let t' = {t with cmdline= t.cmdline @ ["--config-test"]} in
 	let cmd = string_of_t t' in
 	debug "Executing %s" cmd ;
 	match Unix.fork () with
@@ -169,7 +169,7 @@ let parse_live_update args =
 				]
 			(fun x -> raise (Arg.Bad x))
 			"live-update -s" ;
-			debug "Live update process queued" ;
+			(* debug "Live update process queued" ; *)
 				{!state with deadline = Unix.gettimeofday () +. float !timeout
 				; force= !force; pending= true})
 		| _ ->
@@ -235,10 +235,6 @@ let do_debug con t _domains cons data =
 	| "watches" :: _ ->
 		let watches = Connections.debug cons in
 		Some (watches ^ "\000")
-	| "mfn" :: domid :: _ ->
-		let domid = int_of_string domid in
-		let con = Connections.find_domain cons domid in
-		may (fun dom -> Printf.sprintf "%nd\000" (Domain.get_mfn dom)) (Connection.get_domain con)
 	| _ -> None
 	with _ -> None
 
@@ -449,6 +445,8 @@ let transaction_replay c t doms cons =
 		(fun () ->
 			try
 				Logging.start_transaction ~con ~tid;
+				if t.must_fail then
+					raise Transaction_again;
 				List.iter (perform_exn ~wlog:true replay_t) (Transaction.get_operations t); (* May throw EAGAIN *)
 
 				Logging.end_transaction ~con ~tid;
@@ -550,22 +548,24 @@ let do_introduce con t domains cons data =
 		| _                         -> raise Invalid_Cmd_Args;
 		in
 	let dom =
-		if Domains.exist domains domid then
+		if Domains.exist domains domid then begin
 			let edom = Domains.find domains domid in
-			if (Domain.get_mfn edom) = mfn && (Connections.find_domain cons domid) != con then begin
-				(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
-				edom.remote_port <- port;
-				Domain.bind_interdomain edom;
-			end;
+			(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
+			edom.remote_port <- port;
+			Domain.bind_interdomain edom;
 			edom
+		end
 		else try
-			let ndom = Domains.create domains domid mfn port in
+			let ndom = Domains.create domains domid port in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
-		with _ -> raise Invalid_Cmd_Args
+		with e ->
+			let bt = Printexc.get_backtrace () in
+			 Logging.debug "process" "do_introduce: %s (%s)" (Printexc.to_string e) bt;
+			 raise Invalid_Cmd_Args
 	in
-	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
+	if (Domain.get_remote_port dom) <> port then
 		raise Domain_not_match
 
 let do_release con t domains cons data =

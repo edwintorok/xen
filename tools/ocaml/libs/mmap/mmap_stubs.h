@@ -27,7 +27,16 @@
 struct mmap_interface
 {
 	void *addr;
-	int len;
+	size_t len;
 };
+
+#ifndef Data_abstract_val
+#define Data_abstract_val(v) ((void*) Op_val(v))
+#endif
+
+#define Intf_val(a) ((struct mmap_interface *) Data_abstract_val(a))
+#define Intf_data_val(a) (Intf_val(a)->addr)
+
+value stub_mmap_alloc(void *addr, size_t len);
 
 #endif
