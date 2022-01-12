@@ -49,6 +49,7 @@ CAMLprim value stub_eventchn_init(void)
 		caml_failwith("open failed");
 
 	result = (value)xce;
+        /* TODO: should wrap in abstract-tag for nnp */
 	CAMLreturn(result);
 }
 
