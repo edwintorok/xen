@@ -1,0 +1,16 @@
+(rule
+ (alias gospel-check)
+ (deps
+  (:model
+   (glob_files model/*.mli))
+  (:mli
+   (glob_files libs/eventchn/*.mli)
+   (glob_files libs/mmap/*.mli)
+;   (glob_files libs/xb/*.mli)
+;   (glob_files libs/xc/*.mli)
+   (glob_files libs/xentoollog/*.mli)
+;   (glob_files libs/xs/*.mli)
+; (glob_files xenstored/*.mli)
+  )
+ )
+ (action (run gospel check %{model} %{mli})))
