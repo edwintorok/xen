@@ -33,7 +33,30 @@
 #include <caml/fail.h>
 #include <caml/signals.h>
 
-#define _H(__h) ((xenevtchn_handle *)(__h))
+/* We want to close the event channel when it is no longer in use,
+   which can only be done safely with a finalizer.
+   Event channels are typically long lived, so we don't need tighter control over resource deallocation.
+   Use a custom block
+*/
+
+/* Access the xenevtchn_t* part of the OCaml custom block */
+#define _H(__h) (*((xenevtchn_handle**)Data_custom_val(__h)))
+
+static void stub_evtchn_finalize(value v)
+{
+	/* docs say to not use any CAMLparam* macros here */
+	xenevtchn_close(_H(v));
+}
+
+static struct custom_operations xenevtchn_ops = {
+	"xenevtchn",
+	stub_evtchn_finalize,
+	custom_compare_default, /* raises Failure, cannot compare */
+	custom_hash_default, /* ignored */
+	custom_serialize_default, /* raises Failure, can't serialize */
+	custom_deserialize_default, /* raises Failure, can't deserialize */
+	custom_compare_ext_default /* raises Failure */
+};
 
 CAMLprim value stub_eventchn_init(void)
 {
@@ -48,7 +71,9 @@ CAMLprim value stub_eventchn_init(void)
 	if (xce == NULL)
 		caml_failwith("open failed");
 
-	result = (value)xce;
+	/* contains file descriptors, trigger full GC at least every 128 allocations */
+	result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
+	_H(result) = xce;
 	CAMLreturn(result);
 }
 
