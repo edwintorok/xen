@@ -17,14 +17,13 @@
 (** Event channel bindings: see tools/libxc/include/xenctrl.h *)
 
 (*@ open Stdlib *)
-(*@ function evtchn_is_fifo: bool *)
-(*@ function max_evtchns: integer =
-  if evtchn_is_fifo then 131072 else Sys.word_size * Sys.word_size *)
+(*@ function max_evtchns: integer *)
+(*@ axiom evtchn_range: max_evtchns >= 1024 *)
 
 type t
 (** A local event channel. *)
 (*@ model port: int
-    invariant 0 <= port < max_evtchns
+    invariant 0 < port < max_evtchns
  *)
 
 (*@ type port_state =
@@ -93,7 +92,7 @@ val to_int: t -> int
 
 val of_int: int -> t
 (*@ t = of_int port
-    requires 0 <= port < max_evtchns
+    requires 0 < port < max_evtchns
     ensures t.port = port *)
 
 val init: unit -> handle
