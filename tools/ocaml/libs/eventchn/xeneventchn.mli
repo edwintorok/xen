@@ -32,6 +32,9 @@ type t
   ; masked: bool
   }
 *)
+(* tracking port state isn't strictly needed for tracking resource usage,
+   but it helps understanding it:
+     i.e. that unbounded number of notifications can be sent, because they just set a bit *)
 
 type handle
 (** An initialised event channel interface. *)
