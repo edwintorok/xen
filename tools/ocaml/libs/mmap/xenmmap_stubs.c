@@ -89,13 +89,13 @@ CAMLprim value stub_mmap_read(value intf, value start, value len)
 	c_start = Int_val(start);
 	c_len = Int_val(len);
 
-	if (c_start > Intf_val(intf)->len)
+	if (c_start > Intf_val(intf)->len || c_start < 0)
 		caml_invalid_argument("start invalid");
-	if (c_start + c_len > Intf_val(intf)->len)
+	if (c_start + c_len > Intf_val(intf)->len || c_len < 0)
 		caml_invalid_argument("len invalid");
 
 	data = caml_alloc_string(c_len);
-	memcpy((char *) data, Intf_val(intf)->addr + c_start, c_len);
+	memcpy(Bp_val(data), Intf_val(intf)->addr + c_start, c_len);
 
 	CAMLreturn(data);
 }
@@ -110,12 +110,12 @@ CAMLprim value stub_mmap_write(value intf, value data,
 	c_start = Int_val(start);
 	c_len = Int_val(len);
 
-	if (c_start > Intf_val(intf)->len)
+	if (c_start > Intf_val(intf)->len || c_start < 0)
 		caml_invalid_argument("start invalid");
-	if (c_start + c_len > Intf_val(intf)->len)
+	if (c_start + c_len > Intf_val(intf)->len || c_len < 0 || c_len > caml_string_length(data))
 		caml_invalid_argument("len invalid");
 
-	memcpy(Intf_val(intf)->addr + c_start, (char *) data, c_len);
+	memcpy(Intf_val(intf)->addr + c_start, String_val(data), c_len);
 
 	CAMLreturn(Val_unit);
 }
