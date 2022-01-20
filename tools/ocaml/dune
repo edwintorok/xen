@@ -5,7 +5,7 @@
   (:mli
    (glob_files libs/eventchn/*.mli)
    (glob_files libs/mmap/*.mli)
-;   (glob_files libs/xb/*.mli)
+   (glob_files libs/xb/*.mli)
 ;   (glob_files libs/xc/*.mli)
    (glob_files libs/xentoollog/*.mli)
 ;   (glob_files libs/xs/*.mli)

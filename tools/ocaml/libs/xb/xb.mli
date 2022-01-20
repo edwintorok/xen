@@ -1,3 +1,4 @@
+(*@ open Stdlib *)
 module Op :
   sig
     type operation =
@@ -40,12 +41,12 @@ module Packet :
     }
     exception Error of string
     exception DataError of string
-    external string_of_header : int -> int -> int -> int -> string
-      = "stub_string_of_header"
     val create : int -> int -> Op.operation -> string -> t
     val of_partialpkt : Partial.pkt -> t
     val to_string : t -> string
     val unpack : t -> int * int * Op.operation * string
+    (*@ tid, rid, ty, data = unpack t *)
+
     val get_tid : t -> int
     val get_ty : t -> Op.operation
     val get_data : t -> string
