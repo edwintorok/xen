@@ -53,6 +53,10 @@ check: dune-pre
 	# --force isn't necessary here if the test is deterministic
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune runtest --profile=release --no-buffer --force
 
+check2: dune-pre
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build @gospel-check @check --profile=release
+
+
 # Convenience targets for development
 
 .PHONY: dune-clean
