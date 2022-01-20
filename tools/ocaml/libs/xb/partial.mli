@@ -6,8 +6,6 @@ type pkt = {
   buf : Buffer.t;
 }
 external header_size : unit -> int = "stub_header_size"
-external header_of_string_internal : string -> int * int * int * int
-  = "stub_header_of_string"
 val xenstore_payload_max : int
 val xenstore_rel_path_max : int
 val of_string : string -> pkt
