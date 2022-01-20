@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+(*@ open Stdlib *)
+
 type mmap_interface
 (*@ model mapped_len: integer *)
 
@@ -25,7 +27,7 @@ type mmap_map_flag = SHARED | PRIVATE
 external mmap : Unix.file_descr -> mmap_prot_flag -> mmap_map_flag -> int -> int
              -> mmap_interface = "stub_mmap_init"
 (*@ m = mmap fd prot mapflag len offset
-    requires len > 0 && exists k >= 0. k * pagesize = offset
+    requires len > 0 && exists k. k >= 0 && k * pagesize = offset
     ensures m.mapped_len = len
     raises Failure _ -> true *)
 
