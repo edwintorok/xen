@@ -40,7 +40,7 @@
 */
 
 /* Access the xenevtchn_t* part of the OCaml custom block */
-#define _H(__h) (*((xenevtchn_t**)Data_custom_val(__h)))
+#define _H(__h) (*((xenevtchn_handle**)Data_custom_val(__h)))
 
 static void stub_evtchn_finalize(value v)
 {
@@ -48,14 +48,14 @@ static void stub_evtchn_finalize(value v)
 	xenevtchn_close(_H(v));
 }
 
-static struct custom_operations xenevtchn_ops {
+static struct custom_operations xenevtchn_ops = {
 	"xenevtchn",
 	stub_evtchn_finalize,
 	custom_compare_default, /* raises Failure, cannot compare */
 	custom_hash_default, /* ignored */
 	custom_serialize_default, /* raises Failure, can't serialize */
 	custom_deserialize_default, /* raises Failure, can't deserialize */
-	custom_compareext_default /* raises Failure */
+	custom_compare_ext_default /* raises Failure */
 };
 
 CAMLprim value stub_eventchn_init(void)
