@@ -15,9 +15,6 @@
  *)
 
 (*@ open Stdlib *)
-module String: sig
-  (*@ function length (s: string) : integer *)
-end
 
 type mmap_interface
 (*@ model mapped_len: integer *)
