@@ -381,6 +381,8 @@ let main () =
 				if Some port = eventchn.Event.virq_port then (
 					let (notify, deaddom) = Domains.cleanup domains in
 					List.iter (Store.reset_permissions store) deaddom;
+                                        (* TODO: spurious watches, fix ordering here, delete watches
+                                           first *)
 					List.iter (Connections.del_domain cons) deaddom;
 					if deaddom <> [] || notify then
 						Connections.fire_spec_watches
