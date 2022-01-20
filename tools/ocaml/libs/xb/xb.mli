@@ -87,6 +87,13 @@ type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
   | HaveHdr _ -> 0
   | NoHdr (len, _) -> len *)
 
+(*@ function max_domain_bytes: integer *)
+(*@ axiom domainbytes: Partial.xenstore_payload_max < max_domain_bytes <= Sys.max_string_length *)
+(* TODO: calculate a reasonable minimum here based on supported limits *)
+
+(*@ function max_domain_queued: integer *)
+(*@ axiom queuelen: 1 < max_domain_queued && max_domain_queued * Partial.xenstore_payload_max <= max_domain_bytes *)
+
 type t = {
   backend : backend;
   pkt_in : Packet.t Queue.t;
@@ -95,6 +102,12 @@ type t = {
   mutable partial_out : string;
 }
 (*@ invariant is_valid_partial_buf(partial_in) *)
+(*@ invariant Queue.length pkt_in + Queue.length pkt_out <= max_domain_queued *)
+(*@ invariant String.length partial_out <= Partial.xenstore_payload_max *)
+(* partial_buf and Packet.t already has invariants related to size *)
+
+(* TODO: directory replies won't obey the limits, have to implement proper support
+   for this to pass verification *)
 
 (*@ predicate is_empty(t: t) =
      Queue.is_empty t.pkt_in && Queue.is_empty t.pkt_out
@@ -122,38 +135,54 @@ val queue : t -> Packet.t -> unit
 val read_fd : backend_fd -> 'a -> bytes -> int -> int
 (*@ n = read_fd fd c b len
     ensures n <> 0
+    modifies b
     raises End_of_file -> true *)
 
 val read_mmap : backend_mmap -> 'a -> bytes -> int -> int
 (*@ n = read_mmap back c b len
     modifies back.work_again
+    modifies b
     ensures back.work_again <-> (n > 0)
   *)
 
 val read : t -> bytes -> int -> int
-(*@ n = read t b len *)
-(* TODO *)
+(*@ n = read t b len
+    modifies t
+    modifies b
+ *)
+(* TODO: match and dispatch to other 2 reads *)
 
 val write_fd : backend_fd -> 'a -> string -> int -> int
-(*@ n = write_fd back c b len *)
+(*@ n = write_fd back c b len
+    modifies back
+ *)
 
 val write_mmap : backend_mmap -> 'a -> string -> int -> int
-(*@ n = write_mmap back c b len *)
+(*@ n = write_mmap back c b len
+    modifies back
+ *)
 
 val write : t -> string -> int -> int
 (*@ n = write t s len *)
-(* TODO *)
+(* TODO: match and dispatch to other 2 writes *)
 
 val output : t -> bool
 (*@ r = output t
     modifies t
     ensures r <-> (String.length t.partial_out = 0)
+    ensures 0 <= Queue.length (old t).pkt_out - Queue.length t.pkt_out <= 1
+    ensures Queue.length (old t).pkt_out = Queue.length t.pkt_out
+            -> String.length t.partial_out < String.length (old t).partial_out
+    raises Reconnect -> true
   *)
+(* TODO  *)
 
 val input : t -> bool
 (*@ r = input t
     modifies t
+    ensures 0 <= Queue.length t.pkt_in - Queue.length t.pkt_out <= 1
 *)
+(* TODO *)
 
 val newcon : backend -> t
 (*@ t = newcon back
@@ -177,10 +206,12 @@ val close : t -> unit
 
 val is_fd : t -> bool
 (*@ r = is_fd t
+    pure
     ensures r = not is_mmap_backend t.backend *)
 
 val is_mmap : t -> bool
 (*@ r = is_mmap t
+    pure
     ensures r = is_mmap_backend t.backend *)
 
 val output_len : t -> int
@@ -221,18 +252,22 @@ val has_in_packet : t -> bool
 val get_in_packet : t -> Packet.t
 (*@ p = get_in_packet t
     requires has_in_packet t
-    modifies t
+    modifies t.pkt_in
+    ensures old t.pkt_in.Queue.contents = Seq.snoc t.pkt_in.Queue.contents p
 *)
-(* TODO *)
 
 val has_more_input : t -> bool
-(*@ r = has_more_input t *)
-(* TODO *)
+(*@ r = has_more_input t
+    pure
+ *)
+(* TODO : select work_again field *)
 
 val is_selectable : t -> bool
 (*@ r = is_selectable t
-    ensures r = not is_mmap_backend t.backend *)
+    pure
+    ensures r <-> not is_mmap_backend t.backend *)
 
 val get_fd : t -> Unix.file_descr
 (*@ r = get_fd t
-    requires not is_mmap_backend t.backend *)
+    requires not is_mmap_backend t.backend
+*)
