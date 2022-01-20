@@ -23,7 +23,7 @@ type operation =
   | Invalid
 
 val size : int
-(*@ ensures size > 0 *)
+(*@ function size: integer *)
 
 val of_cval : int -> operation
 (*@ op = of_cval i *)
