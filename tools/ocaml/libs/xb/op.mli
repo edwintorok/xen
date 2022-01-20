@@ -21,9 +21,16 @@ type operation =
   | Set_target
   | Reset_watches
   | Invalid
-val operation_c_mapping : operation array
+
 val size : int
-val array_search : 'a -> 'a array -> int
+(*@ ensures size > 0 *)
+
 val of_cval : int -> operation
+(*@ op = of_cval i *)
+
 val to_cval : operation -> int
+(*@ r = to_cval op
+    ensures 0 <= r < size *)
+
 val to_string : operation -> string
+(*@ s = to_string op *)

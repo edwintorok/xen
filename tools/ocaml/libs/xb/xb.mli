@@ -24,9 +24,7 @@ module Op :
       | Set_target
       | Reset_watches
       | Invalid
-    val operation_c_mapping : operation array
     val size : int
-    val array_search : 'a -> 'a array -> int
     val of_cval : int -> operation
     val to_cval : operation -> int
     val to_string : operation -> string
