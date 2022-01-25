@@ -1,0 +1,3 @@
+(test
+(name xsgen_monolith)
+(libraries monolith ortac-runtime-monolith xen.store threads.posix xenstored_test))
