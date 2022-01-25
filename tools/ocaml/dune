@@ -15,12 +15,12 @@
  (action (run gospel check %{model} %{mli})))
 
  (rule
- (with-stdout-to eventchn_rtac.ml (run %{dep:model/ortac-wrap.sh} %{dep:libs/eventchn/xeneventchn.mli})))
+ (targets event_test_rtac.ml event_test_test.mli)
+ (deps (:model (glob_files model/*.mli)))
+ (action
+ (run %{dep:model/ortac-wrap.sh} %{dep:libs/eventchn/xeneventchn.mli} %{dep:event_test.mli})))
 
-(rule
-(with-stdout-to xeneventchn_test.ml (echo "include Xeneventchn")))
-
- (test
- (name eventchn_rtac)
- (libraries xen.eventchn ortac-runtime-monolith)
- )
+ ;(test
+ ;(name event_test_rtac)
+ ;(libraries xen.eventchn ortac-runtime-monolith)
+ ;)
