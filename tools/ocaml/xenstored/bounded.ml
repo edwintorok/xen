@@ -62,14 +62,14 @@ module Make(I: ImmutableContainer) = struct
   (*@ n = size t
       pure *)
 
-  (*@ invariant count t <= (raw t).count_limit *)
+  (*@ invariant count (raw t).container <= (raw t).count_limit *)
 
   (*@ invariant size t <= (raw t).size_limit *)
 
   (*@ invariant size t = (raw t).cached_size = container_size (raw t).container *)
 
   let create container ~count_limit ~size_limit =
-    if I.count container > count_limit then
+    if count container > count_limit then
       invalid_arg "Container has exceeded count limit";
     let cached_size = container_size container in
     if cached_size > size_limit then
@@ -80,20 +80,24 @@ module Make(I: ImmutableContainer) = struct
     ; cached_size
     }
   (*@ t = create container ~count_limit ~size_limit
-      raises Invalid_argument _ -> (count container > count_limit) || (container_size container > size_limit)
+      raises Invalid_argument _ -> count container > count_limit || container_size container > size_limit
       ensures (raw t).container = container
       ensures (raw t).count_limit = count_limit
       ensures (raw t).size_limit = size_limit
    *)
 
-  (*@ r = add t e
-      pure *)
+  (* TODO: cameleer should add invariants here automatically, ortac does *)
   let add t e =
     if I.count t.container >= t.count_limit then None
     else
-    let cached_size = t.size + I.element_size e in
+    let cached_size = t.cached_size + I.element_size e in
     if cached_size > t.size_limit then None
     else Some { t with cached_size; container = I.add t.container e }
+  (*@ r = add t e
+      ensures count (raw r).container <= (raw r).count_limit
+      ensures (raw r).cached_size <= (raw r).size_limit
+      ensures (raw r).cached_size = container_size (raw r).container
+      *)
 
   let remove t e =
     let cached_size = t.cached_size - I.element_size e in
