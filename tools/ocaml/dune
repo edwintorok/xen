@@ -8,6 +8,7 @@
    (glob_files libs/xb/*.mli)
 ;   (glob_files libs/xc/*.mli)
    (glob_files libs/xentoollog/*.mli)
+   xenstored/bounded.mli
 ;   (glob_files libs/xs/*.mli)
 ; (glob_files xenstored/*.mli)
   )
@@ -24,3 +25,7 @@
  ;(name event_test_rtac)
  ;(libraries xen.eventchn ortac-runtime-monolith)
  ;)
+
+ (rule
+  (alias cameleer-check)
+  (action (run cameleer %{dep:xenstored/bounded.ml} --prover=cvc4-ce --batch)))
