@@ -9,8 +9,41 @@
    (glob_files libs/xb/*.mli)
    ;   (glob_files libs/xc/*.mli)
    (glob_files libs/xentoollog/*.mli)
-;   (glob_files libs/xs/*.mli)
-; (glob_files xenstored/*.mli)
-  )
- )
- (action (run gospel check %{model} %{mli})))
+   ;   xenstored/bounded.mli
+   ;   (glob_files libs/xs/*.mli)
+   ; (glob_files xenstored/*.mli)
+   ))
+ (action
+  (run gospel check %{model} %{mli})))
+
+(rule
+ (targets xsgen_rtac.ml xsgen_test.mli)
+ (deps
+  (:model
+   (glob_files model/*.mli)))
+ (action
+  (run
+   %{dep:model/ortac-wrap.sh}
+   %{dep:xsgen.mli})))
+
+(test
+(name xsgen_monolith)
+(libraries monolith ortac-runtime-monolith xen.store threads.posix xenstored_test)
+)
+
+(rule
+(alias ortac-fuzz1)
+(deps xsgen_monolith.exe (sandbox none))
+(action
+ (run bun -svv -o ../../afl-output ./xsgen_monolith.exe))
+)
+
+(rule
+(alias ortac-fuzz)
+(deps xsgen_monolith.exe (sandbox none))
+(action (run bun -o ../../afl-output ./xsgen_monolith.exe)))
+
+(rule
+(alias ortac-fuzz-keepgoing)
+(deps xsgen_monolith.exe (sandbox none))
+(action (run bun --no-kill -o ../../afl-output ./xsgen_monolith.exe)))
