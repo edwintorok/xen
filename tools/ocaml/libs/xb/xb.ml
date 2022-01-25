@@ -17,6 +17,49 @@
 module Op = struct include Op end
 module Packet = struct include Packet end
 
+module BoundedQueue : sig
+	type 'a t
+
+	(** [create ~capacity] creates a queue with maximum [capacity] elements. *)
+	val create: capacity:int -> 'a t
+
+	(** [clear q] discards all elements from [q] *)
+	val clear: 'a t -> unit
+
+	(** [can_push q] when [length q < capacity].	*)
+	val can_push: 'a t -> bool
+
+	(** [push e q] adds [e] at the end of queue [q] if [can_push q], or returns [None]. *)
+	val push: 'a -> 'a t -> unit option
+
+	(** [pop q] removes and returns first element in [q], or raises [Queue.Empty]. *)
+	val pop: 'a t -> 'a
+
+	(** [peek q] returns the first element in [q], or raises [Queue.Empty].  *)
+	val peek : 'a t -> 'a
+
+	(** [length q] returns the current number of elements in [q] *)
+	val length: 'a t -> int
+end = struct
+	type 'a t = { q: 'a Queue.t; capacity: int }
+
+	let create ~capacity =
+		{ capacity; q = Queue.create () }
+
+	let can_push t = Queue.length t.q < t.capacity
+	let push e t =
+		if can_push t then
+			Some (Queue.push e t.q)
+		else
+			None
+
+	let clear t = Queue.clear t.q
+	let pop t = Queue.pop t.q
+	let peek t = Queue.peek t.q
+	let length t = Queue.length t.q
+end
+
+
 exception End_of_file
 exception Eagain
 exception Noent
