@@ -94,13 +94,12 @@ type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 (*@ function max_domain_queued: integer *)
 (*@ axiom queuelen: 1 < max_domain_queued && max_domain_queued * Partial.xenstore_payload_max <= max_domain_bytes *)
 
-type t = {
-  backend : backend;
-  pkt_in : Packet.t Queue.t;
-  pkt_out : Packet.t Queue.t;
-  mutable partial_in : partial_buf;
-  mutable partial_out : string;
-}
+type t
+(*@ model backend: backend
+    model pkt_in: Packet.t Queue.t
+    model pkt_out: Packet.t Queue.t
+    mutable model partial_in: partial_buf
+    mutable model partial_out: string *)
 (*@ invariant is_valid_partial_buf(partial_in) *)
 (*@ invariant Queue.length pkt_in + Queue.length pkt_out <= max_domain_queued *)
 (*@ invariant String.length partial_out <= Partial.xenstore_payload_max *)
@@ -248,6 +247,12 @@ val has_in_packet : t -> bool
 (*@ r = has_in_packet t
     pure
     ensures r <-> input_len t > 0 *)
+
+val has_partial_input : t -> bool
+(*@ r = has_partial_input t
+    pure
+    ensures r <->
+      (match t.partial_in with HaveHdr _ -> true | NoHdr(n, _) -> n < Partial.headersize) *)
 
 val get_in_packet : t -> Packet.t
 (*@ p = get_in_packet t
