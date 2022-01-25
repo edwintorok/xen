@@ -1,0 +1,10 @@
+(copy_files# ../../xenstored/*.ml{,i})
+
+(library
+ (modes native)
+ (name xenstored_test)
+ (ocamlopt_flags -afl-instrument)
+ (modules (:standard \ systemd xenstored))
+ (flags (:standard -w -52))
+ ;;(action (run %{test} -v --seed 364172147))
+ (libraries unix xen.bus xen.mmap xenstubs xen.store))
