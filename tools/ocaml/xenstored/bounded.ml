@@ -1,108 +1,126 @@
-module type ImmutableContainer = sig
-  type size = int (** bytes, or words, or count, defined by container. *)
+module type Sys = sig
+  (*@ function _word_size_bytes: integer *)
+  (*@ axiom bitness: _word_size_bytes = 4 || _word_size_bytes = 8 *)
+  (*@ function word_size: integer = _word_size_bytes * 8 *)
 
-  type element (** the type of elements in the container *)
-
-  val element_size: element -> size
-  (** [element_size el] is the size of [el] computed in O(1) *)
-  (*@ n = element_size el
-      pure
-      ensures 0 <= n
-   *)
-
-  type t (** the type of the container *)
-
-  val count: t -> int
-  (*@ n = count t
-      pure
-      ensures 0 <= n *)
-
-  val add: t -> element -> t
-  (*@ r = add t e
-      pure
-   *)
-
-  val remove: t -> element -> t
-  (*@ r = remove t e
-      pure
+  (*@ function max_array_length: integer *)
+  (*@ axiom maxarrayl:
+    (word_size = 32 -> max_array_length = 4194303)
+    && (word_size = 64 -> 4194303 < max_array_length <= 18014398509481983)
     *)
 
-  val fold: ('a -> element -> 'a) -> 'a -> t -> 'a
-  (*@ r = fold f init t
-      pure *)
-
+  (*@ function max_string_length: integer = _word_size_bytes * max_array_length - 1 *)
 end
 
-module Make(I: ImmutableContainer) = struct
-  type size = I.size
-  type container = I.t
-  type element = I.element
+module type Sized = sig
+  type t (** a type that we want to associate a size with *)
 
-  type raw =
-    { container: container
-    ; count_limit: int
-    ; size_limit: int
-    ; cached_size: int
-    }
-
-  type t = raw
-  let[@logic] count x = I.count x
-  (*@ n = count t
+  val size_bytes: t -> int
+  (** [size_bytes t] is the size in bytes of [t], to be used for quota purposes.
+      It should be related to the size that a xenstore client specified, and exclude any
+      OCaml/implementation specific overhead.
+      It should include the size of any values it contains (even if that value is shared).
+      The OCaml overhead must have a constant upper bound defined by {!val:overhead_words}.
+      It should be computed in O(1).
+      *)
+  (*@ n = size_bytes t
       pure
-      ensures 0 <= n *)
+      ensures 0 <= n <= Sys.max_string_length *)
+  (* [t] was at some point stored in a Packet, thus in a String, hence its size cannot be larger
+      than maximum string size. *)
 
-  let[@logic] raw x = x
-  (*@ r = raw t
+  val max_overhead_words: int
+  (** [max_overhead] is the maximum overhead (in words) that the OCaml value itself uses.
+      E.g. [2] for a String, and is at least [1] word for the OCaml value header.
+      It does not include any extra overhead used by a container to store the item, that overhead
+      will be declared on the container itself.
+      *)
+  (*@ ensures 1 <= result < Sys.max_string_length *)
+end
+
+(*@ open Seq *)
+
+module type Container = sig
+  type 'a t
+  (** The type of an immutable container holding elements of type 'a. *)
+  (*@ model contents: 'a seq *)
+  (* we model it with a sequence, although a bag would suffice, but cameleer doesn't implement it yet *)
+
+  val fold: ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
+  (** [fold f init c] traverses [c] and calls [f acc] on each element,
+      where [acc] starts out with [init]. *)
+  (*@ r = fold f init t
       pure *)
+  (* cameleer doesn't have Seq.fold_left to express what 'r' is yet *)
 
-  let[@logic] container_size c =
-    I.fold (fun s e -> s + I.element_size e) 0 c
-
-  let size t = t.cached_size
-  (*@ n = size t
-      pure *)
-
-  (*@ invariant count (raw t).container <= (raw t).count_limit *)
-
-  (*@ invariant size t <= (raw t).size_limit *)
-
-  (*@ invariant size t = (raw t).cached_size = container_size (raw t).container *)
-
-  let create container ~count_limit ~size_limit =
-    if count container > count_limit then
-      invalid_arg "Container has exceeded count limit";
-    let cached_size = container_size container in
-    if cached_size > size_limit then
-      invalid_arg "Container has exceeded size limit";
-    { container
-    ; count_limit
-    ; size_limit
-    ; cached_size
-    }
-  (*@ t = create container ~count_limit ~size_limit
-      raises Invalid_argument _ -> count container > count_limit || container_size container > size_limit
-      ensures (raw t).container = container
-      ensures (raw t).count_limit = count_limit
-      ensures (raw t).size_limit = size_limit
-   *)
-
-  (* TODO: cameleer should add invariants here automatically, ortac does *)
-  let add t e =
-    if I.count t.container >= t.count_limit then None
-    else
-    let cached_size = t.cached_size + I.element_size e in
-    if cached_size > t.size_limit then None
-    else Some { t with cached_size; container = I.add t.container e }
+  val add: 'a t -> 'a -> 'a t
+  (** [add t e] adds [e] to [t] *)
   (*@ r = add t e
-      ensures count (raw r).container <= (raw r).count_limit
-      ensures (raw r).cached_size <= (raw r).size_limit
-      ensures (raw r).cached_size = container_size (raw r).container
+      pure
+      ensures r.contents = Seq.cons e t.contents
       *)
 
-  let remove t e =
-    let cached_size = t.cached_size - I.element_size e in
-    { t with container = I.remove t.container e; cached_size }
+  val remove: 'a t -> 'a -> 'a t
+  (** [remove t e] removes [e] from [t] *)
   (*@ r = remove t e
+      requires Seq.mem e t.contents
       pure
-   *)
+      ensures Seq.cons e r.contents = t.contents *)
+end
+
+module SizedContainer(C: Container)(S: Sized) = struct
+  let fold = C.fold
+
+  let[@logic] sum acc e = acc + S.size_bytes e
+
+  type element = S.t
+
+  type t =
+    { cached_size: int
+    ; container: S.t C.t }
+  (*@ invariant cached_size = fold sum 0 container *)
+
+  let create container =
+    let cached_size = C.fold sum 0 container in
+    { cached_size; container }
+
+  let add t e =
+    let cached_size = t.cached_size + S.size_bytes e in
+    { cached_size; container = C.add t.container e }
+
+  let remove t e =
+    let cached_size = t.cached_size - S.size_bytes e in
+    { cached_size; container = C.remove t.container e }
+
+  let size_bytes t = t.cached_size
+end
+
+(* TODO: use SC instead *)
+module Bounded(S: Sized)(C: Container with type 'a t = S.t) = struct
+  let size_bytes = S.size_bytes
+  type t =
+    { byte_limit: int
+    ; container: S.t
+   }
+  (*@ invariant size_bytes container <= byte_limit *)
+
+  let create container ~byte_limit =
+    if S.size_bytes container > byte_limit then None
+    else Some { byte_limit; container }
+  (*@ t = create container ~byte_limit
+      requires byte_limit >= 0
+      pure
+      *)
+
+  let add t e =
+    let container = C.add t.container e in
+    (* we could move this before the add if we change the types to give us element size *)
+    if S.size_bytes t.container > t.byte_limit then None
+    else Some { t with container }
+  (*@ r = add t e
+      pure *)
+
+  let remove t e = { t with container = C.remove t.container e }
+  (*@ r = remove t e
+      pure *)
 end

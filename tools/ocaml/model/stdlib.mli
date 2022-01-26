@@ -2,3 +2,4 @@
 exception Failure of string
 
 (*@ type bytes *)
+
