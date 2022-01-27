@@ -37,17 +37,17 @@ module type S = sig
       ensures r = t.raw *)
 end
 
-module Make(R: Raw) :S with type raw = R.t = struct
+module Make(R: Raw) = struct
   type raw = R.t
-
-  type t = { raw: R.t }
-  (* TODO: only because of model *)
-
-  (*@ predicate is_valid (x:raw) = R.is_valid x *)
+  type t = raw
 
   let validate raw =
     if R.is_valid raw then Some { raw }
     else None
+  (*@ t = validate raw
+      pure
+      ensures R.is_valid raw <-> t = Some raw *)
 
-  let to_raw t = t.raw
+  let raw t =
+    if 
 end
