@@ -46,6 +46,7 @@ let[@logic] is_safe_size i = i >= 0 && i <= safe_max_int
 type t = { limit: int; sum: int }
 (*@ invariant is_safe_size limit
     invariant 0 <= sum <= limit
+    invariant int_in_bounds limit && int_in_bounds sum
  *)
 
 let create_exn limit =
@@ -71,7 +72,7 @@ let add x t =
     pure
     ensures (let sum = t.sum + x in match ropt with
       | None -> sum < t.sum || sum > t.limit
-      | Some r -> r.sum = sum && r.limit = t.limit && r.sum >= t.sum && is_safe_size sum )
+      | Some r -> r.sum = sum && r.limit = t.limit && r.sum >= t.sum )
   *)
 
 let remove x t = {t with sum = t.sum - x}
