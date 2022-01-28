@@ -62,7 +62,7 @@ let create_exn limit =
 
 let add x t =
   let sum = t.sum + x in
-  if is_safe_size x && 0 <= sum && sum <= t.limit then
+  if 0 <= x && x <= t.limit && 0 <= sum && sum <= t.limit then
     Some { t with sum }
   else None
 (** [add x t] will add [x] to [t] if doing so wouldn't cause limits to be exceeded.
