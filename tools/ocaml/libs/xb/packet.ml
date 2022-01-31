@@ -48,3 +48,5 @@ let get_data pkt =
 	else
 		pkt.data
 let get_rid pkt = pkt.rid
+
+let size_bytes pkt = String.length pkt.data + Partial.header_size ()

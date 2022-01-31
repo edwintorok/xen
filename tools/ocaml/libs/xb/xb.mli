@@ -126,7 +126,7 @@ val reconnect : t -> unit
     ensures is_empty t
  *)
 
-val queue : t -> Packet.t -> unit
+val queue : t -> Packet.t -> unit option
 (*@ queue t p
     modifies t
  *)
@@ -183,8 +183,8 @@ val input : t -> bool
 *)
 (* TODO *)
 
-val newcon : backend -> t
-(*@ t = newcon back
+val newcon : ?limit:int -> backend -> t
+(*@ t = newcon ?limit back
     ensures t.backend = back
     ensures is_empty t *)
 

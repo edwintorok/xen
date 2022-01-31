@@ -45,8 +45,8 @@ type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 type t =
 {
 	backend: backend;
-	pkt_in: Packet.t Queue.t;
-	pkt_out: Packet.t Queue.t;
+	pkt_in: Packet.t Sized_queue.t;
+	pkt_out: Packet.t Sized_queue.t;
 	mutable partial_in: partial_buf;
 	mutable partial_out: string;
 }
@@ -62,12 +62,12 @@ let reconnect t = match t.backend with
 		Xs_ring.close backend.mmap;
 		backend.eventchn_notify ();
 		(* Clear our old connection state *)
-		Queue.clear t.pkt_in;
-		Queue.clear t.pkt_out;
+		Sized_queue.clear t.pkt_in;
+		Sized_queue.clear t.pkt_out;
 		t.partial_in <- init_partial_in ();
 		t.partial_out <- ""
 
-let queue con pkt = Queue.push pkt con.pkt_out
+let queue con pkt = Sized_queue.push pkt con.pkt_out
 
 let read_fd back _con b len =
 	let rd = Unix.read back.fd b 0 len in
@@ -108,8 +108,8 @@ let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
 	let s = if String.length con.partial_out > 0 then
 			con.partial_out
-		else if Queue.length con.pkt_out > 0 then
-			Packet.to_string (Queue.pop con.pkt_out)
+		else if Sized_queue.length con.pkt_out > 0 then
+			Packet.to_string (Sized_queue.pop con.pkt_out)
 		else
 			"" in
 	(* send data from s, and save the unsent data to partial_out *)
@@ -142,9 +142,17 @@ let input con =
 			Partial.append partial_pkt (Bytes.to_string b) sz;
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
-			con.partial_in <- init_partial_in ();
-			Queue.push pkt con.pkt_in;
-			newpacket := true
+			match Sized_queue.push pkt con.pkt_in with
+			| None ->
+			    (* We always process one packet at a time in a cycle, so this shouldn't happen.
+			       If it does, it means we've got unprocessed packets in the queue,
+			       so those should get processed first to make room.
+			       Until then we treat this as if we haven't received any more input.
+			       *)
+			    ()
+			| Some () ->
+			  con.partial_in <- init_partial_in ();
+			  newpacket := true
 		)
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
@@ -155,10 +163,10 @@ let input con =
 	);
 	!newpacket
 
-let newcon backend = {
+let newcon ?(limit=Sys.max_string_length) backend = {
 	backend = backend;
-	pkt_in = Queue.create ();
-	pkt_out = Queue.create ();
+	pkt_in = Sized_queue.create_exn Packet.size_bytes limit;
+	pkt_out = Sized_queue.create_exn Packet.size_bytes limit;
 	partial_in = init_partial_in ();
 	partial_out = "";
 	}
@@ -185,17 +193,17 @@ let is_fd con =
 
 let is_mmap con = not (is_fd con)
 
-let output_len con = Queue.length con.pkt_out
-let has_new_output con = Queue.length con.pkt_out > 0
+let output_len con = Sized_queue.length con.pkt_out
+let has_new_output con = Sized_queue.length con.pkt_out > 0
 let has_old_output con = String.length con.partial_out > 0
 
 let has_output con = has_new_output con || has_old_output con
 
-let peek_output con = Queue.peek con.pkt_out
+let peek_output con = Sized_queue.peek con.pkt_out
 
-let input_len con = Queue.length con.pkt_in
-let has_in_packet con = Queue.length con.pkt_in > 0
-let get_in_packet con = Queue.pop con.pkt_in
+let input_len con = Sized_queue.length con.pkt_in
+let has_in_packet con = Sized_queue.length con.pkt_in > 0
+let get_in_packet con = Sized_queue.pop con.pkt_in
 let has_partial_input con = match con.partial_in with
 	| HaveHdr _ -> true
 	| NoHdr (n, _) -> n < Partial.header_size ()

@@ -1,4 +1,5 @@
 (library
+ (flags (:standard -strict-sequence))
  (foreign_stubs
   (language c)
   (names xenbus_stubs xs_ring_stubs))

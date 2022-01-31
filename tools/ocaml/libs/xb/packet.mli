@@ -43,3 +43,8 @@ val get_rid : t -> int
 (*@ rid = get_rid t
     ensures rid = t.rid && rid >= 0
 *)
+
+val size_bytes: t -> int
+(*@ n = size_bytes t
+    pure
+    ensures n = String.length t.data + Partial.headersize *)
