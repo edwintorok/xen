@@ -84,3 +84,9 @@ let remove x t = {t with sum = t.sum - x}
     ensures r.limit = t.limit
     ensures r.sum + x = t.sum
     *)
+
+let clear t = { t with sum = 0 }
+(*@ r = clear t
+    pure
+    ensures r.sum = 0
+    ensures r.limit = t.limit *)
