@@ -126,7 +126,7 @@ val reconnect : t -> unit
     ensures is_empty t
  *)
 
-val queue : t -> Packet.t -> unit option
+val queue : t -> Packet.t -> unit
 (*@ queue t p
     modifies t
  *)

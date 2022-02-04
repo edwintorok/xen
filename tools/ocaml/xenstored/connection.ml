@@ -208,6 +208,8 @@ let lookup_watch_perm path = function
 let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
+let valid = Some ()
+
 let fire_single_watch_unchecked watch =
 	let data = Utils.join_by_null [watch.path; watch.token; ""] in
 	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
@@ -220,7 +222,8 @@ let fire_single_watch (oldroot, root) watch =
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
-		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
+		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath);
+		valid
 
 let fire_watch roots watch path =
 	let new_path =

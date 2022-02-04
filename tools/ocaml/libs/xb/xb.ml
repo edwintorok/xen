@@ -51,6 +51,9 @@ type t =
 	mutable partial_out: string;
 }
 
+let size t =
+	Sized_queue.size t.pkt_in + Sized_queue.size t.pkt_out
+
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
 
@@ -142,17 +145,9 @@ let input con =
 			Partial.append partial_pkt (Bytes.to_string b) sz;
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
-			match Sized_queue.push pkt con.pkt_in with
-			| None ->
-			    (* We always process one packet at a time in a cycle, so this shouldn't happen.
-			       If it does, it means we've got unprocessed packets in the queue,
-			       so those should get processed first to make room.
-			       Until then we treat this as if we haven't received any more input.
-			       *)
-			    ()
-			| Some () ->
-			  con.partial_in <- init_partial_in ();
-			  newpacket := true
+			Sized_queue.push pkt con.pkt_in;
+			con.partial_in <- init_partial_in ();
+			newpacket := true
 		)
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)

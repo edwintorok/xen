@@ -8,7 +8,7 @@
    (glob_files libs/xb/*.mli)
 ;   (glob_files libs/xc/*.mli)
    (glob_files libs/xentoollog/*.mli)
-   xenstored/bounded.mli
+;   xenstored/bounded.mli
 ;   (glob_files libs/xs/*.mli)
 ; (glob_files xenstored/*.mli)
   )

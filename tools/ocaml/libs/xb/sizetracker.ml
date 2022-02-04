@@ -90,3 +90,11 @@ let clear t = { t with sum = 0 }
     pure
     ensures r.sum = 0
     ensures r.limit = t.limit *)
+
+module Relaxed = struct
+  type nonrec t = t option
+  let empty = Some (create_exn safe_max_int)
+  let add x opt = Option.bind opt (add x)
+  let remove x opt = Option.map (remove x) opt
+  let clear (_:t option) = empty
+end
