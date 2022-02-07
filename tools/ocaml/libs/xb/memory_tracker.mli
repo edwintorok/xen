@@ -1,51 +1,73 @@
 module Size : sig
   type t = private int
   (** a type representing the size of a value with overflow detection *)
+  (* we cannot attach invariant to type aliases, so we'll add 'requires/ensures'
+     to all functions handling 't' *)
 
   val invalid: t
   (** [invalid] is a size value that has overflown and is not valid. *)
-  (*@ ensures result > 0 *)
+  (*@ ensures result < 0 *)
 
-  (* we cannot attach invariant to type aliases, so we'll add 'requires/ensures'
-     to all functions handling 't' *)
-  (*@ predicate is_t(t: integer) = 0 <= t <= invalid *)
-  (*@ predicate is_valid_t(t: integer) = is_t t && t <> invalid *)
+  (*@ function to_int(x: t): int *)
+  (*@ predicate is_t(i:t) *)
 
-  val to_int: t -> int option
-  (** [to_int t] returns [Some t] if [t] represents a valid size, and None otherwise. *)
-  (*@ r = to_int i
-      requires is_t i
-      pure
-      ensures i = invalid <-> r = None
-      ensures in_valid_t i <-> r = Some i
-      *)
-
-  val of_int : int -> t
-  (** [of_int t] is [t] when [t] >= 0, or an invalid value such that [to_int] will return None.  *)
+  val of_int: int -> t
+  (** [of_int t] is [t] when [0 <= t < max_int/2], or an invalid value otherwise,
+      such that [to_int (of_int invalid)] will return None. *)
   (*@ r = of_int i
       pure
       ensures is_t r
-      ensures is_valid_t i <-> r = i && to_int r = Some i
-      ensures not in_valid_t i <-> to_int r = None
-      *)
+      ensures is_valid_size i -> to_int r = i
+      ensures not is_valid_size i <-> not is_valid_size (to_int r)
+    *)
+  (* 'to_int r = i -> is_valid_size i' is not true when i = min_int so we only use -> and not <-> *)
 
-  val (+) : t -> t -> t
-  (** [a + b] is a saturating add of [a] and [b].
-      If [a+b] would overflow then the result is set to [max_int].
+  val[@logic] to_int_opt: t -> int option
+  (** [to_int_opt t] returns [Some t] if [t] represents a valid size, and None otherwise. *)
+  (*@ r = to_int_opt i
+      requires is_t i
+      pure
+      ensures is_valid_size (to_int i)  <-> r = Some (to_int i)
+      ensures not is_valid_size (to_int i) <-> r = None
+    *)
+  (* r is None if and only if [i] is not a valid size, hence the <-> *)
+
+  val invalid: t
+  (** [invalid] is a size value that has overflown and is not valid. *)
+  (*@ ensures to_int_opt invalid = None *)
+
+  val (+): t -> t -> t
+  (** [a + b] adds [a] and [b] if they do not overflow.
+      If [a+b] would overflow then the result is set to an invalid value,
+      such that all further operations on the invalid value will result in an invalid value.
       This ensures that overflows do not go undetected *)
   (*@ r = (+) a b
       requires is_t a && is_t b
       pure
-      ensures r = of_int (a+b)
-   *)
+      ensures is_t r
+      ensures is_valid_size (to_int a)
+              && is_valid_size (to_int b)
+              && is_valid_size ((to_int a) + (to_int b)) <-> to_int_opt r = Some ((to_int a) + (to_int b))
+      ensures not is_valid_size (to_int a)
+              || not is_valid_size (to_int b)
+              || not is_valid_size ((to_int a) + (to_int b)) <-> to_int_opt r = None
+    *)
 
-  val (-) : t -> t -> t
-  (** [a - b] is a saturating subtraction of [a] and [b].
-      If [a - b] would become negative then the result is set to [-1]. *)
+  val (-): t -> t -> t
+  (** [a - b] subtracts [a] and [b] if they do not overflow.
+      If [a-b] would overflow then the result is set to an invalid value,
+      such that all further operations on the invalid value will result in an invalid value.
+      This ensures that overflows do not go undetected *)
   (*@ r = (-) a b
       requires is_t a && is_t b
       pure
-      ensures r = of_int (a-b)
+      ensures is_t r
+      ensures is_valid_size (to_int a)
+              && is_valid_size (to_int b)
+              && is_valid_size ((to_int a) - (to_int b)) <-> to_int_opt r = Some ((to_int a) - (to_int b))
+      ensures not is_valid_size (to_int a)
+              || not is_valid_size (to_int b)
+              || not is_valid_size ((to_int a) - (to_int b)) <-> to_int_opt r = None
     *)
 
   val of_words: int -> t
