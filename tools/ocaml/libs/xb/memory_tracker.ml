@@ -139,8 +139,45 @@ module Hashtbl = struct
     Size.(t.size + of_int overhead)
 end
 
+module List = struct
+  type 'a t =
+    { l: 'a list
+    ; mutable size: Tracker.t
+    ; mutable length: int
+    ; get_size: 'a -> Size.t
+    }
+
+  let empty get_size = { l = []; size = Tracker.empty; length = 0; get_size }
+  let cons a t = { t with l = a :: t.l; size = Tracker.add t.size (t.get_size a); length = t.length + 1}
+  let length t = t.length
+  let hd t = List.hd t.l
+  let tl t = List.tl t.l
+  let rev t = { t with l = List.rev t.l }
+  let rev_append l1 l2 =
+    assert (l1.get_size == l2.get_size);
+    { l = List.rev_append l1.l l2.l
+    ; size = Tracker.add l1.size l2.size
+    ; length = l1.length + l2.length
+    ; get_size = l1.get_size }
+  let iter f t = List.iter f t.l
+  let rev_map get_size f t =
+    let l = List.rev_map f t.l in
+    { l
+    ; size = List.fold_left Tracker.add Tracker.empty l
+    ; length = t.length
+    ; get_size }
+
+  let fold_left f init t = List.fold_left f init t.l
+  (* TODO: more list functions as needed *)
+end
+
 let size_of_string s = Size.of_bytes (String.length s)
 let size_of_bytes s = Size.of_bytes (Bytes.length s)
+
+let value = Size.of_words 0
+let size_of_option size_of_element = function
+  | None -> value
+  | Some x -> Size.(value + size_of_element x)
 
 (* TODO: ortac specifications that size_of is a good approximation for Obj.reachable_size, i.e. that
    it matches exactly for queues, and it is an over-approximation for Hashtbls.
