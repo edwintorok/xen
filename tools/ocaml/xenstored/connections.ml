@@ -16,7 +16,7 @@
  *)
 
 let debug fmt = Logging.debug "connections" fmt
-
+open Xenbus.Memory_tracker
 type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
@@ -24,10 +24,13 @@ type t = {
 	mutable watches: Connection.watch list Trie.t;
 }
 
+let fdsize (_:Unix.file_descr) = 0 (* +1 by default *)
+let intsize (_:int) = 0
+
 let create () = {
-	anonymous = Hashtbl.create 37;
-	domains = Hashtbl.create 37;
-	ports = Hashtbl.create 37;
+	anonymous = Hashtbl.create fdsize Connection.size_of 37;
+	domains = Hashtbl.create intsize Connection.size_of 37;
+	ports = Hashtbl.create Xeneventchn.size_of Connection.size_of 37;
 	watches = Trie.create ()
 }
 

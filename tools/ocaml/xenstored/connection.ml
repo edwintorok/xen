@@ -16,6 +16,7 @@
 
 exception End_of_file
 
+open Xenbus.Memory_tracker
 open Stdext
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
@@ -33,12 +34,22 @@ and t = {
 	dom: Domain.t option;
 	transactions: (int, Transaction.t) Hashtbl.t;
 	mutable next_tid: int;
-	watches: (string, watch list) Hashtbl.t;
+	watches: (string, watch List.t) Hashtbl.t;
 	mutable nb_watches: int;
 	anonid: int;
 	mutable stat_nb_ops: int;
 	mutable perm: Perms.Connection.t;
 }
+
+open Xenbus.Sizeops
+let size_of t =
+  Size.( Xenbus.Xb.size_of t.xb
+       + option_size_of Domain.size_of t.dom
+       + Hashtbl.size_of t.transactions
+       + 1
+       + Hashtbl.size_of size_of_string (List.size_of sizeo_of_watch)
+       + Perms.Connection.size_of t.perm )
+
 
 let mark_as_bad con =
 	match con.dom with
@@ -208,7 +219,6 @@ let lookup_watch_perm path = function
 let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
-let valid = Some ()
 
 let fire_single_watch_unchecked watch =
 	let data = Utils.join_by_null [watch.path; watch.token; ""] in
@@ -222,8 +232,7 @@ let fire_single_watch (oldroot, root) watch =
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
-		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath);
-		valid
+		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
 
 let fire_watch roots watch path =
 	let new_path =

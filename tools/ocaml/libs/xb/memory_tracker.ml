@@ -169,6 +169,8 @@ module List = struct
 
   let fold_left f init t = List.fold_left f init t.l
   (* TODO: more list functions as needed *)
+
+  let size_of t = t.size
 end
 
 let size_of_string s = Size.of_bytes (String.length s)
