@@ -36,3 +36,5 @@ val to_complete : pkt -> int
     ensures n = pkt.len - Buffer.length pkt.buf
     ensures n >= 0
     *)
+
+val size_of: pkt -> Sizeops.Size.t

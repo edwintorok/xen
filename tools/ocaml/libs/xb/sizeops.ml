@@ -36,7 +36,7 @@ let[@logic] invalid_size = Pervasives.max_int / 2
 (*@ predicate is_valid_size(i: integer) = 0 <= i < invalid_size *)
 
 module type SizeSig = sig
-  type t (* = private int - removed for cameleer *)
+  type t = private int (* = private int - removed for cameleer *)
   (* we cannot define a GOSPEL model here yet,
      because we want this to be an integer, and not a record containing an integer *)
   (* is it very important that the type 't' here is either completely abstract,
@@ -154,6 +154,25 @@ module type SizeSig = sig
 
       ensures forall x. is_t x && to_int_opt x = None -> x = result
     *)
+
+  val of_words: int -> t
+  (** [words i] is the size of a value containing [i] words.
+      Automatically adds 1 for OCaml value overhead *)
+  (*@ r = of_words w
+      pure
+      ensures is_t r
+      ensures r = of_int (w+1)
+      *)
+
+  val of_bytes: int -> t
+  (** [of_bytes b] is the size of a value containing [i] bytes,
+      rounded up to nearest word, including the 1 word overhead from OCaml values. *)
+  (*@ w = of_bytes b
+      pure
+      ensures is_t w
+      ensures is_valid_size b -> is_valid_size w
+      ensures b < 0 -> to_int_opt w = None
+      *)
 end
 
 

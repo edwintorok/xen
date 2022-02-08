@@ -51,3 +51,7 @@ let append pkt s sz =
 
 let to_complete pkt =
 	pkt.len - (Buffer.length pkt.buf)
+
+open Sizeops
+let size_of t =
+  Size.(of_int 5 + of_bytes (Buffer.length t.buf))

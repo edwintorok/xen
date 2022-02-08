@@ -49,4 +49,9 @@ let get_data pkt =
 		pkt.data
 let get_rid pkt = pkt.rid
 
-let size_bytes pkt = String.length pkt.data + Partial.header_size ()
+open Memory_tracker
+open Sizeops
+
+let overhead =  Size.of_int 4
+let size_of pkt =
+  Size.(size_of_string pkt.data + overhead)

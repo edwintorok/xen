@@ -139,6 +139,9 @@ module Hashtbl = struct
     Size.(t.size + of_int overhead)
 end
 
+let size_of_string s = Size.of_bytes (String.length s)
+let size_of_bytes s = Size.of_bytes (Bytes.length s)
+
 (* TODO: ortac specifications that size_of is a good approximation for Obj.reachable_size, i.e. that
    it matches exactly for queues, and it is an over-approximation for Hashtbls.
    Obj.reachable_size would be O(n) though, whereas [size_t] is meant to be O(1).
