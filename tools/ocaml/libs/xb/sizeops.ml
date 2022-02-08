@@ -20,7 +20,7 @@ end
 (* The GOSPEL specifications can be checked via cameleer, either by using the dune rule,
    or directly:
    ```
-   cameleer memory_tracker.ml --prover=cvc4-ce --batch
+   cameleer sizeops.ml --prover=cvc4-ce --batch
    ```
 
    alt-ergo can also be used as a prover, however for debugging the specification and the code
