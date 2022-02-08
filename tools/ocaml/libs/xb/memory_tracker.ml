@@ -296,4 +296,33 @@ module Size: SizeSig = struct
       (* same as for +, but for - here *)
     *)
 
+  let of_words x = of_int (x+1)
+  (** [words i] is the size of a value containing [i] words.
+      Automatically adds 1 for OCaml value overhead *)
+  (*@ r = of_words w
+      pure
+      ensures is_t r
+      ensures r = of_int (w+1)
+      *)
+
+
+  let bytes_per_word = Sys.word_size / 8
+  (*@ ensures result = 4 *)
+
+  let words_of_bytes b = (b + bytes_per_word - 1) / bytes_per_word
+  (*@ w = words_of_bytes b
+      requires b >= 0
+      pure
+      ensures (w-1) * bytes_per_word < b <= w * bytes_per_word
+    *)
+
+  let of_bytes b = if b < 0 then invalid else of_words (words_of_bytes b)
+  (** [of_bytes b] is the size of a value containing [i] bytes,
+      rounded up to nearest word *)
+  (*@ w = of_bytes b
+      pure
+      ensures is_t w
+      ensures is_valid_size b -> is_valid_size w
+      ensures b < 0 -> to_int_opt w = None
+      *)
 end
