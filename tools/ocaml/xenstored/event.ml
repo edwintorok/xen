@@ -20,6 +20,16 @@ type t = {
 	mutable virq_port: Xeneventchn.t option;
 }
 
+open Xenbus.Sizeops
+
+let fields_of_t = Size.of_int 2
+
+(* Xeneventchn has some size overhead in its C stubs,
+   but we only ever have one of these per connection,
+   as long as it doesn't leak it is fine if we consider
+   only the OCaml size here *)
+let size_of _t = fields_of_t
+
 let init () = { handle = Xeneventchn.init (); virq_port = None; }
 let fd eventchn = Xeneventchn.fd eventchn.handle
 let bind_dom_exc_virq eventchn = eventchn.virq_port <- Some (Xeneventchn.bind_dom_exc_virq eventchn.handle)

@@ -127,9 +127,9 @@ module Hashtbl = struct
 
   let iter f t = Hashtbl.iter f t.h
 
-  let fold f t init = Hashtbl.fold f t init
+  let fold f t init = Hashtbl.fold f t.h init
 
-  let length t = Hashtbl.length t
+  let length t = Hashtbl.length t.h
 
   (* needs to be O(1) to avoid O(N^2) complexity in packet processing loop *)
   let size_of t =
@@ -147,11 +147,25 @@ module List = struct
     ; get_size: 'a -> Size.t
     }
 
+  let of_list get_size l =
+    let size = List.fold_left (fun acc e -> Tracker.add acc (get_size e)) Tracker.empty l in
+    { l; get_size; length = List.length l; size }
+
+  let filter f t = of_list t.get_size (List.filter f t.l)
+
   let empty get_size = { l = []; size = Tracker.empty; length = 0; get_size }
   let cons a t = { t with l = a :: t.l; size = Tracker.add t.size (t.get_size a); length = t.length + 1}
   let length t = t.length
   let hd t = List.hd t.l
-  let tl t = List.tl t.l
+  let tl t =
+    let l = List.tl t.l in
+    { l
+    ; size = Tracker.remove t.size (t.get_size (List.hd t.l))
+    ; length = t.length - 1
+    ; get_size = t.get_size
+    }
+
+
   let rev t = { t with l = List.rev t.l }
   let rev_append l1 l2 =
     assert (l1.get_size == l2.get_size);
@@ -163,7 +177,7 @@ module List = struct
   let rev_map get_size f t =
     let l = List.rev_map f t.l in
     { l
-    ; size = List.fold_left Tracker.add Tracker.empty l
+    ; size = List.fold_left (fun acc e -> Tracker.add acc (get_size e)) Tracker.empty l
     ; length = t.length
     ; get_size }
 
@@ -171,12 +185,24 @@ module List = struct
   (* TODO: more list functions as needed *)
 
   let size_of t = t.size
+
+  let for_all f t = List.for_all f t.l
+  let exists f t = List.exists f t.l
+  let find e t = List.find e t.l
+
+  let rev t =
+    { t with l = List.rev t.l }
+
+  let is_empty t = match t.l with [] -> true | _ -> false
+
 end
 
 let size_of_string s = Size.of_bytes (String.length s)
 let size_of_bytes s = Size.of_bytes (Bytes.length s)
 
 let value = Size.of_words 0
+
+let size_of_int _ = value
 let size_of_option size_of_element = function
   | None -> value
   | Some x -> Size.(value + size_of_element x)

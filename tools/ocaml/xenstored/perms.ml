@@ -100,21 +100,38 @@ end
 module Connection =
 struct
 
-type elt = Xenctrl.domid * (permty list)
+open Xenbus.Memory_tracker
+open Xenbus.Sizeops
+
+type elt = Xenctrl.domid * (permty List.t)
+
+let fields_of_elt = Size.of_int 2
+let size_of_elt (_, l) =
+  Size.(fields_of_elt + List.size_of l)
+
 type t =
 	{ main: elt;
 	  target: elt option; }
 
+let fields_of_t = Size.of_int 2
+let size_of t =
+  Size.( fields_of_t
+       + size_of_elt t.main
+       + size_of_option size_of_elt t.target
+  )
+
+let size_of_permty _ = Size.of_int 1
+let of_perms l = List.of_list size_of_permty l
 let full_rights : t =
-	{ main = 0, [READ; WRITE];
+	{ main = 0, of_perms [READ; WRITE];
 	  target = None }
 
 let create ?(perms=[NONE]) domid : t =
-	{ main = (domid, perms);
+	{ main = (domid, of_perms perms);
 	  target = None }
 
 let set_target (connection:t) ?(perms=[NONE]) domid =
-	{ connection with target = Some (domid, perms) }
+	{ connection with target = Some (domid, of_perms perms) }
 
 let get_owners (connection:t) =
 	match connection.main, connection.target with
@@ -129,8 +146,13 @@ let is_owner (connection:t) id =
 let is_dom0 (connection:t) =
 	is_owner connection 0
 
-let elt_to_string (i,p) =
-	Printf.sprintf "%i%S" i (String.concat "" (List.map String.of_char (List.map char_of_permty p)))
+let elt_to_string (i,perms) =
+	let is = Printf.sprintf "%i" i in (* string_of_int? *)
+	let b = Buffer.create (String.length is + List.length perms) in
+	List.iter (fun p ->
+	  Buffer.add_char b (char_of_permty p)
+	) perms;
+	Buffer.contents b
 
 let to_string connection =
 	Printf.sprintf "%s%s" (elt_to_string connection.main) (default "" (may elt_to_string connection.target))

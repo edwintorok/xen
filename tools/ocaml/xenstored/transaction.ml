@@ -77,18 +77,40 @@ type ty = No | Full of (
 	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
 )
 
+open Xenbus.Memory_tracker
+open Xenbus.Sizeops
 type t = {
 	ty: ty;
 	start_count: int64;
 	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
 	oldroot: Store.Node.t;
-	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
-	mutable operations: (Packet.request * Packet.response) list;
+	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) List.t;
+	mutable operations: (Packet.request * Packet.response) List.t;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
 let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
+
+let fields_of_reqresp = Size.of_int 5
+
+let size_of_resp = function
+  | Packet.Ack _ -> value
+  | Reply r -> size_of_string r
+  | Error e -> size_of_string e
+
+let size_of_reqresp (req, resp) =
+  Size.(fields_of_reqresp
+       + size_of_string req.Packet.data
+       + size_of_resp resp)
+
+let fields_of_t = Size.of_int 9
+let size_of t =
+  Size.(fields_of_t
+       + Quota.size_of t.quota
+       + List.size_of t.operations)
+  (* TODO: + paths *)
+
 
 let counter = ref 0L
 let failed_commits = ref 0L
@@ -98,14 +120,15 @@ let reset_conflict_stats () =
 	failed_commits_no_culprit := 0L
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
-let short_running_txns = ref []
+let size_of_short (_, t) = size_of t
+let short_running_txns = ref (List.empty size_of_short)
 
 let oldest_short_running_transaction () =
 	let rec last = function
 		| [] -> None
 		| [x] -> Some x
 		| _ :: xs -> last xs
-	in last !short_running_txns
+	in last (!short_running_txns.List.l)
 
 let trim_short_running_transactions txn =
 	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
@@ -117,6 +140,8 @@ let trim_short_running_transactions txn =
 		keep
 		!short_running_txns
 
+let size_of_path_entry _ = value (* for now, shared with other DS *)
+
 let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
 	let txn = {
@@ -125,14 +150,14 @@ let make ?(internal=false) id store =
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
 		oldroot = Store.get_root store;
-		paths = [];
-		operations = [];
+                paths = List.empty size_of_path_entry;
+		operations = List.empty size_of_reqresp;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
 	if id <> none && not internal then (
 		let now = Unix.gettimeofday () in
-		short_running_txns := (now, txn) :: !short_running_txns
+		short_running_txns := List.cons (now, txn) !short_running_txns
 	);
 	txn
 
@@ -141,14 +166,14 @@ let get_paths t = t.paths
 
 let get_root t = Store.get_root t.store
 
-let is_read_only t = t.paths = []
-let add_wop t ty path = t.paths <- (ty, path) :: t.paths
+let is_read_only t = List.is_empty t.paths
+let add_wop t ty path = t.paths <- List.cons (ty, path) t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
 		&& List.length t.operations >= !Define.maxrequests
 		then raise Quota.Limit_reached;
-	t.operations <- (request, response) :: t.operations
+	t.operations <- List.cons (request, response) t.operations
 let get_operations t = List.rev t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
 let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath

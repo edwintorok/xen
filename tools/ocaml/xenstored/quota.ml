@@ -23,11 +23,19 @@ let activate = ref true
 let maxent = ref (10000)
 let maxsize = ref (4096)
 
+open Xenbus.Memory_tracker
+open Xenbus.Sizeops
+
 type t = {
 	maxent: int;               (* max entities per domU *)
 	maxsize: int;              (* max size of data store in one node *)
 	cur: (Xenctrl.domid, int) Hashtbl.t; (* current domains quota *)
 }
+
+let fields_of_t = Size.of_int 3
+let size_of t =
+  Size.(fields_of_t
+       + Hashtbl.size_of t.cur)
 
 let to_string quota domid =
 	if Hashtbl.mem quota.cur domid
@@ -35,7 +43,7 @@ let to_string quota domid =
 	else Printf.sprintf "dom%i quota: not set" domid
 
 let create () =
-	{ maxent = !maxent; maxsize = !maxsize; cur = Hashtbl.create 100; }
+	{ maxent = !maxent; maxsize = !maxsize; cur = Hashtbl.create_sized size_of_int size_of_int 100; }
 
 let copy quota = { quota with cur = (Hashtbl.copy quota.cur) }
 
@@ -62,12 +70,8 @@ let get_entry quota id = Hashtbl.find quota.cur id
 let set_entry quota id nb =
 	if nb = 0
 	then Hashtbl.remove quota.cur id
-	else begin
-	if Hashtbl.mem quota.cur id then
-		Hashtbl.replace quota.cur id nb
 	else
-		Hashtbl.add quota.cur id nb
-	end
+		Hashtbl.replace quota.cur id nb
 
 let del_entry quota id =
 	try

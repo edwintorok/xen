@@ -16,7 +16,9 @@
 
 exception End_of_file
 
+let list_map = List.map
 open Xenbus.Memory_tracker
+open Xenbus.Sizeops
 open Stdext
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
@@ -41,13 +43,21 @@ and t = {
 	mutable perm: Perms.Connection.t;
 }
 
-open Xenbus.Sizeops
+
+let fields_of_watch = Size.of_int 5
+let size_of_watch t =
+  Size.(fields_of_watch
+       + size_of_string t.token
+       + size_of_string t.path
+       + size_of_string t.base)
+
+let fields_of_t = Size.of_int 9
 let size_of t =
-  Size.( Xenbus.Xb.size_of t.xb
-       + option_size_of Domain.size_of t.dom
+  Size.( fields_of_t
+       + Xenbus.Xb.size_of t.xb
+       + size_of_option Domain.size_of t.dom
        + Hashtbl.size_of t.transactions
-       + 1
-       + Hashtbl.size_of size_of_string (List.size_of sizeo_of_watch)
+       + Hashtbl.size_of t.watches
        + Perms.Connection.size_of t.perm )
 
 
@@ -61,9 +71,9 @@ let initial_next_tid = 1
 let do_reconnect con =
 	Xenbus.Xb.reconnect con.xb;
 	(* dom is the same *)
-	Hashtbl.clear con.transactions;
+	Hashtbl.reset con.transactions;
 	con.next_tid <- initial_next_tid;
-	Hashtbl.clear con.watches;
+	Hashtbl.reset con.watches;
 	(* anonid is the same *)
 	con.nb_watches <- 0;
 	con.stat_nb_ops <- 0;
@@ -113,9 +123,9 @@ let create xbcon dom =
 	{
 	xb = xbcon;
 	dom = dom;
-	transactions = Hashtbl.create 5;
+	transactions = Hashtbl.create_sized size_of_int Transaction.size_of 5;
 	next_tid = initial_next_tid;
-	watches = Hashtbl.create 8;
+	watches = Hashtbl.create_sized size_of_string List.size_of 8;
 	nb_watches = 0;
 	anonid = id;
 	stat_nb_ops = 0;
@@ -157,12 +167,13 @@ let get_watch_path con path =
 let get_watches (con: t) path =
 	if Hashtbl.mem con.watches path
 	then Hashtbl.find con.watches path
-	else []
+        else List.empty size_of_watch
 
 let get_children_watches con path =
 	let path = path ^ "/" in
-	List.concat (Hashtbl.fold (fun p w l ->
-		if String.startswith path p then w :: l else l) con.watches [])
+	Hashtbl.fold (fun p w l ->
+		if String.startswith path p then List.rev_append w l else l) con.watches
+                (List.empty size_of_watch)
 
 let is_dom0 con =
 	Perms.Connection.is_dom0 (get_perm con)
@@ -175,15 +186,17 @@ let add_watch con (path, apath) token =
 	if List.exists (fun w -> w.token = token) l then
 		raise Define.Already_exist;
 	let watch = watch_create ~con ~token ~path in
-	Hashtbl.replace con.watches apath (watch :: l);
+	Hashtbl.replace con.watches apath (List.cons watch l);
 	con.nb_watches <- con.nb_watches + 1;
 	watch
 
 let del_watch con path token =
 	let apath = get_watch_path con path in
 	let ws = Hashtbl.find con.watches apath in
-	let w = List.find (fun w -> w.token = token) ws in
-	let filtered = Utils.list_remove w ws in
+        let is_token w = w.token = token in
+        let not_is_token w = not (is_token w) in
+	let w = List.find is_token ws in
+	let filtered = List.filter not_is_token ws in
 	if List.length filtered > 0 then
 		Hashtbl.replace con.watches apath filtered
 	else
@@ -192,17 +205,19 @@ let del_watch con path token =
 	apath, w
 
 let del_watches con =
-  Hashtbl.clear con.watches;
+  Hashtbl.reset con.watches;
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions
+  Hashtbl.reset con.transactions
+
+let size_of_path_token (p, t) = Size.(size_of_string p + size_of_string t)
 
 let list_watches con =
-	let ll = Hashtbl.fold
-		(fun _ watches acc -> List.map (fun watch -> watch.path, watch.token) watches :: acc)
-		con.watches [] in
-	List.concat ll
+	Hashtbl.fold
+		(fun _ watches acc ->
+                  List.rev_append (List.rev_map size_of_path_token (fun watch -> watch.path, watch.token) watches) acc)
+		con.watches (List.empty size_of_path_token)
 
 let dbg fmt = Logging.debug "connection" fmt
 let info fmt = Logging.info "connection" fmt
@@ -230,7 +245,7 @@ let fire_single_watch (oldroot, root) watch =
 	if Perms.can_fire_watch watch.con.perm perms then
 		fire_single_watch_unchecked watch
 	else
-		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
+		let perms = perms |> list_map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
 		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
 
@@ -272,7 +287,7 @@ let start_transaction con store =
 	let id = valid_transaction_id con con.next_tid in
 	con.next_tid <- id + 1;
 	let ntrans = Transaction.make id store in
-	Hashtbl.add con.transactions id ntrans;
+	Hashtbl.replace con.transactions id ntrans;
 	Logging.start_transaction ~tid:id ~con:(get_domstr con);
 	id
 
@@ -363,8 +378,8 @@ let dump con chan =
 
 let debug con =
 	let domid = get_domstr con in
-	let watches = List.map (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
-	String.concat "" watches
+	let watches = List.rev_map size_of_string (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
+	String.concat "" watches.List.l
 
 let decr_conflict_credit doms con =
 	match con.dom with

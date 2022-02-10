@@ -37,6 +37,13 @@ type t =
 	mutable caused_conflicts: int64;
 }
 
+open Xenbus.Sizeops
+
+let fields_of_t = Size.of_int 10
+let size_of t =
+  Size.(fields_of_t
+        + Event.size_of t.eventchn)
+
 let is_dom0 d = d.id = 0
 let get_id domain = domain.id
 let get_interface d = d.interface
