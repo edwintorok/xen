@@ -100,6 +100,7 @@ let parse_config filename =
 		("quota-activate", Config.Set_bool Quota.activate);
 		("quota-maxwatch", Config.Set_int Define.maxwatch);
 		("quota-transaction", Config.Set_int Define.maxtransaction);
+		("quota-domu-memory", Config.Set_int Define.maxdomumemory);
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
