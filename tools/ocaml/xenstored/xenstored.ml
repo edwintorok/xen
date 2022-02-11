@@ -266,6 +266,56 @@ let to_file store cons fds file =
 	        (fun () -> close_out channel)
 end
 
+let tweak_gc () =
+    (* By default OCaml's GC only returns memory to the OS when it exceeds a configurable
+       'max overhead' setting.
+       The default is 500%, that is 5/6th of the OCaml heap needs to be free and only 1/6th live
+       for a compaction to be triggerred that would release memory back to the OS.
+       If the limit is not hit then the OCaml process can reuse that memory for its own purposes,
+       but other processes won't be able to use it.
+
+       There is also a 'space overhead' setting that controls how much work each major GC slice
+       does, and by default aims at having no more than 80% garbage values compared to live values.
+       This doesn't have as much relevance to memory returned to the OS as long as
+       space_overhead < max_overhead, because compaction is only triggerred at the end of major GC
+       cycles, however if we tweak max overhead we need to ensure this one is smaller.
+
+       The defaults are too large once the program starts using ~100MiB of memory, at which point
+       ~500MiB would be unavailable to other processes (which would be fine if this was the main
+       process in this VM, but it is not).
+
+       Max overhead can also be set to 0, however this is for testing purposes only (I think setting
+       it lower than 'space overhead' wouldn't help because the major GC wouldn't run fast enough,
+       and compaction does have a performance cost: we can only compact contiguous regions, so memory
+       has to be moved around).
+
+       The default max overhead setting of the OCaml GC is too large when we're tight on memory.
+       When oxenstored is using a small amount of memory we can run with the defaults, and switch
+       to the more aggressive GC values once memory usage has grown beyond a certain limit.
+       Space overhead controls wasted space inside the OCaml allocated heap: this is not visible to
+       the OS anyway, so not relevant in preventing OOMs.
+       Max overhead controls how often the heap is compacted, which is useful if there are burst
+       of activity followed by long periods of idle state, or if a domain quits, etc.
+       Compaction returns memory to the OS.
+
+       wasted = live * space_overhead / 100
+
+       For globally overriding the GC settings one can use OCAMLRUNPARAM instead as usual.
+     *)
+
+  let word_size_bytes = Sys.word_size / 8 in
+  (* This code runs often, keep it very short and fast,
+     in particular do NOT call Gc.stat which would walk the entire heap.
+     We could register this to run at every major GC instead using Gc.create_alarm,
+     but changing some of these parameters might trigger a GC, which may not be safe to do
+     from inside a finaliser.
+  *)
+  let quick = Gc.quick_stat () in
+  if quick.Gc.heap_words > !Define.gc_max_overhead / word_size_bytes then
+    Gc.set { (Gc.get ()) with
+              Gc.allocation_policy = !Define.gc_allocation_policy
+            ; Gc.max_overhead = !Define.gc_max_overhead }
+
 let () =
 	let cf = do_argv in
 	let pidfile =
@@ -431,6 +481,7 @@ let () =
 		(* scan all the xs rings as a safenet for ill-behaved clients *)
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
 			(last_scan_time := now; Domains.iter domains ring_scan_checker);
+		tweak_gc ();
 
 		(* make sure we don't print general stats faster than 2 min *)
 		if now > (!last_stat_time +. 120.) then (
