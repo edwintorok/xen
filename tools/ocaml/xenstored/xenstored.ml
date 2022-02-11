@@ -451,7 +451,6 @@ let _ =
 			info "%Ld failed transactions; of these no culprit was found for %Ld" !Transaction.failed_commits !Transaction.failed_commits_no_culprit;
 			Transaction.reset_conflict_stats ();
 
-			let gc = Gc.stat () in
 			let (lanon, lanon_ops, lanon_watchs,
 			     ldom, ldom_ops, ldom_watchs) = Connections.stats cons in
 			let store_nodes, store_abort, store_coalesce = Store.stats store in
@@ -462,6 +461,9 @@ let _ =
 			info "sytbl stat: length(%d) entries(%d)" symtbl_len symtbl_entries;
 			info "  con stat: anonymous(%d, %d o, %d w) domains(%d, %d o, %d w)"
 			     lanon lanon_ops lanon_watchs ldom ldom_ops ldom_watchs;
+
+			if Logging.int_of_level !Logging.xenstored_log_level <= Logging.int_of_level Logging.Info then
+			let gc = Gc.stat () in
 			info "  mem stat: minor(%.0f) promoted(%.0f) major(%.0f) heap(%d w, %d c) live(%d w, %d b) free(%d w, %d b)"
 			     gc.Gc.minor_words gc.Gc.promoted_words gc.Gc.major_words
 			     gc.Gc.heap_words gc.Gc.heap_chunks
