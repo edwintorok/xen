@@ -130,8 +130,9 @@ let add_watch cons con path token =
 let del_watch cons con path token =
  	let apath, watch = Connection.del_watch con path token in
  	let key = key_of_str apath in
- 	let watches = Utils.list_remove watch (Trie.find cons.watches key) in
- 	if watches = [] then
+(* TODO: use set *)
+ 	let watches = List.filter (fun x -> x <> watch) (Trie.find cons.watches key) in
+ 	if List.is_empty watches then
 		cons.watches <- Trie.unset cons.watches key
  	else
 		cons.watches <- Trie.set cons.watches key watches;
