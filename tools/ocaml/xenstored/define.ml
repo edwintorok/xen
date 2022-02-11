@@ -25,6 +25,16 @@ let maxwatch = ref (50)
 let maxtransaction = ref (20)
 let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
+let gc_max_overhead = ref 100
+let gc_switch_threshold = ref (100*1024*1024)
+let gc_allocation_policy =
+  let current_policy = (Gc.get ()).Gc.allocation_policy in
+  (* if we have a version of OCaml new enough to support allocation policy 2 or newer (best-fit)
+     then don't change it by default, otherwise switch to 1 (first-fit) once we use more memory.
+     First-fit reduces fragmentation, and compactions, but can be somewhat slower.
+  *)
+  if current_policy < 2 then ref 1 else ref current_policy
+
 (* TODO: calc based on config limits and RAM% *)
 let maxdomumemory = ref (4*1024*1024)
 
