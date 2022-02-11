@@ -25,6 +25,9 @@ let maxwatch = ref (50)
 let maxtransaction = ref (20)
 let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
+(* TODO: calc based on config limits and RAM% *)
+let maxdomumemory = ref (4*1024*1024)
+
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05
 let conflict_rate_limit_is_aggregate = ref true

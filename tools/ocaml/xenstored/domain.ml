@@ -45,7 +45,7 @@ let get_remote_port d = d.remote_port
 let get_port d = d.port
 
 let is_bad_domain domain = domain.bad_client
-let mark_as_bad domain = domain.bad_client <- true
+let mark_as_bad domain = domain.bad_client <- true (* TODO: free memory *)
 
 let get_io_credit domain = domain.io_credit
 let set_io_credit ?(n=1) domain = domain.io_credit <- max 0 n
