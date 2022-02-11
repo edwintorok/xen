@@ -26,6 +26,7 @@ let maxtransaction = ref (10)
 let maxrequests = ref (1024)   (* maximum requests per transaction *)
 let maxoutstanding = ref (1024) (* maximum outstanding requests, i.e. in-flight requests / domain *)
 
+let gc_max_overhead = ref 120 (* 120% see comment in xenstored.ml *)
 let test_mode = ref false
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05
