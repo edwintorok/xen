@@ -696,13 +696,16 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
-let check_memory_usage cons con =
+let check_memory_usage store con =
 	match Connection.get_domain con with
 	| None -> () (* dom0 excluded *)
 	| Some dom ->
 	  let domid = Domain.get_id dom in
+	  let quota = Store.get_quota store in
+	  let entry = Quota.get_entry_0 quota domid in
 	  (* TODO: convert words to bytes to make it easier for user *)
-	  let bad = match Connection.size_of con |> Xenbus.Sizeops.Size.to_int_opt with
+          let actual = Xenbus.Sizeops.Size.(Connection.size_of con + entry.Quota.size) in
+	  let bad = match actual |> Xenbus.Sizeops.Size.to_int_opt with
 	  | Some n when n < !Define.maxdomumemory -> false
 	  | None ->
 	      warn "domain %u: overflow in computing memory usage, considering quota exceeded"
@@ -745,7 +748,7 @@ let do_input store cons doms con =
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
-		check_memory_usage cons con
+		check_memory_usage store con
 	)
 
 let do_output _store _cons _doms con =

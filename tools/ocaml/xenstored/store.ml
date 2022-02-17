@@ -493,7 +493,7 @@ let write store perm path value =
 	let root, node_created = path_write store perm path value in
 	store.root <- root;
 	if node_created
-	then Quota.add_entry store.quota owner
+	then Quota.add_entry store.quota owner path value
 
 let mkdir store perm path =
 	let node, existing = get_deepest_existing_node store path in
@@ -502,7 +502,7 @@ let mkdir store perm path =
 	if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota owner 0;
 	store.root <- path_mkdir store perm path;
 	if not existing then
-	Quota.add_entry store.quota owner
+	Quota.add_entry store.quota owner path ""
 
 let rm store perm path =
 	let rmed_node = Path.get_node store.root path in
@@ -521,8 +521,9 @@ let setperms store perm path nperms =
 		if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then
 			raise Define.Permission_denied;
 		store.root <- path_setperms store perm path nperms;
-		Quota.del_entry store.quota old_owner;
-		Quota.add_entry store.quota new_owner
+                let value = Node.get_value node in
+		Quota.del_entry store.quota old_owner path value;
+		Quota.add_entry store.quota new_owner path value
 
 let reset_permissions store domid =
 	Logging.info "store|node" "Cleaning up xenstore ACLs for domid %d" domid;
