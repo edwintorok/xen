@@ -142,8 +142,8 @@ end
 module List = struct
   type 'a t =
     { l: 'a list
-    ; mutable size: Tracker.t
-    ; mutable length: int
+    ; size: Tracker.t
+    ; length: int
     ; get_size: 'a -> Size.t
     }
 

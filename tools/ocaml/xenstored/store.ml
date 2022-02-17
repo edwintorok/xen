@@ -16,7 +16,67 @@
  *)
 open Stdext
 
-module SymbolMap = Map.Make(Symbol)
+
+module SymbolMap = struct
+  open Xenbus.Memory_tracker
+  open Xenbus.Sizeops
+  module M = Map.Make(Symbol)
+  type 'a t =
+    { map: 'a M.t
+    ; size: Tracker.t
+    ; get_size: 'a -> Size.t
+    }
+
+  let empty get_size = { map = M.empty; size = Tracker.empty; get_size }
+
+  let add k v t =
+    let ksize = size_of_string (Symbol.to_string k) in
+    let vsize = t.get_size v in
+    { map = M.add k v t.map
+    ; size = Tracker.add t.size Size.(ksize + vsize)
+    ; get_size = t.get_size
+    }
+
+  let remove k t =
+    let ksize = size_of_string (Symbol.to_string k) in
+    let size = match M.find_opt k t.map with
+    | None -> t.size
+    | Some vold -> Tracker.remove t.size Size.(t.get_size vold + ksize)
+    in
+    { map = M.remove k t.map
+    ; size
+    ; get_size = t.get_size
+    }
+
+  let mem x t = M.mem x t.map
+  let find x t = M.find x t.map
+  let find_opt x t = M.find_opt x t.map
+
+    let update k f t =
+            let r = find_opt k t in
+            let r' = f r in
+            match r, r' with
+            | None, None -> t
+            | Some _, None -> remove k t
+            | Some r, Some r' when r == r' -> t
+            | _, Some r' -> add k r' t
+
+  let size_of t = t.size
+
+  let iter f t = M.iter f t.map
+  let fold f t init = M.fold f t.map init
+
+  let map f t =
+    (* this is a map that preserves type, so we don't need a new get_size *)
+    let map = M.map f t.map in
+    let size = M.fold (fun k v acc ->
+      Tracker.add acc @@ Size.( size_of_string (Symbol.to_string k)
+           + t.get_size v)) t.map Tracker.empty in
+    { map
+    ; size
+    ; get_size = t.get_size
+    }
+end
 
 module Node = struct
 
@@ -27,8 +87,23 @@ type t = {
 	children: t SymbolMap.t;
 }
 
+
+let fields_of_t = Xenbus.Sizeops.Size.of_int 4
+let rec size_of t =
+        let open Xenbus.Sizeops in
+        (* TODO: rename List to avoid clashes... *)
+        let open Xenbus.Memory_tracker in
+	Size.( fields_of_t
+	 + size_of_string (Symbol.to_string t.name)
+	 (*  + Perms.Node.size_of t.perms *)
+	 + size_of_string t.value
+         + SymbolMap.size_of t.children
+	)
+
+
+
 let create _name _perms _value =
-	{ name = Symbol.of_string _name; perms = _perms; value = _value; children = SymbolMap.empty; }
+	{ name = Symbol.of_string _name; perms = _perms; value = _value; children = SymbolMap.empty size_of; }
 
 let get_owner node = Perms.Node.get_owner node.perms
 let get_children node = node.children
@@ -71,7 +146,7 @@ let del_childname node childname =
 	}
 
 let del_all_children node =
-	{ node with children = SymbolMap.empty }
+	{ node with children = SymbolMap.empty size_of}
 
 (* check if the current node can be accessed by the current connection with rperm permissions *)
 let check_perm node connection request =
@@ -90,6 +165,7 @@ let rec recurse fct node = fct node; SymbolMap.iter (fun _ -> recurse fct) node.
 (** [recurse_map f tree] applies [f] on each node in the tree recursively *)
 let recurse_map f =
 	let rec walk node =
+          (* TODO: could check for physical equality *)
 		f { node with children = SymbolMap.map walk node.children }
 	in
 	walk
@@ -234,6 +310,12 @@ type t =
 	mutable root: Node.t;
 	mutable quota: Quota.t;
 }
+
+let fields_of_t = Xenbus.Sizeops.Size.of_int 4
+let size_of t =
+  Xenbus.Sizeops.Size.( fields_of_t
+       + Node.size_of t.root
+       + Quota.size_of t.quota)
 
 let get_root store = store.root
 let set_root store root = store.root <- root

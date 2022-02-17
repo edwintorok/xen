@@ -106,10 +106,13 @@ let size_of_reqresp (req, resp) =
 
 let fields_of_t = Size.of_int 9
 let size_of t =
+  let delta = Size.(Store.size_of t.store - Store.Node.size_of t.oldroot) in
   Size.(fields_of_t
+       + delta
        + Quota.size_of t.quota
+       + List.size_of t.paths (* TODO: there is a lot of sharing here, may not need to count paths *)
        + List.size_of t.operations)
-  (* TODO: + paths *)
+  (* read/write lowpath is just shared with what is in the tree already: don't count *)
 
 
 let counter = ref 0L
