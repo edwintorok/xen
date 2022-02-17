@@ -289,16 +289,7 @@ let tweak_gc () =
        and compaction does have a performance cost: we can only compact contiguous regions, so memory
        has to be moved around).
 
-       When oxenstored exceeds some pre-configured *absolute* memory usage then it can switch to a
-       much lower value of 'space overhead' to ensure we stay below OOM limits (and don't needlessly
-       take away memory from the rest of the system).
-
-       Instead of a percentage we'd like to ensure we don't waste more than a fixed amount of
-       memory, thus recalculate the max overhead at the end of each GC cycle.
-       Care needs to be taken that this doesn't trigger too frequent compactions during activity
-       bursts (e.g VM boot)
-
-    (* The default max overhead setting of the OCaml GC is too large when we're tight on memory.
+       The default max overhead setting of the OCaml GC is too large when we're tight on memory.
        When oxenstored is using a small amount of memory we can run with the defaults, and switch
        to the more aggressive GC values once memory usage has grown beyond a certain limit.
        Space overhead controls wasted space inside the OCaml allocated heap: this is not visible to
@@ -308,6 +299,21 @@ let tweak_gc () =
        Compaction returns memory to the OS.
 
        wasted = live * space_overhead / 100
+
+       For globally overriding the GC settings one can use OCAMLRUNPARAM instead as usual.
+  *)
+  let word_size_bytes = Sys.word_size / 8 in
+  (* This code runs often, keep it very short and fast,
+     in particular do NOT call Gc.stat which would walk the entire heap.
+     We could register this to run at every major GC instead using Gc.create_alarm,
+     but changing some of these parameters might trigger a GC, which may not be safe to do
+     from inside a finaliser.
+  *)
+  let quick = Gc.quick_stat () in
+  if quick.Gc.heap_words > !Define.gc_max_overhead / word_size_bytes then
+    Gc.set { (Gc.get ()) with
+              Gc.allocation_policy = !Define.gc_allocation_policy
+            ; Gc.max_overhead = !Define.gc_max_overhead }
 
 
 let main () =
@@ -475,6 +481,7 @@ let main () =
 		(* scan all the xs rings as a safenet for ill-behaved clients *)
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
 			(last_scan_time := now; Domains.iter domains ring_scan_checker);
+		tweak_gc ();
 
 		(* make sure we don't print general stats faster than 2 min *)
 		if now > (!last_stat_time +. 120.) then (
