@@ -1,36 +1,66 @@
-open Xenstored_internal
+exception Noent = Xenbus.Xb.Noent
+open Xenstored_test
 open Xenstore
 type transaction = int
 
 let none = 0
 
-let server_thread =
-  let cons = Connections.create () in
-  let store = Store.create () in
-  let eventchn = Event.init () in
-  let doms = Domains.init eventchn ignore in
-  fun fd ->
-  Connections.add_anonymous cons fd;
-  let rset, wset, _ = Poll.poll_select [fd] [fd] [] 1. in
-  List.iter (fun fd -> Process.do_input store cons doms @@ Connections.find cons fd) rset;
-  List.iter (fun fd -> Process.do_output store cons doms @@ Connections.find cons fd) wset
+let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
+(* during AFL print nothing *)
 
-let con =
+let () =
+  if not is_output_devnull then begin
+    Printexc.record_backtrace true;
+    Logging.xenstored_log_destination := Logging.File "/dev/stderr";
+    Logging.access_log_destination := Logging.File "/dev/stderr";
+    Logging.access_log_special_ops := true;
+    Logging.init_xenstored_log ();
+    Logging.init_access_log ignore
+  end
+
+let cons = Connections.create ()
+let store = Store.create ()
+let eventchn = Event.init ()
+let doms = Domains.init eventchn ignore
+
+let server_thread fd =
+  try while true do
+    let rset, wset, _ = Poll.poll_select [fd] [fd] [] 1. in
+    List.iter (fun fd -> Process.do_input store cons doms @@ Connections.find cons fd) rset;
+    List.iter (fun fd -> Process.do_output store cons doms @@ Connections.find cons fd) wset
+  done
+  with e ->
+    Printexc.print_backtrace stderr;
+    prerr_endline (Printexc.to_string e);
+    Unix.close fd
+
+let con, connection =
   let client, server = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+  Connections.add_anonymous cons server;
   let (_:Thread.t) = Thread.create server_thread server in
-  Xsraw.open_fd client
+  Xsraw.open_fd client, Connections.find cons server
 
 let transaction_start () = Xsraw.transaction_start con
+
+let transaction_valid tid =
+  try let _:Transaction.t = Connection.get_transaction connection tid in true
+  with Not_found -> false
 
 let transaction_end tid commit = Xsraw.transaction_end tid commit con
 
 type path = string
 
-let path () = "TODO"
+let path_is_valid p = String.length p > 0 (* for now *)
+
+let path () = "/TODO"
 
 type perm = { r: bool; w: bool }
 
 let directory tid path = Xsraw.directory tid path con
+
+let path_exists tid path =
+  let store = tid |> Connection.get_transaction connection |> Transaction.get_store in
+  Store.Node.exists store.root path
 
 let read tid path = Xsraw.read tid path con
 
@@ -64,8 +94,8 @@ let getperms tid path =
 
 
 type token = string
-let token () = failwith "TODO"
-let value () = failwith "TODO"
+let token () = "TODO"
+let value () = "TODO"
 
 type value = string
 
@@ -75,6 +105,7 @@ let unwatch path token = Xsraw.unwatch path token con
 
 let dom0 = 0
 
+(* candidate and reference run same queries: must not interfere *)
 let introduce =
   let counter = ref 0 in
   fun () ->
@@ -83,7 +114,13 @@ let introduce =
     Xsraw.introduce domid 0n 0 con;
     domid
 
-let release domid = Xsraw.release domid con
+let domid_exists domid =
+  try let (_:Domain.t) =  Domains.find doms domid in true
+  with Not_found -> false
+
+let release domid =
+  assert (domid > 0);
+  Xsraw.release domid con
 
 let resume domid = Xsraw.resume domid con
 

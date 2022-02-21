@@ -563,7 +563,9 @@ let do_introduce con t domains cons data =
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
-		with _ -> raise Invalid_Cmd_Args
+		with e ->
+		  warn "introduce invalid command: %s" (Printexc.to_string e);
+		  raise Invalid_Cmd_Args
 	in
 	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
 		raise Domain_not_match

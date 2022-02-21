@@ -5,9 +5,16 @@ val none: transaction
 val transaction_start: unit -> transaction
 (*@ t = transaction_start () *)
 
+val transaction_valid: transaction -> bool
+(*@ b = transaction_valid t
+    pure *)
+
 val transaction_end: transaction -> bool -> bool
 (*@ r = transaction_end t comit
+    requires transaction_valid t
+    modifies t
     consumes t
+    ensures not (transaction_valid t)
  *)
 
 type path
@@ -16,13 +23,25 @@ type path
 val path: unit -> path
 (*@ p = path () *)
 
+exception Noent
+val path_exists: transaction -> path -> bool
+(*@ v = path_exists transaction path
+    requires transaction_valid transaction
+    pure *)
+
+val path_is_valid : path -> bool
+(*@ b = path_is_valid path
+    pure *)
+
 (* ortac limitation: no variants yet, and if we make this a tuple
    then the type of S.perm will have weak type variable that fail to generalize *)
 type perm = { r: bool; w: bool }
 
 val directory: transaction -> path -> path list
 (*@ entries = directory transaction path
-    pure *)
+    requires transaction_valid transaction
+    raises Noent -> not (path_exists transaction path)
+    *)
 
 type value
 
@@ -31,19 +50,15 @@ val value: unit -> value
 
 val read: transaction -> path -> value
 (*@ v = read transaction path
-    pure *)
+    requires transaction_valid transaction
+    raises Noent -> not (path_exists transaction path)
+    *)
 
 type domid
 
-val domid: int -> domid
-(*@ d = domid i
+val domid_exists: domid -> bool
+(*@ b = domid_exists domid
     pure *)
-
-val int_of_domid: domid -> int
-(*@ i = int_of_domid d
-    pure
-    ensures (domid i) = d
-    *)
 
 (* ortac limitation: can't use a record here containing other types declared here,
    or their type variables will be weak in S.perms, failing to generalize.
@@ -64,7 +79,9 @@ val perms: domid -> perm -> perms
 
 val getperms: transaction -> path -> perms
 (*@ perms = getperms transaction path
-    pure *)
+    requires transaction_valid transaction && path_is_valid path
+    raises Noent -> not (path_exists transaction path)
+    *)
 
 type token
 
@@ -72,38 +89,58 @@ val token: unit -> token
 (* t = token () *)
 
 val watch: path -> token -> unit
-(*@ watch path token *)
+(*@ watch path token
+    requires path_is_valid path
+ *)
 
 val unwatch: path -> token -> unit
-(*@ unwatch path token *)
+(*@ unwatch path token
+    requires path_is_valid path
+    *)
 
 
-val dom0: domid
+(*val dom0: domid*)
 
 val introduce: unit -> domid
 (*@ domid = introduce ()
-    ensures 0 < int_of_domid domid <= 0xFFFF *)
+    ensures domid_exists domid
+*)
+    (* ensures domid <> dom0 *)
 
 val release: domid -> unit
 (*@ release domid
-    requires int_of_domid domid > 0
-    consumes domid *)
+    requires domid_exists domid
+    modifies domid
+    consumes domid
+    *)
 
 val resume: domid -> unit
-(*@ resume domid *)
+(*@ resume domid
+    requires domid_exists domid
+ *)
 
 val getdomainpath: domid -> path
 (*@ s = getdomainpath domid
+    requires domid_exists domid
     pure *)
 
 val write: transaction -> path -> value -> unit
-(*@ write transaction path value *)
+(*@ write transaction path value
+    requires transaction_valid transaction && path_is_valid path
+ *)
 
 val mkdir: transaction -> path -> unit
-(*@ mkdir transaction path *)
+(*@ mkdir transaction path
+    requires transaction_valid transaction && path_is_valid path
+ *)
 
 val rm: transaction -> path -> unit
-(*@ rm transaction path *)
+(*@ rm transaction path
+    requires transaction_valid transaction && path_is_valid path
+ *)
 
 val setperms: transaction -> path -> perms -> unit
-(*@ setperms transaction path perms *)
+(*@ setperms transaction path perms
+    requires transaction_valid transaction && path_is_valid path
+    raises Noent -> not (path_exists transaction path)
+ *)

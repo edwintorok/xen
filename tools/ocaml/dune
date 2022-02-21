@@ -39,7 +39,7 @@
 
 (test
 (name xsgen_rtac)
-(libraries xen.eventchn xen.store ortac-runtime-monolith threads.posix xenstored_internal)
+(libraries xen.store ortac-runtime-monolith threads.posix xenstored_test)
 )
 
 (rule

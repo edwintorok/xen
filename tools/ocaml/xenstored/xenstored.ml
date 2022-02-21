@@ -19,9 +19,6 @@ open Printf
 open Parse_arg
 open Stdext
 
-(* TODO *)
-open Xenstored_internal
-
 let error fmt = Logging.error "xenstored" fmt
 let warn fmt = Logging.warn "xenstored" fmt
 let debug fmt = Logging.debug "xenstored" fmt
