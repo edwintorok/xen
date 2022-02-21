@@ -16,8 +16,9 @@ type path
 val path: unit -> path
 (*@ p = path () *)
 
-(* ortac limitation: no variants or records yet *)
-type perm = bool * bool
+(* ortac limitation: no variants yet, and if we make this a tuple
+   then the type of S.perm will have weak type variable that fail to generalize *)
+type perm = { r: bool; w: bool }
 
 val directory: transaction -> path -> path list
 (*@ entries = directory transaction path
@@ -32,14 +33,34 @@ val read: transaction -> path -> value
 (*@ v = read transaction path
     pure *)
 
-type domid = int
+type domid
 
-type perms =
+val domid: int -> domid
+(*@ d = domid i
+    pure *)
+
+val int_of_domid: domid -> int
+(*@ i = int_of_domid d
+    pure
+    ensures (domid i) = d
+    *)
+
+(* ortac limitation: can't use a record here containing other types declared here,
+   or their type variables will be weak in S.perms, failing to generalize.
+   Instead use a constructor function that takes record fields *)
+type perms
+
+val perms: domid -> perm -> perms
+(*@ p = perms domid perm
+    pure *)
+
+(*
   { owner: domid
   ; others: perm
   (* ortac: list generation broken? Gen.list takes a size parameter, but not supplied *)
   (*; rest: (domid * perm) list *)
   }
+*)
 
 val getperms: transaction -> path -> perms
 (*@ perms = getperms transaction path
@@ -61,11 +82,11 @@ val dom0: domid
 
 val introduce: unit -> domid
 (*@ domid = introduce ()
-    ensures 0 < domid <= 0xFFFF *)
+    ensures 0 < int_of_domid domid <= 0xFFFF *)
 
 val release: domid -> unit
 (*@ release domid
-    requires domid > 0
+    requires int_of_domid domid > 0
     consumes domid *)
 
 val resume: domid -> unit

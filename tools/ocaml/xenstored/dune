@@ -1,11 +1,18 @@
+(library
+ (name xenstored_internal)
+ (modules (:standard \ syslog systemd xenstored))
+ (flags (:standard -w -52))
+ (libraries unix xen.bus xen.mmap xen.ctrl xen.eventchn xenstubs))
+
+
 (executable
  (modes byte exe)
  (name xenstored)
- (modules (:standard \ syslog systemd))
+ (modules xenstored)
  (public_name oxenstored)
  (package xenstored)
  (flags (:standard -w -52))
- (libraries unix xen.bus xen.mmap xen.ctrl xen.eventchn xenstubs))
+ (libraries xenstored_internal unix xen.bus xen.mmap xen.ctrl xen.eventchn xenstubs))
 
 (library
  (foreign_stubs

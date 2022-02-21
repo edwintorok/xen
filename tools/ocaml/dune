@@ -27,10 +27,20 @@
    %{dep:libs/eventchn/xeneventchn.mli}
    %{dep:event_test.mli})))
 
-;(test
-;(name event_test_rtac)
-;(libraries xen.eventchn ortac-runtime-monolith)
-;)
+(rule
+ (targets xsgen_rtac.ml xsgen_test.mli)
+ (deps
+  (:model
+   (glob_files model/*.mli)))
+ (action
+  (run
+   %{dep:model/ortac-wrap.sh}
+   %{dep:xsgen.mli})))
+
+(test
+(name xsgen_rtac)
+(libraries xen.eventchn xen.store ortac-runtime-monolith threads.posix xenstored_internal)
+)
 
 (rule
  (alias cameleer-check)

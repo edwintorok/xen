@@ -56,6 +56,12 @@ check: dune-pre
 check2: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build @check --profile=release
 
+ortac1: dune-pre
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release ./xsgen_rtac.exe --no-buffer
+
+event-print: dune-pre
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec ocaml-print-intf xenstored/event.ml
+
 check3: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build @gospel-check @check --profile=release
 
