@@ -2,7 +2,7 @@ exception Noent = Xenbus.Xb.Noent
 open Xenstored_test
 open Xenstore
 type transaction = int
-type connection = Xenstore.Xsraw.con
+type connection = Xenstore.Xsraw.con * Connection.t
 let none = 0
 
 let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
@@ -34,7 +34,7 @@ let server_thread fd =
     prerr_endline (Printexc.to_string e);
     Unix.close fd
 
-let con, connection =
+let connection =
   let client, server = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
   Connections.add_anonymous cons server;
   let (_:Thread.t) = Thread.create server_thread server in
@@ -43,17 +43,17 @@ let con, connection =
 exception Quota
 
 let maxtransaction _ = !Define.maxtransaction
-let number_of_transactions _ = Connection.number_of_transactions connection
+let number_of_transactions (_, connection) = Connection.number_of_transactions connection
 
-let transaction_start con =
+let transaction_start (con, _) =
   try Xsraw.transaction_start con
   with Xenbus.Xb.Packet.Error "EQUOTA" -> raise Quota
 
-let transaction_is_valid tid =
+let transaction_is_valid (_, connection) tid =
   try let _:Transaction.t = Connection.get_transaction connection tid in true
   with Not_found -> false
 
-let transaction_end tid commit = Xsraw.transaction_end tid commit con
+let transaction_end (con, _) tid commit = Xsraw.transaction_end tid commit con
 
 type path = string
 
@@ -63,13 +63,14 @@ let path () = "/TODO"
 
 type perm = { r: bool; w: bool }
 
-let directory tid path = Xsraw.directory tid path con
+let directory (con, _) tid path =
+  List.rev_map (function "" -> path | entry -> Filename.concat path entry) @@ Xsraw.directory tid path con
 
-let path_exists tid path =
+let path_exists (_, connection) tid path =
   let store = tid |> Connection.get_transaction connection |> Transaction.get_store in
   Store.Node.exists store.root path
 
-let read tid path = Xsraw.read tid path con
+let read (con, _) tid path = Xsraw.read tid path con
 
 type domid = int
 
@@ -95,7 +96,7 @@ let rev_map_perm = function
   | {r=false; w=true} -> Xsraw.PERM_WRITE
   | {r=true; w=true} -> Xsraw.PERM_RDWR
 
-let getperms tid path =
+let getperms (con, _) tid path =
   let owner, others, rest = Xsraw.getperms tid path con in
   { owner; others = map_perm others; (*rest = List.map (fun (domid, perm) -> domid, map_perm perm) rest*) }
 
@@ -106,16 +107,22 @@ let value () = "TODO"
 
 type value = string
 
-let watch path token = Xsraw.watch path token con
+let has_watch (_, connection) path = not @@ Xenbus.Memory_tracker.List.is_empty @@ Connection.get_watches connection path
 
-let unwatch path token = Xsraw.unwatch path token con
+exception Eexist
+
+let watch (con, _) path token =
+  try Xsraw.watch path token con
+  with Xenbus.Packet.Error "EEXIST" -> raise Eexist
+
+let unwatch (con, _) path token = Xsraw.unwatch path token con
 
 let dom0 = 0
 
 (* candidate and reference run same queries: must not interfere *)
 let introduce =
   let counter = ref 0 in
-  fun () ->
+  fun (con, _) ->
     incr counter;
     let domid = !counter in
     Xsraw.introduce domid 0n 0 con;
@@ -125,21 +132,21 @@ let domid_exists domid =
   try let (_:Domain.t) =  Domains.find doms domid in true
   with Not_found -> false
 
-let release domid =
+let release (con, _) domid =
   assert (domid > 0);
   Xsraw.release domid con
 
-let resume domid = Xsraw.resume domid con
+let resume (con, _) domid = Xsraw.resume domid con
 
-let getdomainpath domid = Xsraw.getdomainpath domid con
+let getdomainpath (con, _) domid = Xsraw.getdomainpath domid con
 
-let write tid path value = Xsraw.write tid path value con
+let write (con, _) tid path value = Xsraw.write tid path value con
 
-let mkdir tid path = Xsraw.mkdir tid path con
+let mkdir (con, _) tid path = Xsraw.mkdir tid path con
 
-let rm tid path = Xsraw.rm tid path con
+let rm (con, _) tid path = Xsraw.rm tid path con
 
 
-let setperms tid path perms =
+let setperms (con, _) tid path perms =
   (*let rest = List.map (fun (domid, perm) -> domid, rev_map_perm perm ) perms.rest in*)
   Xsraw.setperms tid path (perms.owner, rev_map_perm perms.others, []) con

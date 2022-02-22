@@ -2,6 +2,8 @@ type connection
 
 type transaction
 
+val connection: connection
+
 val none: transaction
 
 val number_of_transactions: connection -> int
@@ -16,28 +18,28 @@ val maxtransaction: connection -> int
     pure *)
 
 exception Quota
+exception Eexist
 
 val transaction_start: connection -> transaction
 (*@ t = transaction_start connection
     raises Quota -> number_of_transactions connection > maxtransaction connection
 *)
 
-val transaction_is_valid: transaction -> bool
-(*@ b = transaction_is_valid t
+val transaction_is_valid: connection -> transaction -> bool
+(*@ b = transaction_is_valid con t
     pure *)
 
 (* ortac/monolith limitation: it doesn't check that we attempt to use a consumed t,
    so have to check validity ourselves for now
  *)
-val transaction_end: transaction -> bool -> bool
-(*@ r = transaction_end t comit
-    requires transaction_is_valid t
+val transaction_end: connection -> transaction -> bool -> bool
+(*@ r = transaction_end con t comit
+    requires transaction_is_valid con t
     modifies t
     consumes t
-    ensures not (transaction_is_valid t)
+    ensures not (transaction_is_valid con t)
  *)
 
-(*
 type path
 (* TODO: valid path constraint *)
 
@@ -45,9 +47,9 @@ val path: unit -> path
 (*@ p = path () *)
 
 exception Noent
-val path_exists: transaction -> path -> bool
-(*@ v = path_exists transaction path
-    requires transaction_is_valid transaction
+val path_exists: connection -> transaction -> path -> bool
+(*@ v = path_exists con transaction path
+    requires transaction_is_valid con transaction
     pure *)
 
 (* can't use as an invariant because 'directory' can return an empty path,
@@ -62,10 +64,11 @@ val path_is_valid : path -> bool
    then the type of S.perm will have weak type variable that fail to generalize *)
 type perm = { r: bool; w: bool }
 
-val directory: transaction -> path -> path list
-(*@ entries = directory transaction path
-    requires transaction_is_valid transaction
-    raises Noent -> not (path_exists transaction path)
+(* TODO: should return valid paths.... prefix *)
+val directory: connection -> transaction -> path -> path list
+(*@ entries = directory con transaction path
+    requires transaction_is_valid con transaction
+    raises Noent -> not (path_exists con transaction path)
     *)
 
 type value
@@ -73,10 +76,10 @@ type value
 val value: unit -> value
 (*@ v = value () *)
 
-val read: transaction -> path -> value
-(*@ v = read transaction path
-    requires transaction_is_valid transaction
-    raises Noent -> not (path_exists transaction path)
+val read: connection -> transaction -> path -> value
+(*@ v = read con transaction path
+    requires transaction_is_valid con transaction
+    raises Noent -> not (path_exists con transaction path)
     *)
 
 type domid
@@ -102,10 +105,10 @@ val perms: domid -> perm -> perms
   }
 *)
 
-val getperms: transaction -> path -> perms
-(*@ perms = getperms transaction path
-    requires transaction_is_valid transaction && path_is_valid path
-    raises Noent -> not (path_exists transaction path)
+val getperms: connection -> transaction -> path -> perms
+(*@ perms = getperms con transaction path
+    requires transaction_is_valid con transaction && path_is_valid path
+    raises Noent -> not (path_exists con transaction path)
     *)
 
 type token
@@ -113,60 +116,68 @@ type token
 val token: unit -> token
 (* t = token () *)
 
-val watch: path -> token -> unit
-(*@ watch path token
+val has_watch: connection -> path -> bool
+(*@ b = has_watch con path
+    pure *)
+
+(* TODO: also quota... *)
+
+val watch: connection -> path -> token -> unit
+(*@ watch con path token
     requires path_is_valid path
+    ensures has_watch con path
+    raises Eexist -> has_watch con path
  *)
 
-val unwatch: path -> token -> unit
-(*@ unwatch path token
-    requires path_is_valid path
+(*val unwatch: connection -> path -> token -> unit*)
+(* TODO: unwatch doens't work for some reason... raises EINVAL
+  unwatch con path token
+    requires path_is_valid path && has_watch con path
+    ensures not (has_watch con path)
     *)
-
 
 (*val dom0: domid*)
 
-val introduce: unit -> domid
-(*@ domid = introduce ()
+val introduce: connection -> domid
+(*@ domid = introduce con
     ensures domid_exists domid
 *)
     (* ensures domid <> dom0 *)
 
-val release: domid -> unit
-(*@ release domid
+val release: connection -> domid -> unit
+(*@ release con domid
     requires domid_exists domid
     modifies domid
     consumes domid
     *)
 
-val resume: domid -> unit
-(*@ resume domid
+val resume: connection -> domid -> unit
+(*@ resume con domid
     requires domid_exists domid
  *)
 
-val getdomainpath: domid -> path
-(*@ s = getdomainpath domid
+val getdomainpath: connection -> domid -> path
+(*@ s = getdomainpath con domid
     requires domid_exists domid
     pure *)
 
-val write: transaction -> path -> value -> unit
-(*@ write transaction path value
-    requires transaction_is_valid transaction && path_is_valid path
+val write: connection -> transaction -> path -> value -> unit
+(*@ write con transaction path value
+    requires transaction_is_valid con transaction && path_is_valid path
  *)
 
-val mkdir: transaction -> path -> unit
-(*@ mkdir transaction path
-    requires transaction_is_valid transaction && path_is_valid path
+val mkdir: connection -> transaction -> path -> unit
+(*@ mkdir con transaction path
+    requires transaction_is_valid con transaction && path_is_valid path
  *)
 
-val rm: transaction -> path -> unit
-(*@ rm transaction path
-    requires transaction_is_valid transaction && path_is_valid path
+val rm: connection -> transaction -> path -> unit
+(*@ rm con transaction path
+    requires transaction_is_valid con transaction && path_is_valid path
  *)
 
-val setperms: transaction -> path -> perms -> unit
-(*@ setperms transaction path perms
-    requires transaction_is_valid transaction && path_is_valid path
-    raises Noent -> not (path_exists transaction path)
+val setperms: connection -> transaction -> path -> perms -> unit
+(*@ setperms con transaction path perms
+    requires transaction_is_valid con transaction && path_is_valid path
+    raises Noent -> not (path_exists con transaction path)
  *)
-*)

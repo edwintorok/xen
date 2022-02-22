@@ -24,7 +24,7 @@ ocamldep -sort "$@"
     fi
 done) > "${LASTMODULE}_test.mli"
 # the extra model signatures should only be visible to ortac
-ortac --frontend=monolith "${LASTMODULE}_test.mli" >"${LASTMODULE}_rtac.ml"
+ortac --frontend=default "${LASTMODULE}_test.mli" >"${LASTMODULE}_rtac.ml"
 cp "${LASTMODULE}_test.mli" /tmp
 test -s "${LASTMODULE}_rtac.ml"
 cp "${LASTMODULE}.mli" "${LASTMODULE}_test.mli"

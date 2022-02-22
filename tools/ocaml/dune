@@ -38,8 +38,8 @@
    %{dep:xsgen.mli})))
 
 (test
-(name xsgen_rtac)
-(libraries xen.store ortac-runtime-monolith threads.posix xenstored_test)
+(name xsgen_monolith)
+(libraries monolith ortac-runtime-monolith xen.store threads.posix xenstored_test)
 )
 
 (rule
