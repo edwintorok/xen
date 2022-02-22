@@ -2,7 +2,7 @@ exception Noent = Xenbus.Xb.Noent
 open Xenstored_test
 open Xenstore
 type transaction = int
-
+type connection = Xenstore.Xsraw.con
 let none = 0
 
 let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
@@ -40,9 +40,16 @@ let con, connection =
   let (_:Thread.t) = Thread.create server_thread server in
   Xsraw.open_fd client, Connections.find cons server
 
-let transaction_start () = Xsraw.transaction_start con
+exception Quota
 
-let transaction_valid tid =
+let maxtransaction _ = !Define.maxtransaction
+let number_of_transactions _ = Connection.number_of_transactions connection
+
+let transaction_start con =
+  try Xsraw.transaction_start con
+  with Xenbus.Xb.Packet.Error "EQUOTA" -> raise Quota
+
+let transaction_is_valid tid =
   try let _:Transaction.t = Connection.get_transaction connection tid in true
   with Not_found -> false
 
