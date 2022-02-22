@@ -9,7 +9,11 @@ let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
 (* during AFL print nothing *)
 
 let () =
-  if not is_output_devnull then begin
+  (* by default we don't print xenstore access/debug logs
+     however when the env var XSLOG is defined we do: this allows to debug failures more easily,
+     while also allowing the fuzzer to run quickly in the common case: it won't have to print
+     anything unless it fails *)
+  if not is_output_devnull && Sys.getenv_opt "XSLOG" <> None then begin
     Printexc.record_backtrace true;
     Logging.xenstored_log_destination := Logging.File "/dev/stderr";
     Logging.access_log_destination := Logging.File "/dev/stderr";
