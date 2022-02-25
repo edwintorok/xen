@@ -48,6 +48,29 @@ module MutableTracker = struct
   (* TODO: set/remove parent is the one that should add/remove *)
 end
 
+module Record = struct
+  module Immutable = struct
+    type t = Tracker.t
+
+    let size_of compute record = compute Tracker.empty
+
+    let immutable_field f size_of acc = Tracker.add acc (size_of f)
+  end
+  module Mutable = struct
+    type t = MutableTracker.t
+
+    let register _record compute =
+      let t = MutableTracker.empty () in
+      compute t;
+      t
+
+    let size_of tracker_of record = MutableTracker.size (tracker_of record)
+
+    let immutable_field f size_of acc = MutableTracker.add acc (size_of f)
+    let mutable_field f size_of tracker_of acc = MutableTracker.add_mutable acc (size_of f) (tracker_of f); acc
+  end
+end
+
 module Queue = struct
   type 'a t =
     { q: 'a Queue.t
