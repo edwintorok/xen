@@ -5,21 +5,41 @@ type transaction = int
 type connection = Xenstore.Xsraw.con * Connection.t
 let none = 0
 
+let memory_calculated_words (_, con) =
+  (* if this is none something has overflown... *)
+  match (Xenbus.Sizeops.Size.to_int_opt (Connection.size_of con)) with
+  | Some x -> x
+  | None -> failwith "Invalid size: overflow detected"
+
+let memory_reachable_words (_, con) =
+  Obj.reachable_words (Obj.repr con)
+
+let memory_check con =
+  let words = memory_reachable_words con in
+  let calculated = memory_calculated_words con in
+  if words <= calculated then true
+  else failwith (Printf.sprintf "calculated: %d words, actual: %d words" calculated words)
+
 let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
 (* during AFL print nothing *)
 
+let monolith_write ?(level=Logging.Debug) s =
+  Monolith.dprintf "(* %s %s *)\n" (Logging.string_of_level level) s
+
+let monolith_logger =
+  Logging.{ stop = ignore
+               ; restart = ignore
+               ; rotate = ignore
+               ; write = monolith_write }
+
 let () =
-  (* by default we don't print xenstore access/debug logs
-     however when the env var XSLOG is defined we do: this allows to debug failures more easily,
-     while also allowing the fuzzer to run quickly in the common case: it won't have to print
-     anything unless it fails *)
-  if not is_output_devnull && Sys.getenv_opt "XSLOG" <> None then begin
+  (* by default we don't print xenstore access/debug logs *)
+  if not is_output_devnull (* && Sys.getenv_opt "XSLOG" <> None *) then begin
     Printexc.record_backtrace true;
-    Logging.xenstored_log_destination := Logging.File "/dev/stderr";
-    Logging.access_log_destination := Logging.File "/dev/stderr";
+    Logging.set_xenstored_logger monolith_logger;
+    Logging.access_logger := Some monolith_logger;
     Logging.access_log_special_ops := true;
-    Logging.init_xenstored_log ();
-    Logging.init_access_log ignore
+    Logging.access_log_transaction_ops := true ;
   end
 
 let cons = Connections.create ()

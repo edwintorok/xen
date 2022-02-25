@@ -1,5 +1,23 @@
 type connection
 
+val memory_reachable_words: connection -> int
+(*@ n = memory_reachable_words con
+    pure *)
+
+val memory_calculated_words: connection -> int
+(*@ n = memory_calculated_words con
+    pure *)
+
+val memory_check: connection -> bool
+(*@ b = memory_check con
+    pure
+ *)
+
+(* reachable words can be smaller due to sharing *)
+(*@ predicate memory_calculation_ok(c:connection) =
+      memory_reachable_words c <= memory_calculated_words c
+  *)
+
 type transaction
 
 val connection: connection
@@ -38,6 +56,7 @@ val transaction_end: connection -> transaction -> bool -> bool
     modifies t
     consumes t
     ensures not (transaction_is_valid con t)
+    ensures memory_check con
  *)
 
 type path
