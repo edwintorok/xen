@@ -467,7 +467,7 @@ let transaction_replay c t doms cons =
 					let can_apply_on store = (
 						let store = Store.copy store in
 						let trial_t = Transaction.make ~internal:true Transaction.none store in
-						try Xenbus.Memory_tracker.List.iter (perform_exn ~wlog:false trial_t) (Transaction.get_operations t);
+						try Transaction.iter_operations t (perform_exn ~wlog:false trial_t);
 							true
 						with Transaction_again -> false
 					) in
