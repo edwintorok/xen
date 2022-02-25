@@ -706,7 +706,7 @@ let check_memory_usage store con =
 	  let quota = Store.get_quota store in
 	  let entry = Quota.get_entry_0 quota domid in
 	  (* TODO: convert words to bytes to make it easier for user *)
-          let actual = Xenbus.Sizeops.Size.(Connection.size_of con + entry.Quota.size) in
+          let actual = Xenbus.Sizeops.Size.(Xenbus.Memory_tracker.MutableTracker.size (Connection.size_of con) + entry.Quota.size) in
 	  let bad = match actual |> Xenbus.Sizeops.Size.to_int_opt with
 	  | Some n when n < !Define.maxdomumemory -> false
 	  | None ->

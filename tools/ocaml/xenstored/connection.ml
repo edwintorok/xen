@@ -53,7 +53,7 @@ let size_of_watch t =
 
 let fields_of_t = Size.of_int 9
 let size_of t =
-  Size.( fields_of_t
+  MutableTracker.of_tracker Size.( fields_of_t
        + Xenbus.Xb.size_of t.xb
        + size_of_option Domain.size_of t.dom
        + Hashtbl.size_of t.transactions
@@ -125,7 +125,7 @@ let create xbcon dom =
 	dom = dom;
 	transactions = Hashtbl.create_sized size_of_int Transaction.size_of 5;
 	next_tid = initial_next_tid;
-	watches = Hashtbl.create_sized size_of_string List.size_of 8;
+	watches = Hashtbl.create_sized size_of_string (fun x -> MutableTracker.of_tracker @@ List.size_of x) 8;
 	nb_watches = 0;
 	anonid = id;
 	stat_nb_ops = 0;

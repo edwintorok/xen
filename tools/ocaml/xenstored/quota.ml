@@ -49,7 +49,7 @@ let entry_sub a b =
   }
 
 let fields_of_entry = Size.of_int 2
-let size_of_entry _ = fields_of_entry
+let size_of_entry _ = MutableTracker.of_tracker fields_of_entry
 
   type t = {
 	  maxent: int;               (* max entities per domU *)

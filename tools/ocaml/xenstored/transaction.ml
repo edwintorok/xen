@@ -107,7 +107,7 @@ let size_of_reqresp (req, resp) =
 let fields_of_t = Size.of_int 9
 let size_of t =
   let delta = Size.(Store.size_of t.store - Store.Node.size_of t.oldroot) in
-  Size.(fields_of_t
+  MutableTracker.of_tracker Size.(fields_of_t
        + delta
        + Quota.size_of t.quota
        + List.size_of t.paths (* TODO: there is a lot of sharing here, may not need to count paths *)
@@ -123,7 +123,7 @@ let reset_conflict_stats () =
 	failed_commits_no_culprit := 0L
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
-let size_of_short (_, t) = size_of t
+let size_of_short (_, t) = MutableTracker.size (size_of t)
 let short_running_txns = ref (List.empty size_of_short)
 
 let oldest_short_running_transaction () =

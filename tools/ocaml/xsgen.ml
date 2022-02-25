@@ -7,7 +7,7 @@ let none = 0
 
 let memory_calculated_words (_, con) =
   (* if this is none something has overflown... *)
-  match (Xenbus.Sizeops.Size.to_int_opt (Connection.size_of con)) with
+  match (Xenbus.Sizeops.Size.to_int_opt @@ Xenbus.Memory_tracker.MutableTracker.size @@ Connection.size_of con) with
   | Some x -> x
   | None -> failwith "Invalid size: overflow detected"
 
