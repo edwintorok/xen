@@ -449,7 +449,7 @@ let transaction_replay c t doms cons =
 		(fun () ->
 			try
 				Logging.start_transaction ~con ~tid;
-				Xenbus.Memory_tracker.List.iter (perform_exn ~wlog:true replay_t) (Transaction.get_operations t); (* May throw EAGAIN *)
+                                Transaction.iter_operations t (perform_exn ~wlog:true replay_t); (* May throw EAGAIN *)
 
 				Logging.end_transaction ~con ~tid;
 				Transaction.commit ~con replay_t

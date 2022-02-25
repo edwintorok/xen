@@ -86,7 +86,7 @@ type t = {
 	quota: Quota.t;
 	oldroot: Store.Node.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) List.t;
-	mutable operations: (Packet.request * Packet.response) List.t;
+	operations: (Packet.request * Packet.response) Queue.t;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -111,7 +111,7 @@ let size_of t =
        + delta
        + Quota.size_of t.quota
        + List.size_of t.paths (* TODO: there is a lot of sharing here, may not need to count paths *)
-       + List.size_of t.operations)
+       + Queue.size_of t.operations)
   (* read/write lowpath is just shared with what is in the tree already: don't count *)
 
 
@@ -154,7 +154,7 @@ let make ?(internal=false) id store =
 		quota = Quota.copy store.Store.quota;
 		oldroot = Store.get_root store;
                 paths = List.empty size_of_path_entry;
-		operations = List.empty size_of_reqresp;
+		operations = Queue.create_sized size_of_reqresp;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
@@ -174,10 +174,11 @@ let add_wop t ty path = t.paths <- List.cons (ty, path) t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
-		&& List.length t.operations >= !Define.maxrequests
+		&& Queue.length t.operations >= !Define.maxrequests
 		then raise Quota.Limit_reached;
-	t.operations <- List.cons (request, response) t.operations
-let get_operations t = List.rev t.operations
+        Queue.add (request, response) t.operations
+
+let iter_operations t f = Queue.iter f t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
 let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath
 
