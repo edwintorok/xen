@@ -222,7 +222,14 @@ module Size: SizeSig = struct
      some tooling could help automatically copy these specifications so we don't have to duplicate
      them *)
 
-  let[@logic] of_int i = if i < 0 || i >= invalid_size then invalid else i
+  let[@logic] of_int i = if i < 0 || i >= invalid_size then begin
+      (* raising doesn't work: it gets caught and transformed into Xb.Invalid *)
+      (* TODO: only raise in "debug/fuzz" mode *)
+      let bt = Printexc.get_callstack 100 in
+      Printexc.print_raw_backtrace stderr bt;
+      Printf.eprintf "invalid size %d\n" i;
+      -1
+    end else i
   (*@ r = of_int i
       (* header: all GOSPEL specs must give names to parameters and return values, so we can refer
          to them in the specification below *)

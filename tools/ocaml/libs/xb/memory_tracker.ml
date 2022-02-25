@@ -16,21 +16,53 @@ module Tracker = struct
     | Some _ -> Some t
 end
 
+module MutableTracker = struct
+  type t = {
+    mutable t: Tracker.t;
+    mutable parent: t option
+  }
+
+  let empty () = { t = Tracker.empty; parent = None }
+  let of_tracker t = { t ; parent = None }
+  let set_parent t ~parent = t.parent <- Some parent
+  let remove_parent t = t.parent <- None
+  let size t = t.t
+  let rec add t n =
+    t.t <- Tracker.add t.t n;
+    Option.iter (fun parent -> add parent n) t.parent
+
+  let add_mutable t n e =
+    add t n;
+    set_parent e ~parent:t
+
+  let rec remove t n =
+    t.t <- Tracker.remove t.t n;
+    Option.iter (fun parent -> remove parent n) t.parent
+
+  let remove_mutable t n e =
+    remove_parent e;
+    t.t <- Tracker.remove t.t n
+
+  let clear t = t.t <- Tracker.empty
+
+  (* TODO: set/remove parent is the one that should add/remove *)
+end
+
 module Queue = struct
   type 'a t =
     { q: 'a Queue.t
-    ; mutable size: Tracker.t
+    ; size: MutableTracker.t
     ; get_size: 'a -> Size.t
     }
 
-  let create_sized get_size = { q = Queue.create (); size = Tracker.empty; get_size }
+  let create_sized get_size = { q = Queue.create (); size = MutableTracker.empty (); get_size }
 
   let add e t =
     let size = t.get_size e in
     (* get_size is first in case it raises exceptions *)
 
     Queue.add e t.q;
-    t.size <- Tracker.add t.size size
+    MutableTracker.add t.size size
 
   let push = add
 
@@ -39,7 +71,7 @@ module Queue = struct
     (* get_size is first in case it raises exceptions *)
 
     let e = Queue.take t.q in
-    t.size <- Tracker.remove t.size size;
+    MutableTracker.remove t.size size;
     e
 
   let pop = take
@@ -50,7 +82,7 @@ module Queue = struct
 
   let clear t =
     Queue.clear t.q;
-    t.size <- Tracker.empty
+    MutableTracker.clear t.size
 
   let is_empty t = Queue.is_empty t.q
 
@@ -64,21 +96,21 @@ module Queue = struct
 
   let transfer src dst =
     Queue.transfer src.q dst.q;
-    dst.size <- Tracker.add dst.size src.size;
-    src.size <- Tracker.empty
+    MutableTracker.add dst.size (MutableTracker.size src.size);
+    MutableTracker.clear src.size
 
   (* needs to be O(1) to avoid O(N^2) complexity in packet processing loop *)
   let size_of t =
     let overhead = Queue.length t.q * 3 + 2 in
-    Size.(t.size + of_int overhead)
+    Size.(MutableTracker.size t.size + of_int overhead)
 end
 
 module Hashtbl = struct
   type ('a, 'b) t =
     { h: ('a, 'b) Hashtbl.t
-    ; mutable size: Tracker.t
+    ; size: MutableTracker.t
     ; get_key_size: 'a -> Size.t
-    ; get_value_size: 'b -> Size.t
+    ; get_value_size: 'b -> MutableTracker.t
     }
 
   (* note about randomized hashtbl:
@@ -88,14 +120,14 @@ module Hashtbl = struct
 
   let create_sized get_key_size get_value_size n =
     { h = Hashtbl.create ~random:true n
-    ; size = Tracker.empty
+    ; size = MutableTracker.empty ()
     ; get_key_size
     ; get_value_size
     }
 
   let reset t =
     Hashtbl.reset t.h;
-    t.size <- Tracker.empty
+    MutableTracker.clear t.size
 
   (* [clear] is not implemented: it doesn't shrink the table size,
      thus prone to space leaks *)
@@ -107,17 +139,21 @@ module Hashtbl = struct
   let remove t k =
     begin try
       let prev = Hashtbl.find t.h k in
-      let size = Size.(t.get_key_size k + t.get_value_size prev) in
-      t.size <- Tracker.remove t.size size
+      let value_tracker = t.get_value_size prev in
+      let size = Size.(t.get_key_size k + MutableTracker.size value_tracker) in
+      Printf.eprintf "hashtbl, removing %d\n" (Option.value ~default:(-1) (Size.to_int_opt size));
+      MutableTracker.remove_mutable t.size size value_tracker
     with Not_found -> ()
     end;
     Hashtbl.remove t.h k
 
   let replace t k data =
     remove t k;
-    let size = Size.(t.get_key_size k + t.get_value_size data) in
+    let value_tracker = t.get_value_size data in
+    let size = Size.(t.get_key_size k + MutableTracker.size value_tracker) in
     Hashtbl.replace t.h k data;
-    t.size <- Tracker.add t.size size
+      Printf.eprintf "hashtbl, adding %d\n" (Option.value ~default:(-1) (Size.to_int_opt size));
+    MutableTracker.add_mutable t.size size value_tracker
 
   let find t k = Hashtbl.find t.h k
 
@@ -136,7 +172,7 @@ module Hashtbl = struct
     let stats = Hashtbl.stats t.h in
     (* a constant time approximation *)
     let overhead = stats.Hashtbl.max_bucket_length * stats.Hashtbl.num_buckets * 2 in
-    Size.(t.size + of_int overhead)
+    Size.(MutableTracker.size t.size + of_int overhead)
 end
 
 module List = struct
