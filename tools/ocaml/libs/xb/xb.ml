@@ -56,12 +56,19 @@ type t =
 	pkt_out: Packet.t Queue.t;
 	mutable partial_in: partial_buf;
 	mutable partial_out: string;
+	tracker: Record.Mutable.t
 }
 
-let size_of t =
-        Size.(Queue.size_of t.pkt_in + Queue.size_of t.pkt_out
-              + size_of_partial_buf t.partial_in
-              + size_of_string t.partial_out)
+let size_of_backend _ = value
+
+let register t start =
+	let open Record.Mutable in
+        t.tracker
+	|> immutable_field t.backend size_of_backend
+	|> mutable_field t.pkt_in Queue.size_of
+	|> mutable_field t.pkt_out Queue.size_of
+	|> mutable_field t.partial_in
+	|> mutable_field t.partial_out size_of_string
 
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')

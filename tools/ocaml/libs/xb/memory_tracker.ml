@@ -1,4 +1,5 @@
 open Sizeops
+let value = Size.of_words 0
 module Tracker = struct
 
   type t = Size.t (* the sum *)
@@ -49,25 +50,27 @@ module MutableTracker = struct
 end
 
 module Record = struct
+  let field_size size_of f = Size.(size_of f + value)
   module Immutable = struct
     type t = Tracker.t
 
     let size_of compute record = compute Tracker.empty
 
-    let immutable_field f size_of acc = Tracker.add acc (size_of f)
+    let immutable_field f size_of acc = Tracker.add acc (field_size size_of f)
   end
   module Mutable = struct
     type t = MutableTracker.t
 
     let register _record compute =
       let t = MutableTracker.empty () in
+      MutableTracker.add t value; (* the tracker field itself *)
       compute t;
       t
 
     let size_of tracker_of record = MutableTracker.size (tracker_of record)
 
-    let immutable_field f size_of acc = MutableTracker.add acc (size_of f)
-    let mutable_field f size_of tracker_of acc = MutableTracker.add_mutable acc (size_of f) (tracker_of f); acc
+    let immutable_field f size_of acc = MutableTracker.add acc (field_size size_of f)
+    let mutable_field f size_of tracker_of acc = MutableTracker.add_mutable acc (field_size size_of f) (tracker_of f); acc
   end
 end
 
@@ -259,7 +262,6 @@ end
 let size_of_string s = Size.of_bytes (String.length s)
 let size_of_bytes s = Size.of_bytes (Bytes.length s)
 
-let value = Size.of_words 0
 
 let size_of_int _ = value
 let size_of_option size_of_element = function
