@@ -9,95 +9,113 @@ module Tracker = struct
   let add acc x = Size.(acc + x)
 
   let remove acc x = Size.(acc - x)
-
-  let add_opt acc x =
-    let t = Size.(acc + x) in
-    match Size.to_int_opt t with
-    | None -> None
-    | Some _ -> Some t
-end
-
-module MutableTracker = struct
-  type t = {
-    mutable t: Tracker.t;
-    mutable parent: t option
-  }
-
-  let empty () = { t = Tracker.empty; parent = None }
-  let of_tracker t = { t ; parent = None }
-  let set_parent t ~parent = t.parent <- Some parent
-  let remove_parent t = t.parent <- None
-  let size t = t.t
-  let rec add t n =
-    t.t <- Tracker.add t.t n;
-    Option.iter (fun parent -> add parent n) t.parent
-
-  let add_mutable t n e =
-    add t n;
-    set_parent e ~parent:t
-
-  let rec remove t n =
-    t.t <- Tracker.remove t.t n;
-    Option.iter (fun parent -> remove parent n) t.parent
-
-  let remove_mutable t n e =
-    remove_parent e;
-    t.t <- Tracker.remove t.t n
-
-  let clear t = t.t <- Tracker.empty
-
-  (* TODO: set/remove parent is the one that should add/remove *)
 end
 
 module Record = struct
-  let field_size size_of f = Size.(size_of f + value)
   module Immutable = struct
-    type t = Tracker.t
-
-    let size_of compute record = compute Tracker.empty
-
-    let immutable_field f size_of acc = Tracker.add acc (field_size size_of f)
+    type t = Size.t
+    let empty = value
+    let add_field acc size_of x =
+      let n = size_of x in
+      Size.(acc + value + n)
   end
+
   module Mutable = struct
-    type t = MutableTracker.t
+    type t =
+      { mutable size: Immutable.t
+      ; mutable parent: t option
+      }
 
-    let register _record compute =
-      let t = MutableTracker.empty () in
-      MutableTracker.add t value; (* the tracker field itself *)
-      compute t;
-      t
+    let create fields = { size = Size.of_words fields; parent = None }
 
-    let size_of tracker_of record = MutableTracker.size (tracker_of record)
+    let size_of t = t.size
 
-    let immutable_field f size_of acc = MutableTracker.add acc (field_size size_of f)
-    let mutable_field f size_of tracker_of acc = MutableTracker.add_mutable acc (field_size size_of f) (tracker_of f); acc
+    let set_parent t ~parent =
+      match t.parent with
+      | None -> t.parent <- Some parent
+      | Some _ -> invalid_arg "mutable records can only have one parent"
+
+    let rec add n t =
+      t.size <- Size.(t.size + n);
+      Option.iter (add n) t.parent
+
+    let rec sub n t =
+      t.size <- Size.(t.size - n);
+      Option.iter (sub n) t.parent
+
+    let clear t =
+      sub t.size t
+
+    let add_field t size_of ~field =
+      add Size.(value + size_of field) t
+
+    let add_mutable_field t ~field =
+      set_parent field ~parent:t;
+      add_field t size_of ~field
+
+    let add_mutable_entry t key_size_of key ~entry =
+      add_field t key_size_of ~field:key;
+      add_mutable_field t ~field:entry
+
+    let remove_mutable_entry t key_size_of key_size ~entry =
+      sub Size.(value + key_size_of key_size) t;
+      entry.parent <- None;
+      sub entry.size t
+  end
+
+  module Ref = struct
+    type 'a t =
+      { tracker: Mutable.t
+      ; size_of: 'a -> Size.t
+      ; mutable v: 'a
+      (* we normally don't allow mutable fields in tracked records,
+         except internally here *)
+      }
+
+    let ref size_of v =
+      let r = { tracker = Mutable.create 3; size_of; v } in
+      Mutable.add_field r.tracker size_of ~field:v;
+      r
+
+  let (:=) t v =
+    let tracker = t.tracker in
+      Mutable.clear tracker;
+      Mutable.add (t.size_of v) tracker;
+      t.v <- v
+
+  let (!) t = t.v
+
   end
 end
 
 module Queue = struct
   type 'a t =
     { q: 'a Queue.t
-    ; size: MutableTracker.t
-    ; get_size: 'a -> Size.t
+    ; tracker: Record.Mutable.t
+    ; size_of: 'a -> Size.t
     }
 
-  let create_sized get_size = { q = Queue.create (); size = MutableTracker.empty (); get_size }
+  let create_sized size_of =
+    let tracker = Record.Mutable.create 3 in
+    { q = Queue.create (); tracker; size_of }
+
+  let item_overhead = Size.of_int 3
 
   let add e t =
-    let size = t.get_size e in
+    let size = Size.(t.size_of e + item_overhead) in
     (* get_size is first in case it raises exceptions *)
 
     Queue.add e t.q;
-    MutableTracker.add t.size size
+    Record.Mutable.add size t.tracker
 
   let push = add
 
   let take t =
-    let size = t.get_size (Queue.peek t.q) in
+    let size = t.size_of (Queue.peek t.q) in
     (* get_size is first in case it raises exceptions *)
 
     let e = Queue.take t.q in
-    MutableTracker.remove t.size size;
+    Record.Mutable.sub size t.tracker;
     e
 
   let pop = take
@@ -108,7 +126,7 @@ module Queue = struct
 
   let clear t =
     Queue.clear t.q;
-    MutableTracker.clear t.size
+    Record.Mutable.clear t.tracker
 
   let is_empty t = Queue.is_empty t.q
 
@@ -122,21 +140,16 @@ module Queue = struct
 
   let transfer src dst =
     Queue.transfer src.q dst.q;
-    MutableTracker.add dst.size (MutableTracker.size src.size);
-    MutableTracker.clear src.size
-
-  (* needs to be O(1) to avoid O(N^2) complexity in packet processing loop *)
-  let size_of t =
-    let overhead = Queue.length t.q * 3 + 2 in
-    Size.(MutableTracker.size t.size + of_int overhead)
+    Record.Mutable.add src.tracker.size dst.tracker;
+    Record.Mutable.clear src.tracker
 end
 
 module Hashtbl = struct
   type ('a, 'b) t =
     { h: ('a, 'b) Hashtbl.t
-    ; size: MutableTracker.t
+    ; tracker: Record.Mutable.t
     ; get_key_size: 'a -> Size.t
-    ; get_value_size: 'b -> MutableTracker.t
+    ; get_value_size: 'b -> Record.Mutable.t
     }
 
   (* note about randomized hashtbl:
@@ -146,14 +159,14 @@ module Hashtbl = struct
 
   let create_sized get_key_size get_value_size n =
     { h = Hashtbl.create ~random:true n
-    ; size = MutableTracker.empty ()
+    ; tracker = Record.Mutable.create 4
     ; get_key_size
     ; get_value_size
     }
 
   let reset t =
     Hashtbl.reset t.h;
-    MutableTracker.clear t.size
+    Record.Mutable.clear t.tracker
 
   (* [clear] is not implemented: it doesn't shrink the table size,
      thus prone to space leaks *)
@@ -166,9 +179,7 @@ module Hashtbl = struct
     begin try
       let prev = Hashtbl.find t.h k in
       let value_tracker = t.get_value_size prev in
-      let size = Size.(t.get_key_size k + MutableTracker.size value_tracker) in
-      Printf.eprintf "hashtbl, removing %d\n" (Option.value ~default:(-1) (Size.to_int_opt size));
-      MutableTracker.remove_mutable t.size size value_tracker
+      Record.Mutable.remove_mutable_entry t.tracker t.get_key_size k ~entry:value_tracker
     with Not_found -> ()
     end;
     Hashtbl.remove t.h k
@@ -176,10 +187,8 @@ module Hashtbl = struct
   let replace t k data =
     remove t k;
     let value_tracker = t.get_value_size data in
-    let size = Size.(t.get_key_size k + MutableTracker.size value_tracker) in
     Hashtbl.replace t.h k data;
-      Printf.eprintf "hashtbl, adding %d\n" (Option.value ~default:(-1) (Size.to_int_opt size));
-    MutableTracker.add_mutable t.size size value_tracker
+    Record.Mutable.add_mutable_entry t.tracker t.get_key_size k ~entry:value_tracker
 
   let find t k = Hashtbl.find t.h k
 
@@ -194,11 +203,12 @@ module Hashtbl = struct
   let length t = Hashtbl.length t.h
 
   (* needs to be O(1) to avoid O(N^2) complexity in packet processing loop *)
-  let size_of t =
+  (*let size_of t =
     let stats = Hashtbl.stats t.h in
     (* a constant time approximation *)
     let overhead = stats.Hashtbl.max_bucket_length * stats.Hashtbl.num_buckets * 2 in
-    Size.(MutableTracker.size t.size + of_int overhead)
+    TODO: we're not tracking this overhead for now...
+    Size.(MutableTracker.size t.size + of_int overhead)*)
 end
 
 module List = struct

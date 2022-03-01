@@ -54,21 +54,22 @@ type t =
 	backend: backend;
 	pkt_in: Packet.t Queue.t;
 	pkt_out: Packet.t Queue.t;
-	mutable partial_in: partial_buf;
-	mutable partial_out: string;
+	partial_in: partial_buf Record.Ref.t;
+	partial_out: string Record.Ref.t;
 	tracker: Record.Mutable.t
 }
 
 let size_of_backend _ = value
 
-let register t start =
+let register t =
 	let open Record.Mutable in
-        t.tracker
-	|> immutable_field t.backend size_of_backend
-	|> mutable_field t.pkt_in Queue.size_of
-	|> mutable_field t.pkt_out Queue.size_of
-	|> mutable_field t.partial_in
-	|> mutable_field t.partial_out size_of_string
+        add_field t.tracker size_of_backend ~field:t.backend;
+        add_mutable_field t.tracker ~field:t.pkt_in.tracker;
+        add_mutable_field t.tracker ~field:t.pkt_out.tracker;
+        add_mutable_field t.tracker ~field:t.partial_in.tracker;
+        add_mutable_field t.tracker ~field:t.partial_out.tracker
+
+open Record.Ref
 
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
@@ -83,8 +84,8 @@ let reconnect t = match t.backend with
 		(* Clear our old connection state *)
 		Queue.clear t.pkt_in;
 		Queue.clear t.pkt_out;
-		t.partial_in <- init_partial_in ();
-		t.partial_out <- ""
+		t.partial_in := init_partial_in ();
+		t.partial_out := ""
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
@@ -125,8 +126,8 @@ let write con s len =
 (* NB: can throw Reconnect *)
 let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
-	let s = if String.length con.partial_out > 0 then
-			con.partial_out
+	let s = if String.length !(con.partial_out) > 0 then
+			!(con.partial_out)
 		else if Queue.length con.pkt_out > 0 then
 			Packet.to_string (Queue.pop con.pkt_out)
 		else
@@ -136,10 +137,10 @@ let output con =
 		let len = String.length s in
 		let sz = write con s len in
 		let left = String.sub s sz (len - sz) in
-		con.partial_out <- left
+		con.partial_out := left
 	);
 	(* after sending one packet, partial is empty *)
-	con.partial_out = ""
+	!(con.partial_out) = ""
 
 (* NB: can throw Reconnect *)
 let input con =
