@@ -19,7 +19,7 @@
   Memory usage needs to be tracked efficiently (so we don't consume a lot more memory just to track
   it, and we don't degrade performance by walking all the values on each action).
     * all operations in this module are O(1), except removal of mixed containers
-    * all memory used by long-lived values in this module are O(1), except when debug mode is active
+    * all memory used by long-lived values in this module are O(1)
     * doesn't rely on the Obj module: memory tracking is opt-in for data structures
 
   A given data structure can hold memory belonging to different owners (most obvious example: the
@@ -27,8 +27,8 @@
   values. However we avoid keeping an explicit list of values owned by each owner, and instead just
   update a counter by adding and subtracting sizes on each operation.
 
-  There is a debug mode that can check that the usage maintained on-the-fly matches those recomputed
-  from individual pieces, and can print a breakdown of memory usage. This is not O(1).
+  To detect bugs there is also a "reference" implementation that is not O(1) that can be used
+  by fuzzers to check that the optimized implementation here is correct.
 *)
 
 type top (** phantom type for top-level owner *)
@@ -52,7 +52,7 @@ type 'a printable = 'a -> (Format.formatter -> 'a -> unit)
     This allows calling the pretty printer only when needing and avoids having to create lots of
     temporary strings that are never used *)
 
-val create: 'a printable -> top t
+val create: 'a -> (Format.formatter -> 'a -> unit) -> top t
 (** [create id pp_id] creates a new top-level owner.
     [pp_id id] will be used when pretty printing.
 
@@ -69,7 +69,6 @@ val pp: Format.formatter -> top t -> unit
 
     The format is implementation defined and subject to change between versions.
     It prints at least an identifier for the top-level owner and its size.
-    In debug mode it may also print the size of each container in a tree form.
 
     Complexity:
       - O(1) when debug mode is not enabled
@@ -101,7 +100,7 @@ val remove_nested: _ t -> _ nested t -> unit
   *)
 
 module TrackedSize: sig
-  type 'a t constraint 'a = [< `constant | `ephemeral]
+  type 'a t  (* constraint 'a = [< `constant | `ephemeral] *)
   (** a size can be constant if the value is immutable,
       or ephemeral if the value is mutable and this just represents the size
       at the current moment.
@@ -155,7 +154,7 @@ module TrackedSize: sig
 
       O(1) complexity, it is a constant. *)
 
-  val option: ('a, 'b) immutable_size_of -> ('a option, 'b) immutable_size_of
+  val option: ('a, [<`constant]) immutable_size_of -> ('a option, 'b) immutable_size_of
   (** [option element_immutable_size_of] computes the size of ['a option] using [element_immutable_size_of] to compute
       the size of its element.
 
@@ -225,18 +224,20 @@ module Container: sig
       O(1) complexity.
     *)
 
-  val add_immutable_item: 'a t -> 'a -> unit
-  (** [add_immutable_item t item] adds [item] to [t]. Its size will be computed using
+  val add_immutable_item: ?owner:id -> 'a t -> 'a -> unit
+  (** [add_immutable_item ?owner t item] adds [item] to [t]. Its size will be computed using
       the function provided at the time the container was created.
       [item] must be an immutable value, containing only immutable values and fields.
       In particular its size is not allowed to change, since that would cause [remove_item] to
       incorrectly update the count.
+      [owner] defaults to the parent of this container, but can be manually specified.
 
       O(1) complexity
       *)
 
-  val remove_immutable_item: 'a t -> 'a -> unit
-  (** [remove_immutable_item t item] removes [item] from [t].
+  val remove_immutable_item: ?owner: id -> 'a t -> 'a -> unit
+  (** [remove_immutable_item ?owner t item] removes [item] from [t].
+      [owner] must be specified and identical to [add_immutable_item] if it was specified there.
 
       @raise Invalid_argument if debug mode is enabled and the size of [item] has changed
 
@@ -245,12 +246,3 @@ module Container: sig
         - if we have to walk all items due to mixed owners - O(items)
     *)
 end
-
-
-val enable_debug: bool -> unit
-(** [enable_debug state] enables debug mode.
-    This will cause this module to use more memory for tracking values.
-
-    Turning debug mode off only affects newly created owners/containers,
-    previous containers/owners may still run in debug mode.
-  *)
