@@ -72,6 +72,13 @@ type 'a t constraint 'a = [< size_kind]
 
   *)
 
+val add: 'a t -> 'a t -> 'a t
+(** [add a b] is the size of [a] + size of [b].
+    Updates to the sizes of either [a] or [b] will propagate to the size of their sum *)
+
+val tracker: _ t -> [>`constant] t
+(** the overhead of a size tracker is constant *)
+
 val bool: bool -> [>`constant] t
 (** [bool] computes the size of a bool.
 
@@ -86,6 +93,13 @@ val float: float -> [>`constant] t
 (** [float] computes the size of a float.
 
     O(1) complexity, it is a constant. *)
+
+val func: ('a -> 'b) -> [>`constant] t
+(** [func] computes the size of a function reference.
+    This assumes that the function already exists and is not a closure.
+    However the type system can't verify that.
+
+    O(1) complexity, it is a constant *)
 
 val int: int -> [>`constant ] t
 (** [int] computes the size of an int.
@@ -174,7 +188,7 @@ val record_end: ('a, 'b) fields -> 'b t
   O(1) complexity.
  *)
 
-val container_create: initial:[<`constant | `immutable | `updatable] t -> item_overhead:[<`constant|`immutable] t -> [>`updatable] t
+val container_create: initial:[<`constant | `immutable] t -> item_overhead:Sizeops.Size.t -> [>`updatable] t
 (** [container_create ~initial ~item_overhead] creates a new size update tracker, with [record]'s size as starting
     point and [item_overhead] overhead per element.
 
@@ -193,8 +207,26 @@ val container_remove_element: [<`constant | `immutable | `updatable] t -> [<`upd
 
     O(1) complexity. *)
 
+val container_clear: [<`updatable] t -> unit
+(** [container_clear t] sets [t]'s size back to its initial size.
+
+    O(1) complexity. *)
+
+val container_transfer: src:[<`updatable] t -> dst:[<`updatable] t -> unit
+(** [container_transfer ~src ~dst] transfers all elements from [src] to [dst],
+    while ensuring the [initial] size of the container is not double counted.
+
+    O(1) complexity *)
+
 val size_of: [>`constant|`immutable] t -> Sizeops.Size.t
 (** [size_of t] is the size of [t]. Can only be inspected directly when it is a constant *)
+
+val size_of_bytes: _ t -> int
+(** [size_of_bytes t] returns the size of [t] in bytes. This is only valid at the current moment,
+    future updates to [t]'s size cannot be reflected in the return type (which is an integer).
+    It will return [max_int] if the size tracking has overflown *or* underflown.
+
+    O(1) complexity *)
 
 val pp: Format.formatter -> _ t -> unit
 (** [pp formatter size] pretty prints the size *)
