@@ -2,11 +2,13 @@ open Memory_size
 open Sizeops
 
 type 'a size = 'a t
-
+type require_nestable = Memory_size.require_nestable
+type array_compatible = Memory_size.array_compatible
 module Container = struct
+  type container_size = [`updatable] size
   type 'a t =
-    { tracker: [`updatable] size
-    ; size_of: 'a -> [`constant | `immutable] size
+    { tracker: container_size
+    ; size_of: 'a -> require_nestable size
     }
 
   let container_size =
@@ -15,17 +17,30 @@ module Container = struct
     |> record_add_immutable @@ func ignore
     |> record_end
 
+  let open_nestable x = (x: 'a -> [< require_nestable] size :> 'a -> [> require_nestable] size)
+
   let create ~initial ~item_overhead size_of =
     let initial = add initial container_size in
-    { tracker = container_create ~initial ~item_overhead; size_of }
+    { tracker = container_create ~initial ~item_overhead; size_of = open_nestable size_of }
 
   let add t el = container_add_element (t.size_of el) t.tracker
   let remove t el = container_remove_element (t.size_of el) t.tracker
-  let size_of t = t.size_of
+
+  let add_kv t key valuesize =
+    add t key;
+    container_add_element valuesize t.tracker
+
+  let remove_kv t key valuesize =
+    remove t key;
+    container_remove_element valuesize t.tracker
+
+  let size_of t = (t.tracker : [<`updatable] size :> [> `updatable] size)
   let clear t = container_clear t.tracker
   let transfer ~src ~dst = container_transfer ~src:src.tracker ~dst:dst.tracker
 end
 
+(* use name matching the one in stdlib to ensure this one is used
+   and to reduce the amount of changes: only need to change Queue.create to Queue.create_sized *)
 module Queue = struct
   type 'a t =
     { q: 'a Queue.t
@@ -51,6 +66,7 @@ module Queue = struct
     |> record_add_immutable @@ unit ()
     |> record_end
     |> size_of
+
 
   let create_sized size_of =
     let container = Container.create ~initial ~item_overhead size_of in
@@ -91,8 +107,12 @@ module Queue = struct
   let transfer src dst =
     Queue.transfer src.q dst.q;
     Container.transfer ~src:src.container ~dst:dst.container
+
+  let size_of t = Container.size_of t.container
 end
 
+(* use name matching the one in stdlib to ensure this one is used
+   and to reduce the amount of changes: only need to change Hashtbl.create to Hashtbl.create_sized *)
 module Hashtbl = struct
   type ('a, 'b) t =
     { h: ('a, 'b) Hashtbl.t
@@ -129,7 +149,7 @@ module Hashtbl = struct
     let h = Hashtbl.create ~random:true n in
     { h
     ; container = Container.create ~initial:(initial h) ~item_overhead get_key_size
-    ; get_value_size
+    ; get_value_size = Container.open_nestable get_value_size
     }
 
   let reset t =
@@ -146,19 +166,15 @@ module Hashtbl = struct
   let remove t k =
     begin try
       let prev = Hashtbl.find t.h k in
-      let value_tracker = t.get_value_size prev in
-      Container.remove t.container k;
-      (* TODO.. *)
-      Record.Mutable.remove_mutable_entry t.tracker t.get_key_size k ~entry:value_tracker
+      Container.remove_kv t.container k @@ t.get_value_size prev
     with Not_found -> ()
     end;
     Hashtbl.remove t.h k
 
   let replace t k data =
     remove t k;
-    let value_tracker = t.get_value_size data in
-    Hashtbl.replace t.h k data;
-    Record.Mutable.add_mutable_entry t.tracker t.get_key_size k ~entry:value_tracker
+    Container.add_kv t.container k @@ t.get_value_size data;
+    Hashtbl.replace t.h k data
 
   let find t k = Hashtbl.find t.h k
 
@@ -173,6 +189,7 @@ module Hashtbl = struct
   let length t = Hashtbl.length t.h
 
   (* needs to be O(1) to avoid O(N^2) complexity in packet processing loop *)
+  let size_of t = Container.size_of t.container
   (*let size_of t =
     let stats = Hashtbl.stats t.h in
     (* a constant time approximation *)
@@ -181,52 +198,102 @@ module Hashtbl = struct
     Size.(MutableTracker.size t.size + of_int overhead)*)
 end
 
-module List = struct
+(* Use a different module name so it doesn't clash with stdlib's List module.
+   Lists are used everywhere, and not all of them need to track their sizes,
+   updating all code to use the sized list tracking would cause much churn.
+
+   Only implements functions from the List module that are tail-recursive,
+   to avoid stack overflow.
+   *)
+module SizedList = struct
   type 'a t =
     { l: 'a list
-    ; size: Tracker.t
+    ; size: [`constant | `immutable | `updatable] size
     ; length: int
-    ; get_size: 'a -> Size.t
+    ; size_of: 'a -> [`constant | `updatable | `immutable] size
     }
 
-  let of_list get_size l =
-    let size = List.fold_left (fun acc e -> Tracker.add acc (get_size e)) Tracker.empty l in
-    { l; get_size; length = List.length l; size }
+  let initial =
+    record_start ()
+    |> record_add_immutable @@ unit ()
+    |> record_add_immutable @@ unit ()
+    |> record_add_immutable @@ int 0
+    |> record_add_immutable @@ unit ()
+    |> record_end
 
-  let filter f t = of_list t.get_size (List.filter f t.l)
 
-  let empty get_size = { l = []; size = Tracker.empty; length = 0; get_size }
-  let cons a t = { t with l = a :: t.l; size = Tracker.add t.size (t.get_size a); length = t.length + 1}
+  let item_overhead =
+    record_start ()
+    |> record_add_immutable @@ unit ()
+    |> record_add_immutable @@ unit ()
+    |> record_end
+
+  (* a list of elements with size 0 still takes up space, must consider element overhead *)
+  let add acc e =
+    add acc e
+    |> add item_overhead
+
+  let remove' = remove
+  let remove acc e =
+    remove acc e
+    |> remove item_overhead
+
+
+  (* filter itself is O(N) but we traverse the list only once,
+     and only recompute the size for elements that are removed *)
+  let filter pred t =
+    let rec loop size length filtered = function
+      | [] -> { l = List.rev filtered; length; size; size_of = t.size_of }
+      | hd :: tl when pred hd ->
+          loop size length (hd :: filtered) tl
+      | hd :: tl ->
+          let newsize = remove size @@ t.size_of hd in
+          loop newsize (length-1) filtered tl
+    in
+    loop t.size t.length [] t.l
+
+  let empty size_of = { l = []; size = initial; length = 0; size_of = Container.open_nestable size_of }
+  let cons a t = { t with l = a :: t.l; size = add t.size (t.size_of a); length = t.length + 1}
   let length t = t.length
   let hd t = List.hd t.l
   let tl t =
     let l = List.tl t.l in
     { l
-    ; size = Tracker.remove t.size (t.get_size (List.hd t.l))
+    ; size = remove t.size @@ t.size_of @@ List.hd t.l
     ; length = t.length - 1
-    ; get_size = t.get_size
+    ; size_of = t.size_of
     }
 
-
-  let rev t = { t with l = List.rev t.l }
   let rev_append l1 l2 =
-    assert (l1.get_size == l2.get_size);
+    assert (l1.size_of == l2.size_of);
+    let size = remove (add l1.size l2.size) initial in
+    (* add l1.size l2.size = (l1 size + initial) + (l2 size + initial) + item_overhead
+       remove (..) initial = (..) - initial - item_overhead
+       l1 size + initial + l2 size + initial + item_overhead - initial - item_overhead
+       = l1 size + l2 size + initial *)
     { l = List.rev_append l1.l l2.l
-    ; size = Tracker.add l1.size l2.size
+    ; size
     ; length = l1.length + l2.length
-    ; get_size = l1.get_size }
+    ; size_of = l1.size_of }
+
   let iter f t = List.iter f t.l
-  let rev_map get_size f t =
-    let l = List.rev_map f t.l in
-    { l
-    ; size = List.fold_left (fun acc e -> Tracker.add acc (get_size e)) Tracker.empty l
-    ; length = t.length
-    ; get_size }
+
+  (* O(N), each element is potentially mapped and recomputed,
+     but we traverse the list only once
+   *)
+  let rev_map size_of f t =
+    let size_of = Container.open_nestable size_of in
+    let rec loop l size = function
+      | [] -> { l; length = t.length; size; size_of }
+      | hd :: tl ->
+          let mapped = f hd in
+          loop (mapped :: l) (add size @@ size_of mapped)  tl
+    in
+    loop [] initial t.l
 
   let fold_left f init t = List.fold_left f init t.l
-  (* TODO: more list functions as needed *)
 
-  let size_of t = t.size
+  let size_of t = (t.size : [< require_nestable] size :> [> require_nestable] size)
 
   let for_all f t = List.for_all f t.l
   let exists f t = List.exists f t.l
@@ -236,6 +303,5 @@ module List = struct
     { t with l = List.rev t.l }
 
   let is_empty t = match t.l with [] -> true | _ -> false
-
 end
 

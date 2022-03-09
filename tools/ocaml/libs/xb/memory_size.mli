@@ -65,7 +65,16 @@ type size_kind =
       *)
   ]
 
-type 'a t constraint 'a = [< size_kind]
+(* helper types when we require a specific property *)
+type array_compatible = [`constant]
+
+type require_nestable = [`constant | `immutable | `updatable]
+(** to require a parameter to be nestable use as [< require_nestable] *)
+
+(* we declare various helper types for cases where it is easier to define what *not* to accept *)
+type forbid_updates = [`constant | `immutable] (** to be used as [< forbid_updates] *)
+
+type +'a t
 (** A size expression for data structures.
 
     The type parameter declares how size updates propagate.
@@ -74,64 +83,74 @@ type 'a t constraint 'a = [< size_kind]
 
 val add: 'a t -> 'a t -> 'a t
 (** [add a b] is the size of [a] + size of [b].
-    Updates to the sizes of either [a] or [b] will propagate to the size of their sum *)
+    Updates to the sizes of either [a] or [b] will propagate to the size of their sum.
+    The type parameters are unified, so ideally they should be open polymorphic variants
+    ([> `...]).
+    *)
 
-val tracker: _ t -> [>`constant] t
+val remove: 'a t -> 'a t -> 'a t
+(** [remove a b] is the size of [a] - size of [b].
+    Updates to the sizes of either [a] or [b] will propagate to the size of their difference.
+    The type parameters are unified, so ideally they should be open polymorphic variants
+    ([> `...]).
+    *)
+
+val tracker: _ t -> [> array_compatible] t
 (** the overhead of a size tracker is constant *)
 
-val bool: bool -> [>`constant] t
+val bool: bool -> [> array_compatible] t
 (** [bool] computes the size of a bool.
 
     O(1) complexity, it is a constant. *)
 
-val char: char -> [>`constant ] t
+val char: char -> [> array_compatible] t
 (** [bool] computes the size of a bool.
 
     O(1) complexity, it is a constant. *)
 
-val float: float -> [>`constant] t
+val float: float -> [> array_compatible] t
 (** [float] computes the size of a float.
 
     O(1) complexity, it is a constant. *)
 
-val func: ('a -> 'b) -> [>`constant] t
+val func: ('a -> 'b) -> [> array_compatible] t
 (** [func] computes the size of a function reference.
     This assumes that the function already exists and is not a closure.
     However the type system can't verify that.
 
     O(1) complexity, it is a constant *)
 
-val int: int -> [>`constant ] t
+val int: int -> [> array_compatible] t
 (** [int] computes the size of an int.
 
     O(1) complexity, it is a constant. *)
 
-val int32: int32 -> [>`constant] t
+val int32: int32 -> [> array_compatible] t
 (** [int32] computes the size of an int32.
 
     O(1) complexity, it is a constant. *)
 
-val int64: int64 -> [>`constant] t
+val int64: int64 -> [> array_compatible] t
 (** [int64] computes the size of an int32.
 
     O(1) complexity, it is a constant. *)
 
-val nativeint: nativeint -> [>`constant] t
+val nativeint: nativeint -> [> array_compatible] t
 (** [nativeint] computes the size of a nativeint.
 
     O(1) complexity, it is a constant. *)
 
-val unit: unit -> [>`constant] t
+val unit: unit -> [> array_compatible] t
 (** [unit] computes the size of a unit.
 
     O(1) complexity, it is a constant. *)
 
-val bytes: bytes -> [>`immutable ] t
+val bytes: bytes -> [> `immutable ] t
 (** [bytes] computes the size of a [bytes value]. This is mutable but its size is constant.
 
     O(1) complexity since [bytes] store their size explicitly. *)
 
-val string: string -> [>`immutable] t
+val string: string -> [> `immutable] t
 (** [string] computes the size of a string.
 
     O(1) complexity since strings store their size explicitly. *)
@@ -143,12 +162,12 @@ val option: ('a -> 'a t) -> 'a option -> 'a t
     O(1) complexity if [element_immutable_size_of] is
     *)
 
-val array: ('a -> [<`constant] t) -> 'a array -> [>`constant] t
+val array: ('a -> [< array_compatible] t) -> 'a array -> [> array_compatible] t
 (** [array size_of_element arr] computes the size of the array [arr],
     using [size_of_element].
     The elements must have a constant size regardless of their value. *)
 
-type ('a, 'b) fields constraint 'b = [<size_kind]
+type ('a, +'b) fields
 (** size expression for record fields.
     'a is the type of the record
     'b is the [size_kind]
@@ -173,7 +192,7 @@ val record_add_immutable: 'b t -> ('a, 'b) fields -> ('a, 'b) fields
     O(1) complexity.
  *)
 
-val record_add_mutable: _ t -> ('a, ([>`ephemeral] as 'b)) fields -> ('a, 'b) fields
+val record_add_mutable: _ t -> ('a, _) fields -> ('a, [> `ephemeral]) fields
 (** [record_add_mutable field acc] adds the size of [field] to [acc].
 
     The field is mutable.
@@ -188,37 +207,37 @@ val record_end: ('a, 'b) fields -> 'b t
   O(1) complexity.
  *)
 
-val container_create: initial:[<`constant | `immutable] t -> item_overhead:Sizeops.Size.t -> [>`updatable] t
+val container_create: initial:[< forbid_updates] t -> item_overhead:Sizeops.Size.t -> [> `updatable] t
 (** [container_create ~initial ~item_overhead] creates a new size update tracker, with [record]'s size as starting
     point and [item_overhead] overhead per element.
 
     O(1) complexity *)
 
-val container_add_element: [<`constant | `immutable | `updatable] t -> [<`updatable] t -> unit
+val container_add_element: [< require_nestable] t -> [< `updatable] t -> unit
 (** [container_add_element element container] adds [element]'s size to [container] and tracks
     updates to it. The size expression of the container will always reflect the size of all items
     elements. It includes the [item_overhad].
 
     O(1) complexity. *)
 
-val container_remove_element: [<`constant | `immutable | `updatable] t -> [<`updatable] t -> unit
+val container_remove_element: [< require_nestable] t -> [< `updatable] t -> unit
 (** [container_remove_element element container] removes [element]'s size from the [container].
     It removes the [item_overhead] too.
 
     O(1) complexity. *)
 
-val container_clear: [<`updatable] t -> unit
+val container_clear: [< `updatable] t -> unit
 (** [container_clear t] sets [t]'s size back to its initial size.
 
     O(1) complexity. *)
 
-val container_transfer: src:[<`updatable] t -> dst:[<`updatable] t -> unit
+val container_transfer: src:[< `updatable] t -> dst:[< `updatable] t -> unit
 (** [container_transfer ~src ~dst] transfers all elements from [src] to [dst],
     while ensuring the [initial] size of the container is not double counted.
 
     O(1) complexity *)
 
-val size_of: [>`constant|`immutable] t -> Sizeops.Size.t
+val size_of: [< forbid_updates] t -> Sizeops.Size.t
 (** [size_of t] is the size of [t]. Can only be inspected directly when it is a constant *)
 
 val size_of_bytes: _ t -> int

@@ -17,7 +17,20 @@ type tracker =
 and parent = Immutable | UpdatableUnset | UpdatableParent of tracker
 
 
-type 'a t = tracker constraint 'a = [< size_kind]
+type ephemeral = [`ephemeral]
+
+type updatable = [`updatable | ephemeral ]
+
+type immutable = [`immutable | updatable]
+
+type constant = [`constant | immutable ]
+
+type array_compatible = [`constant]
+
+type require_nestable = [`constant | `immutable | `updatable]
+
+type forbid_updates = [`constant | `immutable] (** to be used as [< forbid_updates] *)
+type +'a t = tracker
 
 let unboxed = Sizeops.Size.of_int 0 (* no extra space taken up beyond that for the field itself *)
 let boxed = Sizeops.Size.of_words 1
@@ -61,6 +74,16 @@ let unset_parent t =
 
 let add a b =
   let size = Sizeops.Size.(a.size + b.size) in
+  match a.parent, b.parent with
+  | Immutable, Immutable -> make size
+  | _ ->
+      let t = { size; parent = UpdatableUnset; item_overhead = unboxed; container_initial = unboxed } in
+      set_parent a ~parent:t;
+      set_parent b ~parent:t;
+      t
+
+let remove a b =
+  let size = Sizeops.Size.(a.size - b.size) in
   match a.parent, b.parent with
   | Immutable, Immutable -> make size
   | _ ->
