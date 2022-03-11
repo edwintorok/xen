@@ -60,9 +60,10 @@ let string s = s |> String.length |> bytes_n
 
 let set_parent t ~parent =
   match t.parent with
-  | Immutable -> () (* no updates possible *)
+  | Immutable -> false (* no updates possible *)
   | UpdatableUnset ->
-      t.parent <- UpdatableParent parent
+      t.parent <- UpdatableParent parent;
+      true
   | UpdatableParent _ ->
       invalid_arg "expression already has a parent set"
 
@@ -79,20 +80,24 @@ let add a b =
   match a.parent, b.parent with
   | Immutable, Immutable -> make size
   | _ ->
-      let t = { size; parent = UpdatableUnset; item_overhead = unboxed; container_initial = unboxed } in
-      set_parent a ~parent:t;
-      set_parent b ~parent:t;
-      t
+      let t = { size; parent = Immutable; item_overhead = unboxed; container_initial = unboxed } in
+      let updatable_a = set_parent a ~parent:t in
+      let updatable_b = set_parent b ~parent:t in
+      if updatable_a || updatable_b then
+        { t with parent = UpdatableUnset }
+      else t
 
 let remove a b =
   let size = Sizeops.Size.(a.size - b.size) in
   match a.parent, b.parent with
   | Immutable, Immutable -> make size
   | _ ->
-      let t = { size; parent = UpdatableUnset; item_overhead = unboxed; container_initial = unboxed } in
-      set_parent a ~parent:t;
-      set_parent b ~parent:t;
-      t
+      let t = { size; parent = Immutable; item_overhead = unboxed; container_initial = unboxed } in
+      let updatable_a = set_parent a ~parent:t in
+      let updatable_b = set_parent b ~parent:t in
+      if updatable_a || updatable_b then
+        { t with parent = UpdatableUnset }
+      else t
 
 let variant f x = add (make boxed) (f x)
 
@@ -112,10 +117,17 @@ let array size_of a =
 
 type ('a, 'b) fields = 'b t
 
-let record_start _t = { size = boxed; parent = UpdatableUnset; item_overhead = unboxed; container_initial = unboxed }
+(* important to keep records as immutable, because we may have constant or immutable sized
+   record size expression as globals, and we want to use that immutable expression in multiple
+   places.
+   But if we set this to UpdatableUnset from the beginning then even immutable record sizes will
+   have the restriction that we can only use them in a single expression (because they may change
+   size then) *)
+let record_start _t = { size = boxed; parent = Immutable; item_overhead = unboxed; container_initial = unboxed }
 
 let record_add_immutable field t =
-  set_parent field ~parent:t;
+  if set_parent field ~parent:t && t.parent = Immutable then
+    t.parent <- UpdatableUnset;
   t.size <- Sizeops.Size.(t.size + record_field + field.size);
   t
 
@@ -139,7 +151,7 @@ let rec container_add t n =
   | UpdatableUnset | Immutable -> ()
 
 let container_add_element t e =
-  set_parent e ~parent:t;
+  let (_:bool) = set_parent e ~parent:t in
   container_add t Sizeops.Size.(e.size + t.item_overhead)
 
 let rec container_sub t n =

@@ -1,0 +1,3 @@
+(test
+ (name memory_size_monolith)
+ (libraries xen.bus monolith))
