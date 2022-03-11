@@ -5,11 +5,40 @@ module C = struct
 end
 
 module R = struct
-  module Buffer = struct
-    include Buffer
+  let container_add ~item_overhead el_size_of x acc =
+    let open Memory_size in
+    (*add item_overhead @@ *)add acc @@ el_size_of x
 
-    let size_of (t:Buffer.t) =
-      Sizeops.Size.of_words @@ Obj.reachable_words (Obj.repr t)
+  module Buffer = Buffer
+  module Queue = struct
+    include Queue
+    let create_sized _ = create ()
+
+    let size_of el_size_of t =
+      Queue.fold (fun acc el ->
+        container_add ~item_overhead:C.Queue.item_overhead el_size_of el acc) C.Queue.initial t
+
+  end
+
+  module Hashtbl = struct
+    include Hashtbl
+    let create_sized _ _ n = create n
+    let size_of key_size_of value_size_of t =
+      Hashtbl.fold (fun k v acc ->
+        acc
+        |> container_add ~item_overhead:C.Hashtbl.item_overhead key_size_of k
+        |> container_add ~item_overhead:(Sizeops.Size.of_int 0) value_size_of v) t @@ C.Hashtbl.initial t
+  end
+
+  module SizedList = struct
+    include List
+
+    let empty _ = []
+    let rev_map _ f t = rev_map f t
+
+    let size_of el_size_of t =
+      List.fold_left (fun acc e ->
+        container_add ~item_overhead:C.SizedList.item_overhead el_size_of e acc) C.SizedList.initial t
   end
 end
 
@@ -61,6 +90,26 @@ let () =
   declare "Buffer.reset" (buffer ^> unit) R.Buffer.reset C.Buffer.reset;
   declare "Buffer.contents" (buffer ^> str) R.Buffer.contents C.Buffer.contents;
   declare_size_of_reachable "Buffer" buffer C.Buffer.size_of
+
+let queue_tests el el_size_of =
+  (* TODO: use check method? *)
+  let queue = declare_abstract_type ~var:"queue" () in
+  declare "Queue.create_sized" (unit ^> queue)
+    (fun () -> R.Queue.create_sized el_size_of)
+    (fun () -> C.Queue.create_sized el_size_of);
+  declare "Queue.add" (el ^> queue ^> unit) R.Queue.add C.Queue.add;
+  declare "Queue.push" (el ^> queue ^> unit) R.Queue.push C.Queue.push;
+  declare "Queue.take" (queue ^> el) R.Queue.take C.Queue.take;
+  declare "Queue.pop" (queue ^> el) R.Queue.pop C.Queue.pop;
+  declare "Queue.peek" (queue ^> el) R.Queue.peek C.Queue.peek;
+  declare "Queue.top" (queue ^> el) R.Queue.top C.Queue.top;
+  declare "Queue.clear" (queue ^> unit) R.Queue.clear C.Queue.clear;
+  declare "Queue.is_empty" (queue ^> bool) R.Queue.is_empty C.Queue.is_empty;
+  declare "Queue.copy" (queue ^> queue) R.Queue.copy C.Queue.copy;
+  declare "Queue.length" (queue ^> int) R.Queue.length C.Queue.length;
+  declare "Queue.transfer" (queue ^> queue ^> unit) R.Queue.transfer C.Queue.transfer;
+  declare_size_of "Queue" queue (R.Queue.size_of el_size_of) C.Queue.size_of
+
 
 let () =
   let fuel = 100 in
