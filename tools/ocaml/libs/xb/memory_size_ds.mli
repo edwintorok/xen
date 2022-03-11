@@ -1,6 +1,18 @@
 type 'a size = 'a Memory_size.t
 type require_nestable = Memory_size.require_nestable
 type array_compatible = Memory_size.array_compatible
+
+module Buffer: sig
+  type t
+  val create: int -> t
+  val length: t -> int
+  val add_char: t -> char -> unit
+  val add_substring: t -> string -> int -> int -> unit
+  val reset: t -> unit
+  val size_of: t -> [> `updatable] size
+  val contents: t -> string
+end
+
 module Queue: sig
   type 'a t
 

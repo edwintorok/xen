@@ -113,6 +113,11 @@ val float: float -> [> array_compatible] t
 
     O(1) complexity, it is a constant. *)
 
+val variant: ('a -> 'b t) -> 'a -> 'b t
+(** [variant t] is the size of [t] plus the overhead of a variant.
+
+    O(1) complexity *)
+
 val func: ('a -> 'b) -> [> array_compatible] t
 (** [func] computes the size of a function reference.
     This assumes that the function already exists and is not a closure.
@@ -150,12 +155,18 @@ val bytes: bytes -> [> `immutable ] t
 
     O(1) complexity since [bytes] store their size explicitly. *)
 
+val bytes_n: int -> [> `immutable ] t
+(** [bytes_n] computes the size of a [bytes] value without having access to it directly,
+    just by knowing its length.
+
+    O(1) complexity *)
+
 val string: string -> [> `immutable] t
 (** [string] computes the size of a string.
 
     O(1) complexity since strings store their size explicitly. *)
 
-val option: ('a -> 'a t) -> 'a option -> 'a t
+val option: ('a -> 'b t) -> 'a option -> 'b t
 (** [option element_immutable_size_of x] computes the size of ['a option] using [element_immutable_size_of] to compute
     the size of its element.
 
@@ -191,6 +202,14 @@ val record_add_immutable: 'b t -> ('a, 'b) fields -> ('a, 'b) fields
 
     O(1) complexity.
  *)
+
+val record_add_mutable_const: [< `constant] t -> ('a, [> `constant] as 'b) fields -> ('a, 'b) fields
+(** [record_add_mutable_const field acc] adds the size of [field] to [acc] when the record field is
+    mutable.
+    Same as [record_add_immutable]: the size of the field is constant, so changing the value
+    won't change its size.
+
+    *)
 
 val record_add_mutable: _ t -> ('a, _) fields -> ('a, [> `ephemeral]) fields
 (** [record_add_mutable field acc] adds the size of [field] to [acc].

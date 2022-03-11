@@ -48,13 +48,15 @@ let int _ = make unboxed
 let unit () = make unboxed
 
 let float _ = make boxed
+
 let func _ = make boxed
 let int32 _ = make boxed
 let int64 _ = make boxed
 let nativeint _ = make boxed
 
-let bytes b = b |> Bytes.length |> Sizeops.Size.of_bytes |> make
-let string s = s |> String.length |> Sizeops.Size.of_bytes |> make
+let bytes_n n = n |> Sizeops.Size.of_bytes |> make
+let bytes b = b |> Bytes.length |> bytes_n
+let string s = s |> String.length |> bytes_n
 
 let set_parent t ~parent =
   match t.parent with
@@ -92,9 +94,11 @@ let remove a b =
       set_parent b ~parent:t;
       t
 
-let option size_of = function
-  | None -> make boxed
-  | Some e -> add (make boxed) @@ size_of e
+let variant f x = add (make boxed) (f x)
+
+let option size_of = variant @@ function
+  | None -> unit ()
+  | Some e -> size_of e
 
 let array size_of a =
   make @@ match Sizeops.Size.to_int_opt (size_of a.(0)).size with
@@ -114,6 +118,8 @@ let record_add_immutable field t =
   set_parent field ~parent:t;
   t.size <- Sizeops.Size.(t.size + record_field + field.size);
   t
+
+let record_add_mutable_const field t = record_add_immutable field t
 
 let record_add_mutable field t : (_, [> `ephemeral]) fields =
   (* no need to set up size updates, the results are ephemeral anyway *)

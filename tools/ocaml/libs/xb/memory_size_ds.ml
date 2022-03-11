@@ -41,6 +41,71 @@ end
 
 (* use name matching the one in stdlib to ensure this one is used
    and to reduce the amount of changes: only need to change Queue.create to Queue.create_sized *)
+module Buffer = struct
+  type t = { buf: Buffer.t; mutable bufsize: int; mutable is_initial: bool; container: int Container.t }
+
+  let buffer_size n =
+    record_start ()
+    |> record_add_immutable @@ bytes_n 0
+    |> record_add_immutable @@ int 0
+    |> record_add_immutable @@ int 0
+    |> record_add_immutable @@ bytes_n n
+    |> record_end
+
+  let initial n =
+    record_start ()
+    |> record_add_immutable @@ buffer_size n
+    |> record_add_mutable_const @@ int 0
+    |> record_add_immutable @@ unit () (* container will track its own overhead *)
+    |> record_end
+
+  let item_overhead = Sizeops.Size.of_int 0
+
+  let create n =
+    { buf = Buffer.create n; bufsize = n; is_initial = true; container = Container.create ~initial:(initial n) ~item_overhead bytes_n }
+
+  let length t = Buffer.length t.buf
+
+  let update_size t =
+    (* the true size of Buffer's internal buffer is not exposed through its API,
+       so we have to mimic the size growth that happens internally.
+       the unit tests will ensure to detect if the language runtime's internal implementation
+       changes and this is no longer accurate.
+       *)
+    if Buffer.length t.buf > t.bufsize then begin
+      if t.is_initial then
+        t.is_initial <- false
+      else
+        (* we allocate a new buffer, but if we've never grown the buffer before
+           then the initial one remains allocated too.
+           Only remove the bufsize if not the initial allocation *)
+        Container.remove t.container t.bufsize;
+
+      (* we will allocate a new buffer, the old one will be GCed *)
+      while t.bufsize < Buffer.length t.buf do
+        t.bufsize <- t.bufsize * 2;
+      done;
+      Container.add t.container t.bufsize
+    end
+
+  let add_char t c =
+    Buffer.add_char t.buf c;
+    update_size t
+
+  let add_substring t s pos len =
+    Buffer.add_substring t.buf s pos len;
+    update_size t
+
+  let reset t =
+    Buffer.reset t.buf;
+    (* back to initial *)
+    Container.clear t.container;
+    t.is_initial <- true
+
+  let contents t = Buffer.contents t.buf
+  let size_of t = Container.size_of t.container
+end
+
 module Queue = struct
   type 'a t =
     { q: 'a Queue.t

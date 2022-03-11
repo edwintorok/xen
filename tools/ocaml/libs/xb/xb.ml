@@ -33,43 +33,61 @@ type backend_mmap =
 	mutable work_again: bool;
 }
 
+open Memory_size_ds
+open Memory_size
+
+let size_of_mmap_interface () =
+  record_start ()
+  |> record_add_immutable @@ unit ()
+  |> record_add_immutable @@ int 0
+  |> record_end
+
+let size_of_backend_mmap =
+  record_start ()
+  |> record_add_immutable @@ size_of_mmap_interface ()
+  |> record_add_immutable @@ func ignore
+  |> record_add_mutable_const @@ bool true
+  |> record_end
+
 type backend_fd =
 {
 	fd: Unix.file_descr;
 }
 
+let size_of_backend_fd =
+  record_start ()
+  |> record_add_immutable @@ int 0
+  |> record_end
+
 type backend = Fd of backend_fd | Xenmmap of backend_mmap
+
+let size_of_backend = variant @@ function
+  | Fd _ -> size_of_backend_fd
+  | Xenmmap _ -> size_of_backend_mmap
 
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 
-open Memory_tracker
-open Sizeops
-
-let size_of_partial_buf = function
+let size_of_partial_buf = variant @@ function
   | HaveHdr p -> Partial.size_of p
-  | NoHdr (_, s) -> size_of_bytes s
+  | NoHdr (_, s) -> bytes s
 
 type t =
 {
 	backend: backend;
 	pkt_in: Packet.t Queue.t;
 	pkt_out: Packet.t Queue.t;
-	partial_in: partial_buf Record.Ref.t;
-	partial_out: string Record.Ref.t;
-	tracker: Record.Mutable.t
+	mutable partial_in: partial_buf;
+        mutable partial_out: string;
 }
 
-let size_of_backend _ = value
-
-let register t =
-	let open Record.Mutable in
-        add_field t.tracker size_of_backend ~field:t.backend;
-        add_mutable_field t.tracker ~field:t.pkt_in.tracker;
-        add_mutable_field t.tracker ~field:t.pkt_out.tracker;
-        add_mutable_field t.tracker ~field:t.partial_in.tracker;
-        add_mutable_field t.tracker ~field:t.partial_out.tracker
-
-open Record.Ref
+let size_of t =
+  record_start t
+  |> record_add_immutable @@ size_of_backend t.backend
+  |> record_add_immutable @@ Queue.size_of t.pkt_in
+  |> record_add_immutable @@ Queue.size_of t.pkt_out
+  |> record_add_mutable @@ size_of_partial_buf t.partial_in
+  |> record_add_mutable @@ string t.partial_out
+  |> record_end
 
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
@@ -84,8 +102,8 @@ let reconnect t = match t.backend with
 		(* Clear our old connection state *)
 		Queue.clear t.pkt_in;
 		Queue.clear t.pkt_out;
-		t.partial_in := init_partial_in ();
-		t.partial_out := ""
+		t.partial_in <- init_partial_in ();
+		t.partial_out <- ""
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
@@ -126,8 +144,8 @@ let write con s len =
 (* NB: can throw Reconnect *)
 let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
-	let s = if String.length !(con.partial_out) > 0 then
-			!(con.partial_out)
+	let s = if String.length con.partial_out > 0 then
+			con.partial_out
 		else if Queue.length con.pkt_out > 0 then
 			Packet.to_string (Queue.pop con.pkt_out)
 		else
@@ -137,10 +155,10 @@ let output con =
 		let len = String.length s in
 		let sz = write con s len in
 		let left = String.sub s sz (len - sz) in
-		con.partial_out := left
+		con.partial_out <- left
 	);
 	(* after sending one packet, partial is empty *)
-	!(con.partial_out) = ""
+	con.partial_out = ""
 
 (* NB: can throw Reconnect *)
 let input con =
