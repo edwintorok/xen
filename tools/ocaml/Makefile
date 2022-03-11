@@ -65,6 +65,9 @@ input:
 mono-fuzz1: dune-pre input
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release libs/xb/test/memory_size_monolith.exe --no-buffer input
 
+mono-fuzz: dune-pre input
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release libs/xb/test/memory_size_monolith.exe --no-buffer
+
 ortac-fuzz1: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release @ortac-fuzz1 --no-buffer
 
