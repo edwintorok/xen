@@ -24,7 +24,9 @@ module Container = struct
   let create ~initial ~item_overhead size_of =
     { tracker = container_create ~initial ~item_overhead; size_of = open_nestable size_of }
 
-  let add t el = container_add_element (t.size_of el) t.tracker
+  let add t el =
+    container_add_element (t.size_of el) t.tracker
+
   let remove t el = container_remove_element (t.size_of el) t.tracker
 
   let add_kv t key valuesize =

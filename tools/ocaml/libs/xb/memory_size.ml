@@ -16,7 +16,6 @@ type tracker =
 
 and parent = Immutable | UpdatableUnset | UpdatableParent of tracker
 
-
 type ephemeral = [`ephemeral]
 
 type updatable = [`updatable | ephemeral ]
@@ -150,10 +149,6 @@ let rec container_add t n =
   | UpdatableParent p -> container_add p n
   | UpdatableUnset | Immutable -> ()
 
-let container_add_element t e =
-  let (_:bool) = set_parent e ~parent:t in
-  container_add t Sizeops.Size.(e.size + t.item_overhead)
-
 let rec container_sub t n =
   t.size <- Sizeops.Size.(t.size - n);
   match t.parent with
@@ -163,7 +158,7 @@ let rec container_sub t n =
 let container_clear t =
   container_sub t Sizeops.Size.(t.size - t.container_initial)
 
-let container_remove_element t e =
+let container_remove_element e t =
   unset_parent e;
   container_sub t Sizeops.Size.(e.size + t.item_overhead)
 
@@ -183,4 +178,17 @@ let pp ppf t =
   match Sizeops.Size.to_int_opt t.size with
   | None -> Format.pp_print_string ppf "OVERFLOW"
   | Some x -> Format.pp_print_int ppf x
+
+let pp_parent ppf p =
+  Format.pp_print_string ppf @@ match p with
+  | Immutable -> "immutable"
+  | UpdatableUnset -> "updatable"
+  | UpdatableParent _ -> "updatable(parent)"
+
+let pp_dump ppf t =
+  Format.fprintf ppf "(size: %a, parents: %a)" pp t pp_parent t.parent
+
+let container_add_element e t =
+  let (_:bool) = set_parent e ~parent:t in
+  container_add t Sizeops.Size.(e.size + t.item_overhead)
 

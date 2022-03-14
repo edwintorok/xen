@@ -268,3 +268,6 @@ val size_of_bytes: _ t -> int
 
 val pp: Format.formatter -> _ t -> unit
 (** [pp formatter size] pretty prints the size *)
+
+val pp_dump: Format.formatter -> _ t -> unit
+(** [pp formatter size] pretty prints the size *)
