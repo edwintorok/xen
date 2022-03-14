@@ -79,8 +79,8 @@ let declare_size_of_reachable name typ candidate =
     else
       Invalid (fun d ->
         let open PPrint in
-        Print.assert_ (Print.int expected_bytes ^^ Print.string " <= " ^^ d) ^^
-        Print.candidate_finds d)
+        Print.assert_ (Print.int expected_bytes ^^ PPrint.arbitrary_string " <= " ^^ d) ^^
+        Print.candidate_finds @@ Print.int actual_bytes)
   in
   declare (name ^ ".size_of") (typ ^?> int) check_size (wrap_size_of candidate)
 
@@ -95,7 +95,6 @@ let () =
   declare_size_of_reachable "Buffer" buffer C.Buffer.size_of
 
 let queue_tests el el_size_of =
-  (* TODO: use check method? *)
   let queue = declare_abstract_type ~var:"queue" () in
   declare "Queue.create_sized" (unit ^> queue)
     (fun () -> R.Queue.create_sized el_size_of)
@@ -115,5 +114,6 @@ let queue_tests el el_size_of =
 
 
 let () =
+  at_exit (fun () -> print_endline "Done");
   let fuel = 100 in
   main fuel
