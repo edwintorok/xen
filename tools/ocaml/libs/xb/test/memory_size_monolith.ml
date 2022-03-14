@@ -101,10 +101,10 @@ let queue_tests el el_size_of =
     (fun () -> C.Queue.create_sized el_size_of);
   declare "Queue.add" (el ^> queue ^> unit) R.Queue.add C.Queue.add;
   declare "Queue.push" (el ^> queue ^> unit) R.Queue.push C.Queue.push;
-  declare "Queue.take" (queue ^> el) R.Queue.take C.Queue.take;
-  declare "Queue.pop" (queue ^> el) R.Queue.pop C.Queue.pop;
-  declare "Queue.peek" (queue ^> el) R.Queue.peek C.Queue.peek;
-  declare "Queue.top" (queue ^> el) R.Queue.top C.Queue.top;
+  declare "Queue.take" (queue ^!> el) R.Queue.take C.Queue.take;
+  declare "Queue.pop" (queue ^!> el) R.Queue.pop C.Queue.pop;
+  declare "Queue.peek" (queue ^!> el) R.Queue.peek C.Queue.peek;
+  declare "Queue.top" (queue ^!> el) R.Queue.top C.Queue.top;
   declare "Queue.clear" (queue ^> unit) R.Queue.clear C.Queue.clear;
   declare "Queue.is_empty" (queue ^> bool) R.Queue.is_empty C.Queue.is_empty;
   declare "Queue.copy" (queue ^> queue) R.Queue.copy C.Queue.copy;
@@ -112,6 +112,30 @@ let queue_tests el el_size_of =
   declare "Queue.transfer" (queue ^> queue ^> unit) R.Queue.transfer C.Queue.transfer;
   declare_size_of "Queue" queue (R.Queue.size_of el_size_of) C.Queue.size_of
 
+let fixed_item =
+  let neg =
+    easily_constructible (Gen.choose ["foo"; "bar2"; "foobar"]) Print.string
+  in
+  ifpol neg str
+
+let () = queue_tests fixed_item Memory_size.string
+
+let hashtbl_tests el el_size_of v v_size_of =
+  let hashtbl = declare_abstract_type ~var:"hashtbl" () in
+  declare "Hashtbl.create_sized" (small_int ^> hashtbl)
+    (R.Hashtbl.create_sized el_size_of v_size_of)
+    (C.Hashtbl.create_sized el_size_of v_size_of);
+  declare "Hashtbl.reset" (hashtbl ^> unit) R.Hashtbl.reset C.Hashtbl.reset;
+  declare "Hashtbl.copy" (hashtbl ^> hashtbl) R.Hashtbl.copy C.Hashtbl.copy;
+  declare "Hashtbl.remove" (hashtbl ^> el ^> unit) R.Hashtbl.remove C.Hashtbl.remove;
+  declare "Hashtbl.replace" (hashtbl ^> el ^> v ^> unit) R.Hashtbl.replace C.Hashtbl.replace;
+  declare "Hashtbl.find" (hashtbl ^> el ^!> v) R.Hashtbl.find C.Hashtbl.find;
+  declare "Hashtbl.find_all" (hashtbl ^> el ^> list v) R.Hashtbl.find_all C.Hashtbl.find_all;
+  declare "Hashtbl.mem" (hashtbl ^> el ^> bool) R.Hashtbl.mem C.Hashtbl.mem;
+  declare "Hashtbl.length" (hashtbl ^> int) R.Hashtbl.length C.Hashtbl.length;
+  declare_size_of "Hashtbl" hashtbl (R.Hashtbl.size_of el_size_of v_size_of) C.Hashtbl.size_of
+
+let () = hashtbl_tests fixed_item Memory_size.string fixed_item Memory_size.string
 
 let () =
   at_exit (fun () -> print_endline "Done");
