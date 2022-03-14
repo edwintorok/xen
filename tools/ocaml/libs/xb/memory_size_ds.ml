@@ -19,8 +19,9 @@ module Container = struct
 
   let open_nestable x = (x: 'a -> [< require_nestable] size :> 'a -> [> require_nestable] size)
 
+  let initial n = add n container_size
+
   let create ~initial ~item_overhead size_of =
-    let initial = add initial container_size in
     { tracker = container_create ~initial ~item_overhead; size_of = open_nestable size_of }
 
   let add t el = container_add_element (t.size_of el) t.tracker
@@ -58,6 +59,7 @@ module Buffer = struct
     |> record_add_mutable_const @@ int 0
     |> record_add_immutable @@ unit () (* container will track its own overhead *)
     |> record_end
+    |> Container.initial
 
   let item_overhead = Sizeops.Size.of_int 0
 
@@ -124,6 +126,7 @@ module Queue = struct
     |> record_add_immutable @@ queue_size
     |> record_add_immutable @@ tracker @@ unit ()
     |> record_end
+    |> Container.initial
 
   let item_overhead =
     record_start ()
@@ -202,6 +205,7 @@ module Hashtbl = struct
     |> record_add_immutable @@ unit ()
     |> record_add_immutable @@ unit ()
     |> record_end
+    |> Container.initial
 
   (* note about randomized hashtbl:
     would need something like Siphash for this to improve security,
@@ -285,7 +289,7 @@ module SizedList = struct
     |> record_add_immutable @@ int 0
     |> record_add_immutable @@ unit ()
     |> record_end
-
+    |> Container.initial
 
   let item_overhead =
     record_start ()
