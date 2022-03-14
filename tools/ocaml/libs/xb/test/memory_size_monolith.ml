@@ -55,12 +55,17 @@ let buf_string =
 
 let small_int = easily_constructible (Gen.closed_interval 0 100) Print.int
 
-let wrap_size_of f x =
-  Memory_size.size_of_bytes @@ f x
+type size_t = Memory_size.size_kind Memory_size.t
+type size_spec = (size_t, size_t) spec
+
+
+let size_of_bytes = (Memory_size.size_of_bytes :> size_t -> int)
+
+let size  =
+  map_into size_of_bytes (size_of_bytes, constant "Memory_size.size_of_bytes") int
 
 let declare_size_of name typ refs candidate =
-  let size x = Option.value ~default:max_int @@ Sizeops.Size.to_int_opt @@ refs x in
-  declare (name ^ ".size_of") (typ ^> int) size (wrap_size_of candidate)
+  declare (name ^ ".size_of") (typ ^> size) (refs :> 'a -> size_t) (candidate :> 'b -> size_t)
 
 let zero _ = 0
 
@@ -68,18 +73,17 @@ let size_t = deconstructible @@ fun s -> s |> Sizeops.Size.to_int_opt |> Print.o
 
 let declare_size_of_reachable name typ candidate =
   let check_size t actual =
-    let expected = Sizeops.Size.of_words @@ Obj.reachable_words (Obj.repr t) in
-    let expected = Option.value ~default:max_int @@ Sizeops.Size.to_int_opt expected in
-    let expected = expected * Sys.word_size / 8 in
-    if expected <= actual then
+    let expected_bytes = Obj.reachable_words (Obj.repr t) * Sys.word_size / 8 in
+    let actual_bytes = Memory_size.size_of_bytes actual in
+    if expected_bytes <= actual_bytes then
       Valid actual
     else
       Invalid (fun d ->
         let open PPrint in
-        Print.assert_ (d ^^ Print.string " <= " ^^ Print.int actual) ^^
+        Print.assert_ (Print.int expected_bytes ^^ Print.string " <= " ^^ d) ^^
         Print.candidate_finds d)
   in
-  declare (name ^ ".size_of") (typ ^?> int) check_size (wrap_size_of candidate)
+  declare (name ^ ".size_of") (typ ^?> size) check_size (candidate :> ('a -> size_t))
 
 let () =
   let buffer = declare_abstract_type ~var:"buffer" () in
