@@ -61,29 +61,28 @@ type size_spec = (size_t, size_t) spec
 
 let size_of_bytes = (Memory_size.size_of_bytes :> size_t -> int)
 
-let size  =
-  map_into size_of_bytes (size_of_bytes, constant "Memory_size.size_of_bytes") int
+let wrap_size_of f x =
+  Memory_size.size_of_bytes @@ f x
 
 let declare_size_of name typ refs candidate =
-  declare (name ^ ".size_of") (typ ^> size) (refs :> 'a -> size_t) (candidate :> 'b -> size_t)
+  declare (name ^ ".size_of") (typ ^> int) (wrap_size_of refs) (wrap_size_of candidate)
 
 let zero _ = 0
 
 let size_t = deconstructible @@ fun s -> s |> Sizeops.Size.to_int_opt |> Print.option Print.int
 
 let declare_size_of_reachable name typ candidate =
-  let check_size t actual =
+  let check_size t actual_bytes =
     let expected_bytes = Obj.reachable_words (Obj.repr t) * Sys.word_size / 8 in
-    let actual_bytes = Memory_size.size_of_bytes actual in
     if expected_bytes <= actual_bytes then
-      Valid actual
+      Valid actual_bytes
     else
       Invalid (fun d ->
         let open PPrint in
         Print.assert_ (Print.int expected_bytes ^^ Print.string " <= " ^^ d) ^^
         Print.candidate_finds d)
   in
-  declare (name ^ ".size_of") (typ ^?> size) check_size (candidate :> ('a -> size_t))
+  declare (name ^ ".size_of") (typ ^?> int) check_size (wrap_size_of candidate)
 
 let () =
   let buffer = declare_abstract_type ~var:"buffer" () in
