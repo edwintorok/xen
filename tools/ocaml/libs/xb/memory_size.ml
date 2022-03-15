@@ -105,6 +105,9 @@ let option size_of = variant @@ function
   | Some e -> size_of e
 
 let array size_of a =
+  if Array.length a = 0 then
+    make boxed
+  else
   make @@ match Sizeops.Size.to_int_opt (size_of a.(0)).size with
   | None -> Sizeops.Size.invalid
   | Some e ->

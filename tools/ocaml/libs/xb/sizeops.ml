@@ -337,16 +337,18 @@ module Size: SizeSig = struct
   let bytes_per_word = Sys.word_size / 8
   (*@ ensures result = 4 *)
 
-  let words_of_bytes b = (b + bytes_per_word - 1) / bytes_per_word
+  let words_of_bytes b = (b + bytes_per_word ) / bytes_per_word
   (*@ w = words_of_bytes b
       requires b >= 0
       pure
-      ensures (w-1) * bytes_per_word < b <= w * bytes_per_word
+      ensures (w-1) * bytes_per_word < b <= (w+1) * bytes_per_word
     *)
+  (* TODO: add formulate here using remainder vs wordsize *)
 
   let of_bytes b = if b < 0 then invalid else of_words (words_of_bytes b)
   (** [of_bytes b] is the size of a value containing [i] bytes,
-      rounded up to nearest word *)
+      padded the way a string in OCaml would be padded,
+      so its size is a multiple of word, and last byte is used to indicate amount of padding *)
   (*@ w = of_bytes b
       pure
       ensures is_t w
