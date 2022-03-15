@@ -7,7 +7,7 @@ end
 module R = struct
   let container_add ~item_overhead el_size_of x acc =
     let open Memory_size in
-    (*add item_overhead @@ *)add acc @@ el_size_of x
+    add item_overhead @@ add acc @@ el_size_of x
 
   module Buffer = Buffer
   module Queue = struct
@@ -27,7 +27,7 @@ module R = struct
       Hashtbl.fold (fun k v acc ->
         acc
         |> container_add ~item_overhead:C.Hashtbl.item_overhead key_size_of k
-        |> container_add ~item_overhead:(Sizeops.Size.of_int 0) value_size_of v) t @@ C.Hashtbl.initial t
+        |> container_add ~item_overhead:(Memory_size.int 0) value_size_of v) t @@ C.Hashtbl.initial t
   end
 
   module SizedList = struct
@@ -107,7 +107,6 @@ let queue_tests el el_size_of =
   declare "Queue.top" (queue ^!> el) R.Queue.top C.Queue.top;
   declare "Queue.clear" (queue ^> unit) R.Queue.clear C.Queue.clear;
   declare "Queue.is_empty" (queue ^> bool) R.Queue.is_empty C.Queue.is_empty;
-  declare "Queue.copy" (queue ^> queue) R.Queue.copy C.Queue.copy;
   declare "Queue.length" (queue ^> int) R.Queue.length C.Queue.length;
   declare "Queue.transfer" (queue ^> queue ^> unit) R.Queue.transfer C.Queue.transfer;
   declare_size_of "Queue" queue (R.Queue.size_of el_size_of) C.Queue.size_of
@@ -126,7 +125,6 @@ let hashtbl_tests el el_size_of v v_size_of =
     (R.Hashtbl.create_sized el_size_of v_size_of)
     (C.Hashtbl.create_sized el_size_of v_size_of);
   declare "Hashtbl.reset" (hashtbl ^> unit) R.Hashtbl.reset C.Hashtbl.reset;
-  declare "Hashtbl.copy" (hashtbl ^> hashtbl) R.Hashtbl.copy C.Hashtbl.copy;
   declare "Hashtbl.remove" (hashtbl ^> el ^> unit) R.Hashtbl.remove C.Hashtbl.remove;
   declare "Hashtbl.replace" (hashtbl ^> el ^> v ^> unit) R.Hashtbl.replace C.Hashtbl.replace;
   declare "Hashtbl.find" (hashtbl ^> el ^!> v) R.Hashtbl.find C.Hashtbl.find;

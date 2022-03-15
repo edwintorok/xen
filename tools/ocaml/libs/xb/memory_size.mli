@@ -226,7 +226,7 @@ val record_end: ('a, 'b) fields -> 'b t
   O(1) complexity.
  *)
 
-val container_create: initial:[< forbid_updates] t -> item_overhead:Sizeops.Size.t -> [> `updatable] t
+val container_create: initial:[< forbid_updates] t -> item_overhead:[< forbid_updates] t -> [> `updatable] t
 (** [container_create ~initial ~item_overhead] creates a new size update tracker, with [record]'s size as starting
     point and [item_overhead] overhead per element.
 

@@ -173,6 +173,8 @@ module type SizeSig = sig
       ensures is_valid_size b -> is_valid_size w
       ensures b < 0 -> to_int_opt w = None
       *)
+
+    val pp_dump: Format.formatter -> t -> unit
 end
 
 
@@ -351,4 +353,6 @@ module Size: SizeSig = struct
       ensures is_valid_size b -> is_valid_size w
       ensures b < 0 -> to_int_opt w = None
       *)
+
+  let pp_dump ppf t = Format.pp_print_int ppf t
 end

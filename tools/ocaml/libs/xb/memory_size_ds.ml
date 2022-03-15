@@ -63,7 +63,7 @@ module Buffer = struct
     |> record_end
     |> Container.initial
 
-  let item_overhead = Sizeops.Size.of_int 0
+  let item_overhead = Memory_size.int 0
 
   let create n =
     { buf = Buffer.create n; bufsize = n; is_initial = true; container = Container.create ~initial:(initial n) ~item_overhead bytes_n }
@@ -135,8 +135,6 @@ module Queue = struct
     |> record_add_immutable @@ unit ()
     |> record_add_immutable @@ unit ()
     |> record_end
-    |> size_of
-
 
   let create_sized size_of =
     let container = Container.create ~initial ~item_overhead size_of in
@@ -166,7 +164,8 @@ module Queue = struct
 
   let is_empty t = Queue.is_empty t.q
 
-  let copy t = { t with q = Queue.copy t.q }
+  (* copy is not implemented: it'd require 2 parents for expressions if we allow
+     copying a queue with updatable elements *)
 
   let length t = Queue.length t.q
 
@@ -214,7 +213,7 @@ module Hashtbl = struct
     but lets get ready for when that PR is merged: https://github.com/ocaml/ocaml/pull/9764
   *)
 
-  let item_overhead = Sizeops.Size.of_int 0 (* not a constant overhead, we can compute an approximation from stats if we have to *)
+  let item_overhead = Memory_size.int 0 (* not a constant overhead, we can compute an approximation from stats if we have to *)
 
   let create_sized get_key_size get_value_size n =
     let h = Hashtbl.create ~random:true n in
@@ -230,7 +229,8 @@ module Hashtbl = struct
   (* [clear] is not implemented: it doesn't shrink the table size,
      thus prone to space leaks *)
 
-  let copy t = { t with h = Hashtbl.copy t.h }
+  (* copy is not implemented: it'd require 2 parents for expressions if we allow
+     copying a queue with updatable elements *)
 
   (* [add] is not implemented on purpose: it doesn't remove previous bindings,
      but simply hides them, thus prone to space leaks *)

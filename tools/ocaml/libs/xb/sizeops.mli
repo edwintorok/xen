@@ -143,4 +143,7 @@ module Size : sig
       ensures is_valid_size b -> is_valid_size w
       ensures b < 0 -> to_int_opt w = None
       *)
+
+  val pp_dump: Format.formatter -> t -> unit
+  (** [pp_dump ppf t] pretty prints an internal representation of size on [t] *)
 end

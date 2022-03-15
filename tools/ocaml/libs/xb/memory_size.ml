@@ -140,7 +140,7 @@ let record_add_mutable field t : (_, [> `ephemeral]) fields =
 let record_end t = t
 
 let container_create ~initial ~item_overhead =
-  { size = initial.size; parent = UpdatableUnset; item_overhead = item_overhead
+  { size = initial.size; parent = UpdatableUnset; item_overhead = item_overhead.size
   ; container_initial = initial.size }
 
 let rec container_add t n =

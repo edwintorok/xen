@@ -34,8 +34,6 @@ module Queue: sig
 
   val is_empty: 'a t -> bool
 
-  val copy: 'a t -> 'a t
-
   val length: 'a t -> int
 
   val iter: ('a -> unit) -> 'a t -> unit
@@ -45,7 +43,7 @@ module Queue: sig
   val transfer: 'a t -> 'a t -> unit
 
   val initial:  [> array_compatible] size
-  val item_overhead: Sizeops.Size.t
+  val item_overhead: [> array_compatible] size
   val size_of: 'a t -> [> `updatable] size
 end
 
@@ -55,8 +53,6 @@ module Hashtbl : sig
   val create_sized: ('a -> [< require_nestable] size) -> ('b -> [< require_nestable] size) -> int -> ('a, 'b) t
 
   val reset: ('a, 'b) t -> unit
-
-  val copy: ('a, 'b) t -> ('a, 'b) t
 
   val remove: ('a, 'b) t -> 'a -> unit
 
@@ -73,7 +69,7 @@ module Hashtbl : sig
   val length: ('a, 'b) t -> int
 
   val initial:  ('a, 'b) Hashtbl.t -> [> array_compatible] size
-  val item_overhead: Sizeops.Size.t
+  val item_overhead: [> array_compatible] size
   val size_of: ('a, 'b) t -> [> require_nestable] size
 end
 
