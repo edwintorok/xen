@@ -84,6 +84,35 @@ let declare_size_of_reachable name typ candidate =
   in
   declare (name ^ ".size_of") (typ ^?> int) check_size (wrap_size_of candidate)
 
+let declare_sized_type ~var ref_size_of candidate_size_of =
+  let call_size_of = PPrint.arbitrary_string (var ^ ".size_of") in
+  let check ref =
+    let reference = wrap_size_of ref_size_of ref in
+    let code =
+      let open PPrint in
+      Print.parens @@
+      separate space
+      [ arbitrary_string "fun t -> "
+      ; Print.assert_ @@
+        separate space
+        [ Print.apply call_size_of [ arbitrary_string "t" ]
+        ; arbitrary_string "="
+        ; Print.int reference
+        ]
+      ]
+    in
+    (fun candidate ->
+      let candidate = wrap_size_of candidate_size_of candidate in
+      if reference = candidate then ()
+      else begin
+        let code = Print.candidate_finds @@ Print.int candidate in
+        Monolith.dprintf "(* check: %a *)\n" PPrint.ToBuffer.compact code;
+      end;
+      assert (reference = candidate)
+    ), document code
+  in
+  declare_abstract_type ~check ~var ()
+
 let () =
   let buffer = declare_abstract_type ~var:"buffer" () in
   declare "Buffer.create" (small_int ^> buffer) R.Buffer.create C.Buffer.create;
@@ -95,7 +124,7 @@ let () =
   declare_size_of_reachable "Buffer" buffer C.Buffer.size_of
 
 let queue_tests el el_size_of =
-  let queue = declare_abstract_type ~var:"queue" () in
+  let queue = declare_sized_type ~var:"queue" (R.Queue.size_of el_size_of) C.Queue.size_of in
   declare "Queue.create_sized" (unit ^> queue)
     (fun () -> R.Queue.create_sized el_size_of)
     (fun () -> C.Queue.create_sized el_size_of);
@@ -108,8 +137,7 @@ let queue_tests el el_size_of =
   declare "Queue.clear" (queue ^> unit) R.Queue.clear C.Queue.clear;
   declare "Queue.is_empty" (queue ^> bool) R.Queue.is_empty C.Queue.is_empty;
   declare "Queue.length" (queue ^> int) R.Queue.length C.Queue.length;
-  declare "Queue.transfer" (queue ^> queue ^> unit) R.Queue.transfer C.Queue.transfer;
-  declare_size_of "Queue" queue (R.Queue.size_of el_size_of) C.Queue.size_of
+  declare "Queue.transfer" (queue ^> queue ^> unit) R.Queue.transfer C.Queue.transfer
 
 let fixed_item =
   let neg =
@@ -120,7 +148,7 @@ let fixed_item =
 let () = queue_tests fixed_item Memory_size.string
 
 let hashtbl_tests el el_size_of v v_size_of =
-  let hashtbl = declare_abstract_type ~var:"hashtbl" () in
+  let hashtbl = declare_sized_type ~var:"hashtbl" (R.Hashtbl.size_of el_size_of v_size_of) C.Hashtbl.size_of in
   declare "Hashtbl.create_sized" (small_int ^> hashtbl)
     (R.Hashtbl.create_sized el_size_of v_size_of)
     (C.Hashtbl.create_sized el_size_of v_size_of);
@@ -130,12 +158,16 @@ let hashtbl_tests el el_size_of v v_size_of =
   declare "Hashtbl.find" (hashtbl ^> el ^!> v) R.Hashtbl.find C.Hashtbl.find;
   declare "Hashtbl.find_all" (hashtbl ^> el ^> list v) R.Hashtbl.find_all C.Hashtbl.find_all;
   declare "Hashtbl.mem" (hashtbl ^> el ^> bool) R.Hashtbl.mem C.Hashtbl.mem;
-  declare "Hashtbl.length" (hashtbl ^> int) R.Hashtbl.length C.Hashtbl.length;
-  declare_size_of "Hashtbl" hashtbl (R.Hashtbl.size_of el_size_of v_size_of) C.Hashtbl.size_of
+  declare "Hashtbl.length" (hashtbl ^> int) R.Hashtbl.length C.Hashtbl.length
 
 let () = hashtbl_tests fixed_item Memory_size.string fixed_item Memory_size.string
+
+let prologue () =
+  Monolith.dprintf "          #require \"xen.bus\";;\n";
+  Monolith.dprintf "          open Xenbus;;\n";
+  Monolith.dprintf "          open Memory_size_ds;;\n"
 
 let () =
   at_exit (fun () -> print_endline "Done");
   let fuel = 100 in
-  main fuel
+  main ~prologue fuel

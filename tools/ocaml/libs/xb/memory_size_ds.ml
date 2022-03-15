@@ -39,7 +39,8 @@ module Container = struct
 
   let size_of t = (t.tracker : [<`updatable] size :> [> `updatable] size)
   let clear t = container_clear t.tracker
-  let transfer ~src ~dst = container_transfer ~src:src.tracker ~dst:dst.tracker
+  let transfer ~src ~dst =
+    container_transfer ~src:src.tracker ~dst:dst.tracker
 end
 
 (* use name matching the one in stdlib to ensure this one is used

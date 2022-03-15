@@ -165,7 +165,7 @@ let container_remove_element e t =
 let container_transfer ~src ~dst =
   let delta = Sizeops.Size.(src.size - src.container_initial ) in
   container_add dst delta;
-  container_sub src delta
+  container_clear src
 
 let size_of t = t.size
 
