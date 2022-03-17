@@ -60,7 +60,7 @@ let split_one_path data con =
 let process_watch t cons =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.store in
-	let ops = Transaction.get_paths t |> Xenbus.Memory_tracker.List.rev in
+	let ops = Transaction.get_paths t |> Xenbus.Memory_size_ds.SizedList.rev in
 	let do_op_watch op cons =
 		let recurse, oldroot, root = match (fst op) with
 		| Xenbus.Xb.Op.Write|Xenbus.Xb.Op.Mkdir -> false, None, newroot
@@ -68,7 +68,7 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
 		Connections.fire_watches ?oldroot root cons (snd op) recurse in
-	Xenbus.Memory_tracker.List.iter (fun op -> do_op_watch op cons) ops
+	Xenbus.Memory_size_ds.SizedList.iter (fun op -> do_op_watch op cons) ops
 
 let create_implicit_path t perm path =
 	let dirname = Store.Path.get_parent path in
@@ -705,18 +705,17 @@ let check_memory_usage store con =
 	  let domid = Domain.get_id dom in
 	  let quota = Store.get_quota store in
 	  let entry = Quota.get_entry_0 quota domid in
-	  (* TODO: convert words to bytes to make it easier for user *)
-          let actual = Xenbus.Sizeops.Size.(Xenbus.Memory_tracker.MutableTracker.size (Connection.size_of con) + entry.Quota.size) in
-	  let bad = match actual |> Xenbus.Sizeops.Size.to_int_opt with
-	  | Some n when n < !Define.maxdomumemory -> false
-	  | None ->
-	      warn "domain %u: overflow in computing memory usage, considering quota exceeded"
-	      domid;
-	      true
-	  | Some actual ->
+          (* TODO: simplify expression *)
+          let actual_sum = Xenbus.Memory_size.(add (Connection.size_of con) @@ bytes_n
+          (Xenbus.Sizeops.Size.to_int_opt entry.Quota.size |> Option.value ~default:max_int)) in
+          let actual = Xenbus.Memory_size.size_of_bytes actual_sum in
+	  let bad =
+            if actual < !Define.maxdomumemory then false
+            else begin
 	      warn "domain %u: exceeds its memory quota: %u > %u" domid actual
 	      !Define.maxdomumemory;
 	      true
+            end
 	  in
 	  if bad then
 	    Connection.mark_as_bad con

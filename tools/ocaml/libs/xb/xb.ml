@@ -76,8 +76,8 @@ type t =
 	backend: backend;
 	pkt_in: Packet.t Queue.t;
 	pkt_out: Packet.t Queue.t;
-	mutable partial_in: partial_buf;
-        mutable partial_out: string;
+	partial_in: partial_buf Ref.t;
+        partial_out: string Ref.t;
 }
 
 let size_of t =
@@ -85,8 +85,8 @@ let size_of t =
   |> record_add_immutable @@ size_of_backend t.backend
   |> record_add_immutable @@ Queue.size_of t.pkt_in
   |> record_add_immutable @@ Queue.size_of t.pkt_out
-  |> record_add_mutable @@ size_of_partial_buf t.partial_in
-  |> record_add_mutable @@ string t.partial_out
+  |> record_add_immutable @@ Ref.size_of t.partial_in
+  |> record_add_immutable @@ Ref.size_of t.partial_out
   |> record_end
 
 let init_partial_in () = NoHdr
@@ -102,8 +102,8 @@ let reconnect t = match t.backend with
 		(* Clear our old connection state *)
 		Queue.clear t.pkt_in;
 		Queue.clear t.pkt_out;
-		t.partial_in <- init_partial_in ();
-		t.partial_out <- ""
+                Ref.set t.partial_in @@ init_partial_in ();
+                Ref.set t.partial_out ""
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
@@ -144,8 +144,8 @@ let write con s len =
 (* NB: can throw Reconnect *)
 let output con =
 	(* get the output string from a string_of(packet) or partial_out *)
-	let s = if String.length con.partial_out > 0 then
-			con.partial_out
+	let s = if String.length (Ref.get con.partial_out) > 0 then
+			Ref.get con.partial_out
 		else if Queue.length con.pkt_out > 0 then
 			Packet.to_string (Queue.pop con.pkt_out)
 		else
@@ -155,16 +155,16 @@ let output con =
 		let len = String.length s in
 		let sz = write con s len in
 		let left = String.sub s sz (len - sz) in
-		con.partial_out <- left
+                Ref.set con.partial_out left
 	);
 	(* after sending one packet, partial is empty *)
-	con.partial_out = ""
+	Ref.get con.partial_out = ""
 
 (* NB: can throw Reconnect *)
 let input con =
 	let newpacket = ref false in
 	let to_read =
-		match con.partial_in with
+		match Ref.get con.partial_in with
 		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
 		| NoHdr   (i, _)    -> i in
 
@@ -173,7 +173,7 @@ let input con =
 	let sz = if to_read > 0 then read con b to_read else 0 in
 
 	(
-	match con.partial_in with
+	match Ref.get con.partial_in with
 	| HaveHdr partial_pkt ->
 		(* we complete the data *)
 		if sz > 0 then
@@ -181,14 +181,14 @@ let input con =
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
 			Queue.push pkt con.pkt_in;
-			con.partial_in <- init_partial_in ();
+			Ref.set con.partial_in @@ init_partial_in ();
 			newpacket := true
 		)
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
 		if sz > 0 then
 			Bytes.blit b 0 buf (Partial.header_size () - i) sz;
-		con.partial_in <- if sz = i then
+		Ref.set con.partial_in @@ if sz = i then
 			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf)
 	);
 	!newpacket
@@ -197,8 +197,8 @@ let newcon ?(limit=Sys.max_string_length) backend = {
 	backend = backend;
 	pkt_in = Queue.create_sized Packet.size_of;
         pkt_out = Queue.create_sized Packet.size_of;
-	partial_in = init_partial_in ();
-	partial_out = "";
+	partial_in = Ref.make size_of_partial_buf @@ init_partial_in ();
+	partial_out = Ref.make string "";
 	}
 
 let open_fd fd = newcon (Fd { fd = fd; })
@@ -225,7 +225,7 @@ let is_mmap con = not (is_fd con)
 
 let output_len con = Queue.length con.pkt_out
 let has_new_output con = Queue.length con.pkt_out > 0
-let has_old_output con = String.length con.partial_out > 0
+let has_old_output con = String.length (Ref.get con.partial_out) > 0
 
 let has_output con = has_new_output con || has_old_output con
 
@@ -234,7 +234,7 @@ let peek_output con = Queue.peek con.pkt_out
 let input_len con = Queue.length con.pkt_in
 let has_in_packet con = Queue.length con.pkt_in > 0
 let get_in_packet con = Queue.pop con.pkt_in
-let has_partial_input con = match con.partial_in with
+let has_partial_input con = match Ref.get con.partial_in with
 	| HaveHdr _ -> true
 	| NoHdr (n, _) -> n < Partial.header_size ()
 let has_more_input con =

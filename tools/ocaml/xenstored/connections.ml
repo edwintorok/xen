@@ -25,13 +25,14 @@ type t = {
 }
 
 let fdsize (_:Unix.file_descr) = Xenbus.Memory_size.int 0
+let size_of_xeneventchn (_:Xeneventchn.t) = Xenbus.Memory_size.unit () (* TODO *)
 
 let create () =
   let open Xenbus.Memory_size in
   {
 	anonymous = Hashtbl.create_sized fdsize Connection.size_of 37;
 	domains = Hashtbl.create_sized int Connection.size_of 37;
-	ports = Hashtbl.create_sized int Connection.size_of 37;
+	ports = Hashtbl.create_sized size_of_xeneventchn Connection.size_of 37;
 	watches = Trie.create ()
 }
 
@@ -124,7 +125,7 @@ let add_watch cons con path token =
 	let watches =
  		if Trie.mem cons.watches key
  		then Trie.find cons.watches key
- 		else List.empty Connection.size_of_watch
+                else []
 	in
  	cons.watches <- Trie.set cons.watches key (List.cons watch watches);
 	watch
@@ -134,7 +135,7 @@ let del_watch cons con path token =
  	let key = key_of_str apath in
 (* TODO: use set *)
  	let watches = List.filter (fun x -> x <> watch) (Trie.find cons.watches key) in
- 	if List.is_empty watches then
+        if watches = [] then
 		cons.watches <- Trie.unset cons.watches key
  	else
 		cons.watches <- Trie.set cons.watches key watches;
@@ -164,7 +165,7 @@ let fire_watches ?oldroot root cons path recurse =
 
 let fire_spec_watches root cons specpath =
 	iter cons (fun con ->
-		List.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		SizedList.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in

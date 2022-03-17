@@ -113,7 +113,7 @@ type t
      && is_empty_partial_buf t.partial_in
      && String.length t.partial_out = 0 *)
 
-val size_of: t -> [> `ephemeral] Memory_size_ds.size
+val size_of: t -> [> `constant | `updatable] Memory_size_ds.size
 
 val init_partial_in : unit -> partial_buf
 (*@ b = init_partial_in ()

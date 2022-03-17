@@ -5,20 +5,17 @@ type transaction = int
 type connection = Xenstore.Xsraw.con * Connection.t
 let none = 0
 
-let memory_calculated_words (_, con) =
-  (* if this is none something has overflown... *)
-  match (Xenbus.Sizeops.Size.to_int_opt @@ Xenbus.Memory_tracker.MutableTracker.size @@ Connection.size_of con) with
-  | Some x -> x
-  | None -> failwith "Invalid size: overflow detected"
+let memory_calculated_bytes (_, con) =
+  con |> Connection.size_of |> Xenbus.Memory_size.size_of_bytes
 
-let memory_reachable_words (_, con) =
-  Obj.reachable_words (Obj.repr con)
+let memory_reachable_bytes (_, con) =
+  Obj.reachable_words (Obj.repr con) * Sys.word_size / 8
 
 let memory_check con =
-  let words = memory_reachable_words con in
-  let calculated = memory_calculated_words con in
+  let words = memory_reachable_bytes con in
+  let calculated = memory_calculated_bytes con in
   if words <= calculated then true
-  else failwith (Printf.sprintf "calculated: %d words, actual: %d words" calculated words)
+  else failwith (Printf.sprintf "calculated: %d bytes, actual: %d bytes" calculated words)
 
 let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
 (* during AFL print nothing *)
@@ -91,8 +88,9 @@ let directory (con, _) tid path =
   List.rev_map (function "" -> path | entry -> Filename.concat path entry) @@ Xsraw.directory tid path con
 
 let path_exists (_, connection) tid path =
+  let open Xenbus.Memory_size_ds in
   let store = tid |> Connection.get_transaction connection |> Transaction.get_store in
-  Store.Node.exists store.root path
+  Store.Node.exists (Ref.get store.root) path
 
 let read (con, _) tid path = Xsraw.read tid path con
 
@@ -131,7 +129,7 @@ let value () = "TODO"
 
 type value = string
 
-let has_watch (_, connection) path = not @@ Xenbus.Memory_tracker.List.is_empty @@ Connection.get_watches connection path
+let has_watch (_, connection) path = not @@ Xenbus.Memory_size_ds.SizedList.is_empty @@ Connection.get_watches connection path
 
 exception Eexist
 

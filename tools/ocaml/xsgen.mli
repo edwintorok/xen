@@ -1,11 +1,11 @@
 type connection
 
-val memory_reachable_words: connection -> int
-(*@ n = memory_reachable_words con
+val memory_reachable_bytes: connection -> int
+(*@ n = memory_reachable_bytes con
     pure *)
 
-val memory_calculated_words: connection -> int
-(*@ n = memory_calculated_words con
+val memory_calculated_bytes: connection -> int
+(*@ n = memory_calculated_bytes con
     pure *)
 
 val memory_check: connection -> bool
@@ -15,7 +15,7 @@ val memory_check: connection -> bool
 
 (* reachable words can be smaller due to sharing *)
 (*@ predicate memory_calculation_ok(c:connection) =
-      memory_reachable_words c <= memory_calculated_words c
+      memory_reachable_bytes c <= memory_calculated_bytes c
   *)
 
 type transaction
