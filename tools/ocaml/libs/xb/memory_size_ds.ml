@@ -310,6 +310,13 @@ module SizedList = struct
     remove acc e
     |> remove item_overhead
 
+  let of_list size_of l =
+    let size_of = Container.open_nestable size_of in
+    { l
+    ; length = List.length l
+    ; size = List.fold_left (fun acc e -> add acc @@ size_of e) initial l
+    ; size_of
+    }
 
   (* filter itself is O(N) but we traverse the list only once,
      and only recompute the size for elements that are removed *)
@@ -326,6 +333,7 @@ module SizedList = struct
 
   let empty size_of = { l = []; size = initial; length = 0; size_of = Container.open_nestable size_of }
   let cons a t = { t with l = a :: t.l; size = add t.size (t.size_of a); length = t.length + 1}
+  let to_list t = t.l
   let length t = t.length
   let hd t = List.hd t.l
   let tl t =
@@ -377,3 +385,33 @@ module SizedList = struct
   let is_empty t = match t.l with [] -> true | _ -> false
 end
 
+module Ref = struct
+  type 'a t =
+    { mutable contents: 'a
+    ; container: 'a Container.t
+    }
+
+  let initial =
+    record_start ()
+    |> record_add_immutable @@ unit ()
+    |> record_add_immutable @@ unit ()
+    |> record_end
+
+  let item_overhead = Memory_size.int 0
+
+  let make size_of contents = {
+    contents; container = Container.create ~initial ~item_overhead size_of
+  }
+
+  let set t contents =
+    Container.remove t.container t.contents;
+    Container.add t.container contents;
+    t.contents <- contents
+
+  let get t = t.contents
+
+  let size_of t = Container.size_of t.container
+
+  let copy copy_contents t =
+    make t.container.size_of (copy_contents t.contents)
+end

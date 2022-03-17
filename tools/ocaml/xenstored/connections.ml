@@ -16,7 +16,7 @@
  *)
 
 let debug fmt = Logging.debug "connections" fmt
-open Xenbus.Memory_tracker
+open Xenbus.Memory_size_ds
 type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
@@ -24,12 +24,14 @@ type t = {
 	mutable watches: Connection.watch List.t Trie.t;
 }
 
-let fdsize (_:Unix.file_descr) = value (* +1 by default *)
+let fdsize (_:Unix.file_descr) = Xenbus.Memory_size.int 0
 
-let create () = {
+let create () =
+  let open Xenbus.Memory_size in
+  {
 	anonymous = Hashtbl.create_sized fdsize Connection.size_of 37;
-	domains = Hashtbl.create_sized size_of_int Connection.size_of 37;
-	ports = Hashtbl.create_sized size_of_int Connection.size_of 37;
+	domains = Hashtbl.create_sized int Connection.size_of 37;
+	ports = Hashtbl.create_sized int Connection.size_of 37;
 	watches = Trie.create ()
 }
 
@@ -66,7 +68,7 @@ let find_domain_by_port cons port =
 
 let del_watches_of_con con watches =
 	let l = List.filter (fun w -> Connection.get_con w != con) watches in
-	if List.is_empty l then None else Some l
+        if l = [] then None else Some l
 
 let del_anonymous cons con =
 	try

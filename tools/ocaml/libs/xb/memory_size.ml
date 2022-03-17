@@ -44,6 +44,7 @@ let tracker _ = make boxed4
 let bool _ = make unboxed
 let char _ = make unboxed
 let int _ = make unboxed
+let size_t _ = make unboxed
 let unit () = make unboxed
 
 let float _ = make boxed

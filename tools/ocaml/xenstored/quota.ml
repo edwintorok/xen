@@ -23,13 +23,13 @@ let activate = ref true
 let maxent = ref (10000)
 let maxsize = ref (4096)
 
-module OCamlList = List
-open Xenbus.Memory_tracker
 open Xenbus.Sizeops
+open Xenbus.Memory_size
+open Xenbus.Memory_size_ds
 
 type entry =
 	{ entries: int
-	; size: Tracker.t
+	; size: Size.t
 	}
 
 let entry_to_string () e =
@@ -40,16 +40,19 @@ let entry_to_string () e =
 
 let entry_add a b =
   { entries = a.entries + b.entries
-  ; size = Tracker.add a.size b.size
+  ; size = Size.(a.size + b.size)
   }
 
 let entry_sub a b =
   { entries = a.entries - b.entries
-  ; size = Tracker.remove a.size b.size
+  ; size = Size.(a.size - b.size)
   }
 
-let fields_of_entry = Size.of_int 2
-let size_of_entry _ = MutableTracker.of_tracker fields_of_entry
+let size_of_entry t =
+  record_start t
+  |> record_add_immutable @@ int t.entries
+  |> record_add_immutable @@ size_t t.size (* size is int under the hood *)
+  |> record_end
 
   type t = {
 	  maxent: int;               (* max entities per domU *)
@@ -57,10 +60,12 @@ let size_of_entry _ = MutableTracker.of_tracker fields_of_entry
 	  cur: (Xenctrl.domid, entry) Hashtbl.t; (* current domains quota *)
   }
 
-  let fields_of_t = Size.of_int 3
-  let size_of t =
-    Size.(fields_of_t
-	 + Hashtbl.size_of t.cur)
+let size_of t =
+  record_start t
+  |> record_add_immutable @@ int t.maxent
+  |> record_add_immutable @@ int t.maxsize
+  |> record_add_immutable @@ Hashtbl.size_of t.cur
+  |> record_end
 
 let to_string quota domid =
 	if Hashtbl.mem quota.cur domid
@@ -68,9 +73,14 @@ let to_string quota domid =
 	else Printf.sprintf "dom%i quota: not set" domid
 
 let create () =
-	{ maxent = !maxent; maxsize = !maxsize; cur = Hashtbl.create_sized size_of_int size_of_entry 100; }
+	{ maxent = !maxent; maxsize = !maxsize; cur = Hashtbl.create_sized int size_of_entry 100; }
 
-let copy quota = { quota with cur = (Hashtbl.copy quota.cur) }
+let copy quota =
+  (* in general we can't copy the sized Hashtbl because the updates can only go to a single parent,
+     but if the elements have immutable sizes then we can copy it *)
+  let cur_copy = Hashtbl.create_sized int size_of_entry @@ Hashtbl.length quota.cur in
+  Hashtbl.iter (Hashtbl.replace cur_copy) quota.cur;
+  { quota with cur = cur_copy }
 
 let del quota id = Hashtbl.remove quota.cur id
 
@@ -99,9 +109,9 @@ let set_entry quota id nb =
 		Hashtbl.replace quota.cur id nb
 
 let size_of_path path v =
-	let path_size = OCamlList.fold_left (fun acc s -> Size.(acc + size_of_string s)) value path in
-	let vsize = size_of_string v in
-	{ entries = 1; size = Size.(path_size + vsize) }
+	let path_size = List.fold_left (fun acc s -> add acc @@ string s) (unit ()) path in
+	let vsize = string v in
+	{ entries = 1; size = add path_size vsize |> Xenbus.Memory_size.size_of }
 
 let del_entry quota id path v =
 	try
@@ -109,7 +119,7 @@ let del_entry quota id path v =
 		set_entry quota id (entry_sub nb @@ size_of_path path v)
 	with Not_found -> ()
 
-let entries_0 = { entries = 0; size = Tracker.empty }
+let entries_0 = { entries = 0; size = Size.of_int 0 }
 let add_entry quota id path v =
 	let nb = try get_entry quota id with Not_found -> entries_0 in
 	set_entry quota id (entry_add nb @@ size_of_path path v)

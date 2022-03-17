@@ -17,8 +17,7 @@
 exception End_of_file
 
 let list_map = List.map
-open Xenbus.Memory_tracker
-open Xenbus.Sizeops
+open Xenbus.Memory_size_ds
 open Stdext
 
 let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
@@ -36,29 +35,36 @@ and t = {
 	dom: Domain.t option;
 	transactions: (int, Transaction.t) Hashtbl.t;
 	mutable next_tid: int;
-	watches: (string, watch List.t) Hashtbl.t;
+	watches: (string, watch SizedList.t) Hashtbl.t;
 	mutable nb_watches: int;
 	anonid: int;
 	mutable stat_nb_ops: int;
 	mutable perm: Perms.Connection.t;
 }
 
-
-let fields_of_watch = Size.of_int 5
 let size_of_watch t =
-  Size.(fields_of_watch
-       + size_of_string t.token
-       + size_of_string t.path
-       + size_of_string t.base)
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_immutable @@ unit () (* TODO: con *)
+  |> record_add_immutable @@ string t.token
+  |> record_add_immutable @@ string t.path
+  |> record_add_immutable @@ string t.base
+  |> record_add_immutable @@ bool t.is_relative
+  |> record_end
 
-let fields_of_t = Size.of_int 9
 let size_of t =
-  MutableTracker.of_tracker Size.( fields_of_t
-       + Xenbus.Xb.size_of t.xb
-       + size_of_option Domain.size_of t.dom
-       + Hashtbl.size_of t.transactions
-       + Hashtbl.size_of t.watches
-       + Perms.Connection.size_of t.perm )
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_immutable @@ Xenbus.Xb.size_of t.xb
+  |> record_add_immutable @@ option Domain.size_of t.dom
+  |> record_add_immutable @@ Hashtbl.size_of t.transactions
+  |> record_add_mutable_const @@ int t.next_tid
+  |> record_add_immutable @@ Hashtbl.size_of t.watches
+  |> record_add_mutable_const @@ int t.nb_watches
+  |> record_add_immutable @@ int t.anonid
+  |> record_add_mutable_const @@ int t.stat_nb_ops
+  |> record_add_mutable_const @@ unit () (* t.perm constant upper bound in theory if we switch from list *)
+  |> record_end
 
 
 let mark_as_bad con =
@@ -123,9 +129,9 @@ let create xbcon dom =
 	{
 	xb = xbcon;
 	dom = dom;
-	transactions = Hashtbl.create_sized size_of_int Transaction.size_of 5;
+	transactions = Hashtbl.create_sized Xenbus.Memory_size.int Transaction.size_of 5;
 	next_tid = initial_next_tid;
-	watches = Hashtbl.create_sized size_of_string (fun x -> MutableTracker.of_tracker @@ List.size_of x) 8;
+	watches = Hashtbl.create_sized Xenbus.Memory_size.string SizedList.size_of 8;
 	nb_watches = 0;
 	anonid = id;
 	stat_nb_ops = 0;
@@ -167,13 +173,13 @@ let get_watch_path con path =
 let get_watches (con: t) path =
 	if Hashtbl.mem con.watches path
 	then Hashtbl.find con.watches path
-        else List.empty size_of_watch
+        else SizedList.empty size_of_watch
 
 let get_children_watches con path =
 	let path = path ^ "/" in
 	Hashtbl.fold (fun p w l ->
-		if String.startswith path p then List.rev_append w l else l) con.watches
-                (List.empty size_of_watch)
+		if String.startswith path p then SizedList.rev_append w l else l) con.watches
+                (SizedList.empty size_of_watch)
 
 let is_dom0 con =
 	Perms.Connection.is_dom0 (get_perm con)
@@ -183,10 +189,10 @@ let add_watch con (path, apath) token =
 	   not (is_dom0 con) && con.nb_watches > !Define.maxwatch then
 		raise Quota.Limit_reached;
 	let l = get_watches con apath in
-	if List.exists (fun w -> w.token = token) l then
+	if SizedList.exists (fun w -> w.token = token) l then
 		raise Define.Already_exist;
 	let watch = watch_create ~con ~token ~path in
-	Hashtbl.replace con.watches apath (List.cons watch l);
+	Hashtbl.replace con.watches apath (SizedList.cons watch l);
 	con.nb_watches <- con.nb_watches + 1;
 	watch
 
@@ -195,9 +201,9 @@ let del_watch con path token =
 	let ws = Hashtbl.find con.watches apath in
         let is_token w = w.token = token in
         let not_is_token w = not (is_token w) in
-	let w = List.find is_token ws in
-	let filtered = List.filter not_is_token ws in
-	if List.length filtered > 0 then
+	let w = SizedList.find is_token ws in
+	let filtered = SizedList.filter not_is_token ws in
+	if SizedList.length filtered > 0 then
 		Hashtbl.replace con.watches apath filtered
 	else
 		Hashtbl.remove con.watches apath;
@@ -211,13 +217,18 @@ let del_watches con =
 let del_transactions con =
   Hashtbl.reset con.transactions
 
-let size_of_path_token (p, t) = Size.(size_of_string p + size_of_string t)
+let size_of_path_token (p, t) =
+  let open Xenbus.Memory_size in
+  record_start ()
+  |> record_add_immutable @@ string p
+  |> record_add_immutable @@ string p
+  |> record_end
 
 let list_watches con =
 	Hashtbl.fold
 		(fun _ watches acc ->
-                  List.rev_append (List.rev_map size_of_path_token (fun watch -> watch.path, watch.token) watches) acc)
-		con.watches (List.empty size_of_path_token)
+                  SizedList.rev_append (SizedList.rev_map size_of_path_token (fun watch -> watch.path, watch.token) watches) acc)
+		con.watches (SizedList.empty size_of_path_token)
 
 let dbg fmt = Logging.debug "connection" fmt
 let info fmt = Logging.info "connection" fmt
@@ -372,14 +383,14 @@ let dump con chan =
 		-fd
 	in
 	(* dump watches *)
-	List.iter (fun (path, token) ->
+	SizedList.iter (fun (path, token) ->
 		Printf.fprintf chan "watch,%d,%s,%s\n" id (Utils.hexify path) (Utils.hexify token)
 		) (list_watches con)
 
 let debug con =
 	let domid = get_domstr con in
-	let watches = List.rev_map size_of_string (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
-	String.concat "" watches.List.l
+	let watches = SizedList.rev_map Xenbus.Memory_size.string (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
+	String.concat "" (SizedList.to_list watches)
 
 let decr_conflict_credit doms con =
 	match con.dom with

@@ -13,6 +13,15 @@ module Buffer: sig
   val contents: t -> string
 end
 
+module Ref : sig
+  type 'a t
+  val make: ('a -> [< Memory_size.require_nestable] size) -> 'a -> 'a t
+  val set: 'a t -> 'a -> unit
+  val get: 'a t -> 'a
+  val size_of: 'a t -> [> `updatable] size
+  val copy: ('a -> 'a) -> 'a t -> 'a t
+end
+
 module Queue: sig
   type 'a t
 
@@ -76,8 +85,11 @@ end
 module SizedList: sig
   type 'a t
 
+  val of_list : ('a -> [< require_nestable] size) -> 'a list -> 'a t
+
   val filter: ('a -> bool) -> 'a t -> 'a t
   val empty:  ('a -> [< require_nestable] size) -> 'a t
+  val to_list: 'a t -> 'a list
 
   val cons: 'a -> 'a t -> 'a t
   val length: 'a t -> int

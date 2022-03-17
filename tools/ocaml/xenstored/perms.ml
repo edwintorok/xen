@@ -100,28 +100,32 @@ end
 module Connection =
 struct
 
-open Xenbus.Memory_tracker
-open Xenbus.Sizeops
+open Xenbus.Memory_size_ds
 
-type elt = Xenctrl.domid * (permty List.t)
+type elt = Xenctrl.domid * (permty SizedList.t) (* TODO: shouldn't be a list, a single permty can
+already express RDWR *)
 
-let fields_of_elt = Size.of_int 2
-let size_of_elt (_, l) =
-  Size.(fields_of_elt + List.size_of l)
+let size_of_elt ((domid, l) as t) =
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_immutable @@ int domid
+  |> record_add_immutable @@ SizedList.size_of  l
+  |> record_end
 
 type t =
 	{ main: elt;
 	  target: elt option; }
 
-let fields_of_t = Size.of_int 2
 let size_of t =
-  Size.( fields_of_t
-       + size_of_elt t.main
-       + size_of_option size_of_elt t.target
-  )
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_immutable @@ size_of_elt t.main
+  |> record_add_immutable @@ option size_of_elt t.target
+  |> record_end
 
-let size_of_permty _ = Size.of_int 1
-let of_perms l = List.of_list size_of_permty l
+
+let size_of_permty _ = Xenbus.Memory_size.(variant unit ())
+let of_perms l = SizedList.of_list size_of_permty l
 let full_rights : t =
 	{ main = 0, of_perms [READ; WRITE];
 	  target = None }
@@ -148,8 +152,8 @@ let is_dom0 (connection:t) =
 
 let elt_to_string (i,perms) =
 	let is = Printf.sprintf "%i" i in (* string_of_int? *)
-	let b = Buffer.create (String.length is + List.length perms) in
-	List.iter (fun p ->
+	let b = Buffer.create (String.length is + SizedList.length perms) in
+	SizedList.iter (fun p ->
 	  Buffer.add_char b (char_of_permty p)
 	) perms;
 	Buffer.contents b

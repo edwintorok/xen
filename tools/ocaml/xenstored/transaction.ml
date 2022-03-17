@@ -77,7 +77,7 @@ type ty = No | Full of (
 	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
 )
 
-open Xenbus.Memory_tracker
+open Xenbus.Memory_size_ds
 open Xenbus.Sizeops
 type t = {
 	ty: ty;
@@ -85,7 +85,7 @@ type t = {
 	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
 	oldroot: Store.Node.t;
-	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) List.t;
+	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) SizedList.t;
 	operations: (Packet.request * Packet.response) Queue.t;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
@@ -94,26 +94,31 @@ let get_id t = match t.ty with No -> none | Full (id, _, _) -> id
 
 let fields_of_reqresp = Size.of_int 5
 
-let size_of_resp = function
-  | Packet.Ack _ -> value
-  | Reply r -> size_of_string r
-  | Error e -> size_of_string e
+let size_of_resp =
+  let open Xenbus.Memory_size in
+  variant @@ function
+  | Packet.Ack f -> func f
+  | Reply r -> string r
+  | Error e -> string e
 
 let size_of_reqresp (req, resp) =
-  Size.(fields_of_reqresp
-       + size_of_string req.Packet.data
-       + size_of_resp resp)
+  let open Xenbus.Memory_size in
+  record_start ()
+  |> record_add_immutable @@ string req.Packet.data
+  |> record_add_immutable @@ size_of_resp resp
+  |> record_end
 
-let fields_of_t = Size.of_int 9
 let size_of t =
-  let delta = Size.(Store.size_of t.store - Store.Node.size_of t.oldroot) in
-  MutableTracker.of_tracker Size.(fields_of_t
-       + delta
-       + Quota.size_of t.quota
-       + List.size_of t.paths (* TODO: there is a lot of sharing here, may not need to count paths *)
-       + Queue.size_of t.operations)
-  (* read/write lowpath is just shared with what is in the tree already: don't count *)
-
+  let open Xenbus.Memory_size in
+  let delta = remove (Store.size_of t.store) (Store.Node.size_of t.oldroot) in
+  add delta (
+  record_start t
+  |> record_add_immutable @@ int64 t.start_count
+  |> record_add_immutable @@ Quota.size_of t.quota
+  |> record_add_immutable @@ SizedList.size_of t.paths
+  |> record_add_immutable @@ Queue.size_of t.operations
+(* read/write lowpath is just shared with what is in the tree already: don't count *)
+  |> record_end)
 
 let counter = ref 0L
 let failed_commits = ref 0L
@@ -123,15 +128,22 @@ let reset_conflict_stats () =
 	failed_commits_no_culprit := 0L
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
-let size_of_short (_, t) = MutableTracker.size (size_of t)
-let short_running_txns = ref (List.empty size_of_short)
+let size_of_short ((ts, t) as x) =
+  let size_of_t = size_of in
+  let open Xenbus.Memory_size in
+  record_start x
+  |> record_add_immutable @@ float ts
+  |> record_add_immutable @@ size_of_t t
+  |> record_end
+
+let short_running_txns = ref (SizedList.empty size_of_short)
 
 let oldest_short_running_transaction () =
 	let rec last = function
 		| [] -> None
 		| [x] -> Some x
 		| _ :: xs -> last xs
-	in last (!short_running_txns.List.l)
+	in last (SizedList.to_list !short_running_txns)
 
 let trim_short_running_transactions txn =
 	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
@@ -139,11 +151,11 @@ let trim_short_running_transactions txn =
 		| None -> (function (start_time, _) -> start_time >= cutoff)
 		| Some t -> (function (start_time, tx) -> start_time >= cutoff && tx != t)
 	in
-	short_running_txns := List.filter
+	short_running_txns := SizedList.filter
 		keep
 		!short_running_txns
 
-let size_of_path_entry _ = value (* for now, shared with other DS *)
+let size_of_path_entry _ = Xenbus.Memory_size.unit () (* for now, shared with other DS *)
 
 let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
@@ -151,16 +163,16 @@ let make ?(internal=false) id store =
 		ty = ty;
 		start_count = !counter;
 		store = if id = none then store else Store.copy store;
-		quota = Quota.copy store.Store.quota;
+		quota = Quota.copy @@ Ref.get store.Store.quota;
 		oldroot = Store.get_root store;
-                paths = List.empty size_of_path_entry;
+                paths = SizedList.empty size_of_path_entry;
 		operations = Queue.create_sized size_of_reqresp;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
 	if id <> none && not internal then (
 		let now = Unix.gettimeofday () in
-		short_running_txns := List.cons (now, txn) !short_running_txns
+		short_running_txns := SizedList.cons (now, txn) !short_running_txns
 	);
 	txn
 
@@ -169,8 +181,8 @@ let get_paths t = t.paths
 
 let get_root t = Store.get_root t.store
 
-let is_read_only t = List.is_empty t.paths
-let add_wop t ty path = t.paths <- List.cons (ty, path) t.paths
+let is_read_only t = SizedList.is_empty t.paths
+let add_wop t ty path = t.paths <- SizedList.cons (ty, path) t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
@@ -224,7 +236,7 @@ let getperms t perm path =
 	r
 
 let commit ~con t =
-	let has_write_ops = List.length t.paths > 0 in
+	let has_write_ops = SizedList.length t.paths > 0 in
 	let has_coalesced = ref false in
 	let has_commited =
 	match t.ty with
@@ -240,7 +252,7 @@ let commit ~con t =
 
 					(* it has to be in the store, otherwise it means bugs
 					   in the lowpath registration. we don't need to handle none. *)
-					maybe (fun n -> Store.set_node cstore p n t.quota store.Store.quota) n;
+					maybe (fun n -> Store.set_node cstore p n t.quota @@ Ref.get store.Store.quota) n;
 					Logging.write_coalesce ~tid:(get_id t) ~con (Store.Path.to_string p);
 				) t.write_lowpath;
 				maybe (fun p ->
