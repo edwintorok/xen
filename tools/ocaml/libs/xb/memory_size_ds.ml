@@ -404,7 +404,8 @@ module Ref = struct
   }
 
   let set t contents =
-    Container.remove t.container t.contents;
+    (* Container.remove t.container t.contents; *)
+    Container.clear t.container;
     Container.add t.container contents;
     t.contents <- contents
 

@@ -61,6 +61,7 @@ let string s = s |> String.length |> bytes_n
 let set_parent t ~parent =
   match t.parent with
   | Immutable -> false (* no updates possible *)
+  | UpdatableParent p when p == parent -> true (* already set *)
   | UpdatableUnset ->
       t.parent <- UpdatableParent parent;
       true

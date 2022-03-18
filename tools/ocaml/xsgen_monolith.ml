@@ -70,4 +70,5 @@ let () =
   (*declare "unwatch" (connection ^> path ^> token ^!?> unit) wrap3 C.unwatch*)
 
 
-let () = let fuel = 100 in main fuel
+let () =
+  let fuel = 100 in main fuel

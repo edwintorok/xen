@@ -45,14 +45,43 @@ let eventchn = Event.init ()
 let doms = Domains.init eventchn ignore
 
 let server_thread fd =
+  let n = ref 0 in
+  let t = ref @@ Unix.gettimeofday () in
   try while true do
-    let rset, wset, _ = Poll.poll_select [fd] [fd] [] 1. in
+    let is_peaceful c =
+      match Connection.get_domain c with
+                        | None -> true (* Treat socket-connections as exempt, and free to conflict. *)
+                        | Some dom -> not (Domain.is_paused_for_conflict dom)
+    in
+    let mw = Connections.has_more_work cons in
+    let peaceful_mw = List.filter is_peaceful mw in
+    List.iter
+                      (fun c ->
+                        match Connection.get_domain c with
+                       | None -> () | Some d -> Domain.incr_io_credit d)
+                      peaceful_mw;
+    let inset, outset = Connections.select cons in
+    let rset, wset, _ = Poll.poll_select inset outset [] 5. in
+    incr n;
+    let now = Unix.gettimeofday () in
+    if now > !t +. 1.  then begin
+      Printf.eprintf "Requests: %d in %.2f\n" !n (!t -. now);
+      (* TODO: detect if no requests: means stuck processing and bug *)
+      flush stderr;
+      n := 0;
+      t := now
+    end;
+    if List.length rset = 0 && List.length wset = 0 then begin
+      prerr_endline "Packet processing stuck: no more input available\n";
+      exit 4
+    end;
     List.iter (fun fd -> Process.do_input store cons doms @@ Connections.find cons fd) rset;
     List.iter (fun fd -> Process.do_output store cons doms @@ Connections.find cons fd) wset
   done
   with e ->
     Printexc.print_backtrace stderr;
     prerr_endline (Printexc.to_string e);
+    flush stderr;
     Unix.close fd
 
 let connection =

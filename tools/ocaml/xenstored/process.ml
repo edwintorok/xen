@@ -564,6 +564,7 @@ let do_introduce con t domains cons data =
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
 		with e ->
+		  Printexc.print_backtrace stderr;
 		  warn "introduce invalid command: %s" (Printexc.to_string e);
 		  raise Invalid_Cmd_Args
 	in
