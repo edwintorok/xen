@@ -33,13 +33,20 @@
 
 (rule
 (alias ortac-fuzz1)
-(deps xsgen_monolith.exe)
-(action (run bun -svv ./xsgen_monolith.exe)))
+(deps xsgen_monolith.exe (sandbox none))
+(action
+ (run bun -svv -o ../../afl-output ./xsgen_monolith.exe))
+)
 
 (rule
 (alias ortac-fuzz)
-(deps xsgen_monolith.exe)
-(action (run bun --no-kill ./xsgen_monolith.exe)))
+(deps xsgen_monolith.exe (sandbox none))
+(action (run bun -o ../../afl-output ./xsgen_monolith.exe)))
+
+(rule
+(alias ortac-fuzz-keepgoing)
+(deps xsgen_monolith.exe (sandbox none))
+(action (run bun --no-kill -o ../../afl-output ./xsgen_monolith.exe)))
 
 (rule
  (alias cameleer-check)

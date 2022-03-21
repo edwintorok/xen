@@ -37,6 +37,7 @@ let () =
     Logging.access_logger := Some monolith_logger;
     Logging.access_log_special_ops := true;
     Logging.access_log_transaction_ops := true ;
+    Logging.xenstored_log_level := Debug
   end
 
 let cons = Connections.create ()

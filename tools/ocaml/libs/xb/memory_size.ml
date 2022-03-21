@@ -102,7 +102,8 @@ let unset_parent t ~parent =
       if TW.count tw = 0 then
         t.parent <- UpdatableUnset
   | UpdatableUnset ->
-      invalid_arg "expression's parent already removed"
+      ()
+      (* invalid_arg "expression's parent already removed"*)
 
 let add a b =
   let size = Sizeops.Size.(a.size + b.size) in

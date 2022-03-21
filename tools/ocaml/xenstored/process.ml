@@ -387,25 +387,36 @@ let function_of_type_simple_op ty =
 
 let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
+		debug "Replying with EINVAL";
 		Packet.Error e in
 	try
 		fct con t doms cons req.Packet.data
 	with
-	| Define.Invalid_path          -> reply_error "EINVAL"
+	| Define.Invalid_path          ->
+	    debug "Invalid path";
+	    reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
 	| Define.Doesnt_exist          -> reply_error "ENOENT"
 	| Define.Lookup_Doesnt_exist _ -> reply_error "ENOENT"
 	| Define.Permission_denied     -> reply_error "EACCES"
 	| Not_found                    -> reply_error "ENOENT"
-	| Invalid_Cmd_Args             -> reply_error "EINVAL"
-	| Invalid_argument _           -> reply_error "EINVAL"
+	| Invalid_Cmd_Args             ->
+	    debug "Invalid cmd args";
+	    reply_error "EINVAL"
+	| Invalid_argument s           ->
+	    debug "Invalid argument: %s" s;
+	    reply_error "EINVAL"
 	| Transaction_again            -> reply_error "EAGAIN"
 	| Transaction_nested           -> reply_error "EBUSY"
-	| Domain_not_match             -> reply_error "EINVAL"
+	| Domain_not_match             ->
+	    debug "Domain not match";
+	    reply_error "EINVAL"
 	| Quota.Limit_reached          -> reply_error "EQUOTA"
 	| Quota.Data_too_big           -> reply_error "E2BIG"
 	| Quota.Transaction_opened     -> reply_error "EQUOTA"
-	| (Failure "int_of_string")    -> reply_error "EINVAL"
+	| (Failure "int_of_string")    ->
+	    debug "int_of_string failure";
+	    reply_error "EINVAL"
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
 
 let write_access_log ~ty ~tid ~con ~data =

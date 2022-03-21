@@ -62,7 +62,7 @@ ortac1: dune-pre
 input:
 	dd if=/dev/urandom of=$@ bs=1M count=1
 
-crash%.out: crash%
+%.rerun: %
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release ./xsgen_monolith.exe --no-buffer $<
 
 crash%.min: crash%
@@ -80,6 +80,9 @@ ortac-fuzz1: dune-pre
 
 ortac-fuzz: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release @ortac-fuzz --no-buffer
+
+ortac-fuzzk: dune-pre
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release @ortac-fuzz-keepgoing --no-buffer
 
 event-print: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec ocaml-print-intf xenstored/event.ml

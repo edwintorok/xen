@@ -227,9 +227,9 @@ module Size: SizeSig = struct
   let[@logic] of_int i = if i < 0 || i >= invalid_size then begin
       (* raising doesn't work: it gets caught and transformed into Xb.Invalid *)
       (* TODO: only raise in "debug/fuzz" mode *)
-      let bt = Printexc.get_callstack 100 in
+    (*  let bt = Printexc.get_callstack 100 in
       Printexc.print_raw_backtrace stderr bt;
-      Printf.eprintf "invalid size %d\n" i;
+      Printf.eprintf "invalid size %d\n" i;*)
       -1
     end else i
   (*@ r = of_int i
