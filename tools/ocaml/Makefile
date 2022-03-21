@@ -56,6 +56,13 @@ check: dune-pre
 check2: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build @check --profile=release
 
+# TODO: need to export MEMORY=500 currently to avoid this finding unreproducible issues
+# although if we set the GC parameters like we'd in production oxenstored, and
+# set the quota up to match fuzzer set memory limits it might be a useful test,
+# but any bugs found would have to be reproducible just based on the input,
+# and currently it is not in persistent mode (the oxenstored tree is not reset...)
+# the monolith code needs to be changed to have some kind of reset command that is run whenever the
+# persistent mode fuzzer resets itself, e.g. by using the ~prologue feature?
 ortac1: dune-pre
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release ./xsgen_monolith.exe --no-buffer
 

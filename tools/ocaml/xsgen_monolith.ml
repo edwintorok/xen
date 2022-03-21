@@ -69,6 +69,13 @@ let () =
   declare "watch" (connection ^> path ^> token ^!?> unit) wrap3 C.watch
   (*declare "unwatch" (connection ^> path ^> token ^!?> unit) wrap3 C.unwatch*)
 
+let prologue () =
+  (* TODO: send reset command *)
+  ()
 
 let () =
-  let fuel = 100 in main fuel
+  at_exit (fun () ->
+    prerr_endline "Done";
+    flush stderr;
+    flush stdout);
+  let fuel = 100 in main ~prologue fuel
