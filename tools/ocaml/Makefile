@@ -62,6 +62,13 @@ ortac1: dune-pre
 input:
 	dd if=/dev/urandom of=$@ bs=1M count=1
 
+crash%.out: crash%
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release ./xsgen_monolith.exe --no-buffer $<
+
+crash%.min: crash%
+	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune build --profile=release ./xsgen_monolith.exe
+	afl-tmin -i $< -o $@ -m 500 -- _build/default/xsgen_monolith.exe @@
+
 mono-fuzz1: dune-pre input
 	OCAMLRUNPARAM=b C_INCLUDE_PATH=$(C_INCLUDE_PATH) dune exec --profile=release libs/xb/test/memory_size_monolith.exe --no-buffer input
 

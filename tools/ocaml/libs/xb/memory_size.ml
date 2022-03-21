@@ -7,15 +7,39 @@ type size_kind =
     | `ephemeral
   ]
 
-type tracker =
-  { mutable size: Sizeops.Size.t
+module rec T : sig
+  type t =
+    { mutable size: Sizeops.Size.t
     ; mutable parent: parent
     ; item_overhead: Sizeops.Size.t (* TODO: only for updatable! *)
     ; container_initial: Sizeops.Size.t (* TODO: only for updatable! *)
-  }
+    }
 
-and parent = Immutable | UpdatableUnset | UpdatableParent of tracker
+  and parent = Immutable | UpdatableUnset | UpdatableParent of TW.t
 
+  val equal : t -> t -> bool
+
+  val hash: t -> int
+end = struct
+  type t =
+    { mutable size: Sizeops.Size.t
+    ; mutable parent: parent
+    ; item_overhead: Sizeops.Size.t (* TODO: only for updatable! *)
+    ; container_initial: Sizeops.Size.t (* TODO: only for updatable! *)
+    }
+
+  and parent = Immutable | UpdatableUnset | UpdatableParent of TW.t
+
+  let equal a b = a == b
+  (* we don't want to send updates to the same physically equal parent more than once,
+     but other than that each parent is independent from each other and needs updates sent *)
+
+  let hash t = Hashtbl.hash (t.item_overhead, t.container_initial)
+end
+
+and TW : Weak.S with type data = T.t = Weak.Make(T)
+
+open T
 type ephemeral = [`ephemeral]
 
 type updatable = [`updatable | ephemeral ]
@@ -29,7 +53,7 @@ type array_compatible = [`constant]
 type require_nestable = [`constant | `immutable | `updatable]
 
 type forbid_updates = [`constant | `immutable] (** to be used as [< forbid_updates] *)
-type +'a t = tracker
+type +'a t = T.t
 
 let unboxed = Sizeops.Size.of_int 0 (* no extra space taken up beyond that for the field itself *)
 let boxed = Sizeops.Size.of_words 1
@@ -61,18 +85,22 @@ let string s = s |> String.length |> bytes_n
 let set_parent t ~parent =
   match t.parent with
   | Immutable -> false (* no updates possible *)
-  | UpdatableParent p when p == parent -> true (* already set *)
   | UpdatableUnset ->
-      t.parent <- UpdatableParent parent;
+      let tw = TW.create 1 in
+      TW.add tw parent;
+      t.parent <- UpdatableParent tw;
       true
-  | UpdatableParent _ ->
-      invalid_arg "expression already has a parent set"
+  | UpdatableParent tw ->
+      TW.add tw parent;
+      true
 
-let unset_parent t =
+let unset_parent t ~parent =
   match t.parent with
   | Immutable -> () (* no updates possible *)
-  | UpdatableParent _ ->
-      t.parent <- UpdatableUnset
+  | UpdatableParent tw ->
+      TW.remove tw parent;
+      if TW.count tw = 0 then
+        t.parent <- UpdatableUnset
   | UpdatableUnset ->
       invalid_arg "expression's parent already removed"
 
@@ -151,20 +179,22 @@ let container_create ~initial ~item_overhead =
 let rec container_add t n =
   t.size <- Sizeops.Size.(t.size + n);
   match t.parent with
-  | UpdatableParent p -> container_add p n
+  | UpdatableParent tw ->
+      tw |> TW.iter @@ fun p -> container_add p n
   | UpdatableUnset | Immutable -> ()
 
 let rec container_sub t n =
   t.size <- Sizeops.Size.(t.size - n);
   match t.parent with
-  | UpdatableParent p -> container_sub p n
+  | UpdatableParent tw ->
+      tw |> TW.iter @@ fun p -> container_sub p n
   | UpdatableUnset | Immutable -> ()
 
 let container_clear t =
   container_sub t Sizeops.Size.(t.size - t.container_initial)
 
 let container_remove_element e t =
-  unset_parent e;
+  unset_parent e ~parent:t;
   container_sub t Sizeops.Size.(e.size + t.item_overhead)
 
 let container_transfer ~src ~dst =
