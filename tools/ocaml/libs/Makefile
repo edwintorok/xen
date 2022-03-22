@@ -1,4 +1,5 @@
 XEN_ROOT = $(CURDIR)/../../..
+OCAML_TOPLEVEL=$(CURDIR)/..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS= \
@@ -21,3 +22,5 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: subdirs-distclean
+
+include $(OCAML_TOPLEVEL)/Makefile.generated

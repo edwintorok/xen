@@ -1,0 +1,7 @@
+SUBDIRS_GENERATED_FILES=$(addprefix subdir-, $(addsuffix -generated-files, $(SUBDIRS)))
+
+subdir-%-generated-files: Makefile $(XEN_ROOT)/tools/Rules.mk $(XEN_ROOT)/tools/ocaml/Makefile.rules $(XEN_ROOT)/config/Tools.mk
+	$(MAKE) -s -C $* generated-files V=
+
+generated-files: $(SUBDIRS_GENERATED_FILES)
+

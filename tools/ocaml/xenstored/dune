@@ -1,5 +1,5 @@
 (executable
- (modes byte exe)
+ (modes native)
  (name xenstored)
  (modules (:standard \ syslog systemd))
  (public_name oxenstored)
@@ -11,9 +11,10 @@
  (foreign_stubs
   (language c)
   (names syslog_stubs systemd_stubs select_stubs)
-  (flags (-DHAVE_SYSTEMD)))
+  (flags (:standard -DHAVE_SYSTEMD (:include cflags.inc))))
  (modules syslog systemd)
  (name xenstubs)
  (wrapped false)
  (libraries unix)
- (c_library_flags -lsystemd))
+ (no_dynlink)
+ (c_library_flags -lsystemd (:include libs.inc)))

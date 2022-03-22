@@ -11,6 +11,8 @@ LIBS = xeneventchn.cma xeneventchn.cmxa
 LIBS_xeneventchn = $(LDLIBS_libxenevtchn)
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
+foo:
+	@echo $(LIBS_$(OBJS))
 
 bins: $(PROGRAMS)
 
@@ -32,4 +34,3 @@ uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xeneventchn
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
-

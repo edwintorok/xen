@@ -1,7 +1,10 @@
 (library
  (foreign_stubs
   (language c)
+  (flags (:standard (:include cflags.inc)))
   (names xenbus_stubs xs_ring_stubs))
  (name xenbus)
  (public_name xen.bus)
+ (no_dynlink)
+ (c_library_flags (:include libs.inc))
  (libraries unix xenmmap))

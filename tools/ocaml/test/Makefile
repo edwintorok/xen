@@ -53,3 +53,4 @@ install:
 uninstall:
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
+include $(OCAML_TOPLEVEL)/Makefile.generated

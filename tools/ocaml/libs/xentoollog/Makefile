@@ -25,6 +25,9 @@ GENERATED_FILES += _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc META
 
 all: $(INTF) $(LIBS)
 
+%.tmp:
+	touch $@
+
 xentoollog.ml: xentoollog.ml.in _xtl_levels.ml.in
 	$(Q)sed -e '1i\
 (*\

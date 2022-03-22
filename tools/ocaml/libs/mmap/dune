@@ -1,8 +1,12 @@
 (library
  (foreign_stubs
   (language c)
+  (flags (:standard (:include cflags.inc)))
   (names xenmmap_stubs))
  (name xenmmap)
  (public_name xen.mmap)
  (libraries unix)
+ (no_dynlink)
+ (modes native)
+ (c_library_flags (:include libs.inc))
  (install_c_headers mmap_stubs))

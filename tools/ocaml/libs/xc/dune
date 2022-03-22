@@ -1,9 +1,10 @@
 (library
  (foreign_stubs
   (language c)
-  (names xenctrl_stubs))
+  (names xenctrl_stubs)
+  (flags (:standard (:include cflags.inc))))
  (name xenctrl)
  (public_name xen.ctrl)
  (libraries unix xenmmap)
- (c_library_flags -lxenctrl -lxenguest -lxencall -lxenforeignmemory
-   -lxengnttab))
+ (no_dynlink)
+ (c_library_flags (:include libs.inc)))

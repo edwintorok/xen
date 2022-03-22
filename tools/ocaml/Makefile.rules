@@ -111,3 +111,14 @@ define buildmakevars2module-closure
                       $($(var)) >>$(1).tmp;) \
 	$(call move-if-changed,$(1).tmp,$(1))
 endef
+
+cflags.inc: Makefile $(XEN_ROOT)/tools/ocaml/Makefile.rules
+	$(call quiet-command, echo '(' $(CFLAGS) ')' >$@,ECHO,$@)
+
+libs.inc: Makefile $(XEN_ROOT)/tools/ocaml/Makefile.rules
+	$(call quiet-command, echo '(' $(LIBS_$(OBJS)) ')' >$@,ECHO,$@)
+
+GENERATED_FILES += cflags.inc libs.inc
+.PHONY: generated-files
+generated-files: $(GENERATED_FILES)
+

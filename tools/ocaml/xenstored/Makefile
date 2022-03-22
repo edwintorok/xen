@@ -98,3 +98,4 @@ genpath-target = $(call buildmakevars2module,paths.ml)
 $(eval $(genpath-target))
 
 GENERATED_FILES += paths.ml
+include $(OCAML_TOPLEVEL)/Makefile.generated

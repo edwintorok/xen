@@ -26,6 +26,9 @@ GENERATED_FILES += xenlight.ml xenlight.ml.tmp xenlight.mli xenlight.mli.tmp
 GENERATED_FILES += _libxl_types.ml.in _libxl_types.mli.in
 GENERATED_FILES += _libxl_types.inc META
 
+%.tmp:
+	touch $@
+
 all: $(INTF) $(LIBS)
 
 xenlight.ml: xenlight.ml.in _libxl_types.ml.in

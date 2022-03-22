@@ -1,0 +1,11 @@
+(lang dune 2.0)
+
+(env
+  ; we need to support older compilers so don't make deprecation warnings fatal
+ (dev
+  (flags (:standard -w -3)
+  ))
+ (release
+  (env-vars (OCAMLRUNPARAM b))
+  (flags (:standard -strict-sequence -strict-formats -principal))
+  (ocamlopt_flags -nodynlink)))
