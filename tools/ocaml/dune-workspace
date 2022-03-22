@@ -7,5 +7,5 @@
   ))
  (release
   (env-vars (OCAMLRUNPARAM b))
-  (flags (:standard -strict-sequence -strict-formats -principal))
+  (flags (:standard -strict-sequence -strict-formats -principal -w @18))
   (ocamlopt_flags -nodynlink)))
