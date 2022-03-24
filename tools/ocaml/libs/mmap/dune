@@ -1,0 +1,8 @@
+(library
+ (c_names xenmmap_stubs)
+ (c_flags (:standard -I../../../include))
+ (name xenmmap)
+ (public_name xen.mmap)
+ (libraries unix)
+ (no_dynlink)
+ (install_c_headers mmap_stubs))

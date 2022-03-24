@@ -1,0 +1,16 @@
+(rule
+ (targets xenctrl_abi_check.h)
+ (action
+ (with-stdout-to
+  xenctrl_abi_check.h
+  (run perl -w %{dep:abi-check} %{dep:xenctrl_stubs.c} %{dep:xenctrl.ml}))))
+
+(library
+ (c_names xenctrl_stubs)
+ (c_flags (:standard -I../../../include))
+ ;(depends ../../../include/xen/xen.h ../../../libs/ctrl/libxenctrl.so)
+ (name xenctrl)
+ (public_name xen.ctrl)
+ (libraries unix xenmmap xeneventchn)
+ (no_dynlink)
+ (c_library_flags -lxenctrl -lxenguest))

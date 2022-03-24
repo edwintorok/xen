@@ -1,0 +1,5 @@
+; only look inside ocaml and include subdirectory, speeds up the build
+; since dune doesn't need to copy/hash/monitor all the other files
+(dirs ocaml include)
+
+(data_only_dirs libs)

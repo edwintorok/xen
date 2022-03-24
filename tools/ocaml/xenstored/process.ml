@@ -245,7 +245,7 @@ let do_debug con t _domains cons data =
       let domid = int_of_string domid in
       let con = Connections.find_domain cons domid in
       let b = Buffer.create 128 in
-      let () = con.transactions |> Hashtbl.iter @@ fun id tx ->
+      let () = con.transactions |> Hashtbl.iter @@ fun _id tx ->
         Printf.bprintf b "paths: %d, operations: %d, quota_reached: %b\n"
           (List.length tx.Transaction.paths)
           (List.length tx.Transaction.operations)

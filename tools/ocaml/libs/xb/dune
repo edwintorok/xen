@@ -1,0 +1,14 @@
+; this old version of Dune 1.6 doesn't support deps for C files in other ways
+(rule
+ (targets _deps.c)
+ (deps (source_tree ../../../include))
+ (action (with-stdout-to _deps.c (echo "")))
+)
+
+(library
+ (c_names xenbus_stubs xs_ring_stubs _deps)
+ (c_flags (:standard -I../../../include))
+ (name xenbus)
+ (public_name xen.bus)
+ (no_dynlink)
+ (libraries unix xenmmap))
