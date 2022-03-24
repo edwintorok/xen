@@ -1,4 +1,4 @@
-dune-workspace
+dune-workspace*
 _build/
 .merlin
 *.h.gch
