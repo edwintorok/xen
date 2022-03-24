@@ -1,0 +1,8 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names xenmmap_stubs))
+ (name xenmmap)
+ (libraries unix)
+ (no_dynlink)
+ (install_c_headers mmap_stubs))
