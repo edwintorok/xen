@@ -1,0 +1,7 @@
+dune-workspace*
+_build/
+.merlin
+*.h.gch
+*.opam
+ocaml/*.install
+include/_xentoolcore_list.h
