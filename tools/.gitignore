@@ -1,0 +1,5 @@
+dune-workspace
+_build/
+.merlin
+*.h.gch
+*.opam
