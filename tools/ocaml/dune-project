@@ -1,0 +1,27 @@
+(lang dune 2.1)
+
+(name xen)
+
+(formatting (enabled_for dune))
+(generate_opam_files true)
+
+(maintainers christian.lindig@citrix.com)
+(license LGPL)
+
+(package
+ (name xen)
+ (synopsis "Xen interfaces")
+ (depends
+  base-unix
+  (dune (>= 2.1))
+ )
+)
+
+(package
+ (name xenstored)
+ (synopsis "In-memory key-value store for the Xen hypervisor")
+ (depends
+  base-unix
+  (dune (>= 2.1))
+ )
+)
