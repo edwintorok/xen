@@ -1,0 +1,18 @@
+(lang dune 2.1)
+
+(env
+  ; we need to support older compilers so don't make deprecation warnings fatal
+ (dev
+  (flags (:standard -w -3))
+   (env-vars
+    (LD_LIBRARY_PATH @LIBRARY_PATH@)
+    (LIBRARY_PATH @LIBRARY_PATH@)
+   ))
+ (release
+  (env-vars
+   (OCAMLRUNPARAM b)
+    (LD_LIBRARY_PATH @LIBRARY_PATH@)
+    (LIBRARY_PATH @LIBRARY_PATH@)
+  )
+  (flags (:standard -strict-sequence -strict-formats -principal -w @18))
+  (ocamlopt_flags -nodynlink)))
