@@ -1,0 +1,10 @@
+(library
+ (foreign_stubs
+  (language c)
+  (extra_deps ../../../include/xen/xen.h)
+  (include_dirs ../../../include)
+  (names xenbus_stubs xs_ring_stubs))
+ (name xenbus)
+ (public_name xen.bus)
+ (no_dynlink)
+ (libraries unix xenmmap))
