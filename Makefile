@@ -68,6 +68,11 @@ build-tools-oxenstored: build-tools-public-headers
 	$(MAKE) -s -C tools/libs
 	$(MAKE) -C tools/ocaml build-tools-oxenstored
 
+.PHONY: build-tools-oxenstored-prepare
+build-tools-oxenstored-prepare: build-tools-public-headers
+	test -f tools/config.status || (cd tools && ./configure --with-xenstored=oxenstored)
+	$(MAKE) -C tools/libs V=
+
 .PHONY: build-stubdom
 build-stubdom: mini-os-dir build-tools-public-headers
 	$(MAKE) -C stubdom build
