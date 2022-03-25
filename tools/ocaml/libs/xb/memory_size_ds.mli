@@ -1,5 +1,5 @@
 type 'a size = 'a Memory_size.t
-type require_nestable = Memory_size.require_nestable
+type forbid_updates = Memory_size.forbid_updates
 type array_compatible = Memory_size.array_compatible
 
 module Buffer: sig
@@ -25,7 +25,7 @@ end
 module Queue: sig
   type 'a t
 
-  val create_sized : ('a -> [< Memory_size.require_nestable] size) -> 'a t
+  val create_sized : ('a -> [< forbid_updates] size) -> 'a t
 
   val add: 'a -> 'a t -> unit
 
@@ -59,7 +59,7 @@ end
 module Hashtbl : sig
   type ('a, 'b) t
 
-  val create_sized: ('a -> [< require_nestable] size) -> ('b -> [< require_nestable] size) -> int -> ('a, 'b) t
+  val create_sized: ('a -> [< forbid_updates] size) -> ('b -> [< forbid_updates] size) -> int -> ('a, 'b) t
 
   val reset: ('a, 'b) t -> unit
 
@@ -79,16 +79,16 @@ module Hashtbl : sig
 
   val initial:  ('a, 'b) Hashtbl.t -> [> array_compatible] size
   val item_overhead: [> array_compatible] size
-  val size_of: ('a, 'b) t -> [> require_nestable] size
+  val size_of: ('a, 'b) t -> [> Memory_size.require_nestable] size
 end
 
 module SizedList: sig
   type 'a t
 
-  val of_list : ('a -> [< require_nestable] size) -> 'a list -> 'a t
+  val of_list : ('a -> [< forbid_updates] size) -> 'a list -> 'a t
 
   val filter: ('a -> bool) -> 'a t -> 'a t
-  val empty:  ('a -> [< require_nestable] size) -> 'a t
+  val empty:  ('a -> [< forbid_updates] size) -> 'a t
   val to_list: 'a t -> 'a list
 
   val cons: 'a -> 'a t -> 'a t
@@ -98,10 +98,10 @@ module SizedList: sig
   val rev_append: 'a t -> 'a t -> 'a t
 
   val iter: ('a -> unit) -> 'a t -> unit
-  val rev_map: ('b -> [< require_nestable] size) -> ('a -> 'b) -> 'a t -> 'b t
+  val rev_map: ('b -> [< forbid_updates] size) -> ('a -> 'b) -> 'a t -> 'b t
   val fold_left: ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
 
-  val size_of: 'a t -> [> require_nestable] size
+  val size_of: 'a t -> [> forbid_updates] size
 
   val for_all: ('a -> bool) -> 'a t -> bool
   val exists: ('a -> bool) -> 'a t -> bool

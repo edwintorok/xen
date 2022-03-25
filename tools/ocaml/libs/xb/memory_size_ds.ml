@@ -3,6 +3,7 @@ open Sizeops
 
 type 'a size = 'a t
 type require_nestable = Memory_size.require_nestable
+type forbid_updates = Memory_size.forbid_updates
 type array_compatible = Memory_size.array_compatible
 module Container = struct
   type container_size = [`updatable] size
@@ -18,6 +19,7 @@ module Container = struct
     |> record_end
 
   let open_nestable x = (x: 'a -> [< require_nestable] size :> 'a -> [> require_nestable] size)
+  let open_forbid_updates x = (x: 'a -> [< forbid_updates] size :> 'a -> [> forbid_updates] size)
 
   let initial n = add n container_size
 
@@ -187,7 +189,7 @@ module Hashtbl = struct
   type ('a, 'b) t =
     { h: ('a, 'b) Hashtbl.t
     ; container: 'a Container.t
-    ; get_value_size: 'b -> [`constant|`immutable|`updatable] size
+    ; get_value_size: 'b -> [`constant|`immutable] size
     }
 
   let hashtbl_size h =
@@ -220,7 +222,7 @@ module Hashtbl = struct
     let h = Hashtbl.create ~random:true n in
     { h
     ; container = Container.create ~initial:(initial h) ~item_overhead get_key_size
-    ; get_value_size = Container.open_nestable get_value_size
+    ; get_value_size = Container.open_forbid_updates get_value_size
     }
 
   let reset t =
@@ -280,9 +282,9 @@ end
 module SizedList = struct
   type 'a t =
     { l: 'a list
-    ; size: [`constant | `immutable | `updatable] size
+    ; size: [`constant | `immutable ] size
     ; length: int
-    ; size_of: 'a -> [`constant | `updatable | `immutable] size
+    ; size_of: 'a -> [`constant | `immutable] size
     }
 
   let initial =
@@ -311,7 +313,7 @@ module SizedList = struct
     |> remove item_overhead
 
   let of_list size_of l =
-    let size_of = Container.open_nestable size_of in
+    let size_of = Container.open_forbid_updates size_of in
     { l
     ; length = List.length l
     ; size = List.fold_left (fun acc e -> add acc @@ size_of e) initial l
@@ -331,7 +333,7 @@ module SizedList = struct
     in
     loop t.size t.length [] t.l
 
-  let empty size_of = { l = []; size = initial; length = 0; size_of = Container.open_nestable size_of }
+  let empty size_of = { l = []; size = initial; length = 0; size_of = Container.open_forbid_updates size_of }
   let cons a t = { t with l = a :: t.l; size = add t.size (t.size_of a); length = t.length + 1}
   let to_list t = t.l
   let length t = t.length
@@ -362,7 +364,7 @@ module SizedList = struct
      but we traverse the list only once
    *)
   let rev_map size_of f t =
-    let size_of = Container.open_nestable size_of in
+    let size_of = Container.open_forbid_updates size_of in
     let rec loop l size = function
       | [] -> { l; length = t.length; size; size_of }
       | hd :: tl ->
@@ -373,7 +375,7 @@ module SizedList = struct
 
   let fold_left f init t = List.fold_left f init t.l
 
-  let size_of t = (t.size : [< require_nestable] size :> [> require_nestable] size)
+  let size_of t = (t.size : [< forbid_updates] size :> [> forbid_updates] size)
 
   let for_all f t = List.for_all f t.l
   let exists f t = List.exists f t.l

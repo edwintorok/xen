@@ -16,7 +16,6 @@
  *)
 
 let debug fmt = Logging.debug "connections" fmt
-open Xenbus.Memory_size_ds
 type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
@@ -24,15 +23,12 @@ type t = {
 	mutable watches: Connection.watch List.t Trie.t;
 }
 
-let fdsize (_:Unix.file_descr) = Xenbus.Memory_size.int 0
-let size_of_xeneventchn (_:Xeneventchn.t) = Xenbus.Memory_size.unit () (* TODO *)
-
 let create () =
   let open Xenbus.Memory_size in
   {
-	anonymous = Hashtbl.create_sized fdsize Connection.size_of 37;
-	domains = Hashtbl.create_sized int Connection.size_of 37;
-	ports = Hashtbl.create_sized size_of_xeneventchn Connection.size_of 37;
+	anonymous = Hashtbl.create 37;
+	domains = Hashtbl.create 37;
+	ports = Hashtbl.create 37;
 	watches = Trie.create ()
 }
 
@@ -165,7 +161,7 @@ let fire_watches ?oldroot root cons path recurse =
 
 let fire_spec_watches root cons specpath =
 	iter cons (fun con ->
-		SizedList.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		Xenbus.Memory_size_ds.SizedList.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in

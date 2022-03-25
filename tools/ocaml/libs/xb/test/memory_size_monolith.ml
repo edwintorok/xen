@@ -332,7 +332,7 @@ let size_of_updatable_nested_rec h_size_of r =
 
 let make_updatable_nested_rec s h = { s; h }
 
-let () =
+(*let () =
   let t = declare_abstract_type ~var:"updatable_nested_rec" () in
   let q_size_of = R.Queue.size_of Memory_size.string in
   let updatable_size_of_ref = size_of_updatable_rec q_size_of in
@@ -342,7 +342,7 @@ let () =
   (* TODO: store and read later multiple times.. *)
   declare "size_of_updatable_rec" (t ^> int)
     (wrap_size_of @@ size_of_updatable_nested_rec @@ R.Hashtbl.size_of Memory_size.string updatable_size_of_ref)
-    (wrap_size_of @@ size_of_updatable_nested_rec Hashtbl.size_of)
+    (wrap_size_of @@ size_of_updatable_nested_rec Hashtbl.size_of)*)
 
 type ephemeral_rec =
   { x: string

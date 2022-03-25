@@ -129,12 +129,13 @@ let reset_conflict_stats () =
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
 let size_of_short ((ts, t) as x) =
-  let size_of_t = size_of in
+  failwith "TODO"
+  (* let size_of_t = size_of in
   let open Xenbus.Memory_size in
   record_start x
   |> record_add_immutable @@ float ts
   |> record_add_immutable @@ size_of_t t
-  |> record_end
+  |> record_end *)
 
 let short_running_txns = ref (SizedList.empty size_of_short)
 

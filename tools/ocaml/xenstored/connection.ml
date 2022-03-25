@@ -17,6 +17,7 @@
 exception End_of_file
 
 let list_map = List.map
+module CamlHashtbl = Hashtbl
 open Xenbus.Memory_size_ds
 open Stdext
 
@@ -33,7 +34,7 @@ type watch = {
 and t = {
 	xb: Xenbus.Xb.t;
 	dom: Domain.t option;
-	transactions: (int, Transaction.t) Hashtbl.t;
+	transactions: (int, Transaction.t) CamlHashtbl.t;
 	mutable next_tid: int;
 	watches: (string, watch SizedList.t) Hashtbl.t;
 	mutable nb_watches: int;
@@ -52,12 +53,22 @@ let size_of_watch t =
   |> record_add_immutable @@ bool t.is_relative
   |> record_end
 
+let sizeof_small_hashtbl key_size_of value_size_of tbl =
+  let open Xenbus.Memory_size in
+  record_start tbl
+  |> CamlHashtbl.fold (fun k v acc ->
+    acc
+    |> record_add_mutable_const @@ key_size_of k
+    |> record_add_mutable @@ value_size_of v)
+  tbl
+  |> record_end
+
 let size_of t =
   let open Xenbus.Memory_size in
   record_start t
   |> record_add_immutable @@ Xenbus.Xb.size_of t.xb
   |> record_add_immutable @@ option Domain.size_of t.dom
-  |> record_add_immutable @@ Hashtbl.size_of t.transactions
+  |> record_add_immutable @@ sizeof_small_hashtbl int Transaction.size_of t.transactions
   |> record_add_mutable_const @@ int t.next_tid
   |> record_add_immutable @@ Hashtbl.size_of t.watches
   |> record_add_mutable_const @@ int t.nb_watches
@@ -77,7 +88,7 @@ let initial_next_tid = 1
 let do_reconnect con =
 	Xenbus.Xb.reconnect con.xb;
 	(* dom is the same *)
-	Hashtbl.reset con.transactions;
+	CamlHashtbl.reset con.transactions;
 	con.next_tid <- initial_next_tid;
 	Hashtbl.reset con.watches;
 	(* anonid is the same *)
@@ -100,7 +111,7 @@ let watch_create ~con ~path ~token = {
 let get_con w = w.con
 
 let number_of_transactions con =
-	Hashtbl.length con.transactions
+	CamlHashtbl.length con.transactions
 
 let get_domain con = con.dom
 
@@ -129,7 +140,7 @@ let create xbcon dom =
 	{
 	xb = xbcon;
 	dom = dom;
-	transactions = Hashtbl.create_sized Xenbus.Memory_size.int Transaction.size_of 5;
+	transactions = CamlHashtbl.create 5;
 	next_tid = initial_next_tid;
 	watches = Hashtbl.create_sized Xenbus.Memory_size.string SizedList.size_of 8;
 	nb_watches = 0;
@@ -215,7 +226,7 @@ let del_watches con =
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.reset con.transactions
+  CamlHashtbl.reset con.transactions
 
 let size_of_path_token (p, t) =
   let open Xenbus.Memory_size in
@@ -285,7 +296,7 @@ let rec valid_transaction_id con proposed_id =
 	 *)
 	let id = if proposed_id <= 0 || proposed_id >= 0x3fffffff then 1 else proposed_id in
 
-	if Hashtbl.mem con.transactions id then (
+	if CamlHashtbl.mem con.transactions id then (
 		(* Outstanding transaction with this id.  Try the next. *)
 		valid_transaction_id con (id + 1)
 	) else
@@ -293,18 +304,18 @@ let rec valid_transaction_id con proposed_id =
 
 let start_transaction con store =
 	if !Define.maxtransaction > 0 && not (is_dom0 con)
-	&& Hashtbl.length con.transactions > !Define.maxtransaction then
+	&& CamlHashtbl.length con.transactions > !Define.maxtransaction then
 		raise Quota.Transaction_opened;
 	let id = valid_transaction_id con con.next_tid in
 	con.next_tid <- id + 1;
 	let ntrans = Transaction.make id store in
-	Hashtbl.replace con.transactions id ntrans;
+	CamlHashtbl.replace con.transactions id ntrans;
 	Logging.start_transaction ~tid:id ~con:(get_domstr con);
 	id
 
 let end_transaction con tid commit =
-	let trans = Hashtbl.find con.transactions tid in
-	Hashtbl.remove con.transactions tid;
+	let trans = CamlHashtbl.find con.transactions tid in
+	CamlHashtbl.remove con.transactions tid;
 	Logging.end_transaction ~tid ~con:(get_domstr con);
 	match commit with
 	| None -> true
@@ -312,7 +323,7 @@ let end_transaction con tid commit =
 		Transaction.commit ~con:(get_domstr con) trans || transaction_replay_f con trans
 
 let get_transaction con tid =
-	Hashtbl.find con.transactions tid
+	CamlHashtbl.find con.transactions tid
 
 let do_input con = Xenbus.Xb.input con.xb
 let has_input con = Xenbus.Xb.has_in_packet con.xb
@@ -347,7 +358,7 @@ let is_bad con = match con.dom with None -> false | Some dom -> Domain.is_bad_do
 let has_extra_connection_data con =
 	let has_in = has_input con || has_partial_input con in
 	let has_out = has_output con in
-	let has_socket = con.dom = None in
+	let _has_socket = con.dom = None in
 	let has_nondefault_perms = make_perm con.dom <> con.perm in
 	has_in || has_out
 	(* TODO: what about SIGTERM, should use systemd to store FDS
