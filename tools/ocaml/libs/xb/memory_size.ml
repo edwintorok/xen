@@ -72,7 +72,7 @@ let int32 _ = make boxed
 let int64 _ = make boxed
 let nativeint _ = make boxed
 
-let bytes_n n = n |> Sizeops.Size.of_bytes |> make
+let bytes_n n = n |> Sizeops.of_bytes |> make
 let bytes b = b |> Bytes.length |> bytes_n
 let string s = s |> String.length |> bytes_n
 
