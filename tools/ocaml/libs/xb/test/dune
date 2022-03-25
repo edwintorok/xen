@@ -1,0 +1,17 @@
+; TODO: make this use a static seed for reproducible runs
+; if afl is used then bun would be able to print a base64-encoded seed
+; to easily reproduce failures
+(rule
+ (with-stdout-to test.input
+  (run dd if=/dev/urandom bs=1M count=10)))
+
+; by default monolith would run infinitely and print
+; bugs that it finds without stopping
+; when a file is supplied it runs in AFL mode and quits
+; on first error
+; in the CI we don't want to run for an infinite amount of time
+; and we don't want to require afl/bun
+(test
+ (name memory_size_monolith)
+ (libraries xen.bus monolith)
+ (action (run %{test} %{dep:test.input})))
