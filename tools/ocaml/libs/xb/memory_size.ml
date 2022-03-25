@@ -112,7 +112,7 @@ let add a b =
       else t
 
 let remove a b =
-  let size = Sizeops.Size.(a.size - b.size) in
+  let size = Sizeops.(a.size - b.size) in
   match a.parent, b.parent with
   | Immutable, Immutable -> make size
   | _ ->
