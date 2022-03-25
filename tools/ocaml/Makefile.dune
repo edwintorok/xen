@@ -41,7 +41,9 @@ LIBRARY_PATH=$(subst $(eval) ,:,$(LIB_DIRS))
 # for location of various libs which moves between Xen versions
 include $(XEN_ROOT)/tools/Rules.mk
 
-XEN_DEPS=$(XEN_libxenctrl)/libxenctrl.so $(XEN_libxenevtchn)/libxenevtchn.so $(XEN_libxenguest)/libxenguest.so
+XEN_DEPS=$(XEN_libxenctrl)/libxenctrl.so
+XEN_DEPS+=$(XEN_libxenevtchn)/libxenevtchn.so
+XEN_DEPS+=$(XEN_libxenguest)/libxenguest.so
 
 # Cannot be generated from dune
 # Tell the user how to generate them
