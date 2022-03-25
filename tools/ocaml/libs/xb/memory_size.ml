@@ -186,7 +186,7 @@ let rec container_sub t n =
   | UpdatableUnset | Immutable -> ()
 
 let container_clear t =
-  container_sub t Sizeops.Size.(t.size - t.container_initial)
+  container_sub t Sizeops.(t.size - t.container_initial)
 
 let container_remove_element e t =
   unset_parent e ~parent:t;
