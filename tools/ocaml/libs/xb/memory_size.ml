@@ -200,7 +200,7 @@ let container_transfer ~src ~dst =
 let size_of t = t.size
 
 let size_of_bytes t =
-  match Sizeops.Size.to_int_opt t.size with
+  match Sizeops.to_int_opt t.size with
   | None -> max_int
   | Some x -> x * Sys.word_size / 8 (* TODO: this could still overflow *)
 
