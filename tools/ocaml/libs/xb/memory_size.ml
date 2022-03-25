@@ -100,7 +100,7 @@ let unset_parent t ~parent =
       (* invalid_arg "expression's parent already removed"*)
 
 let add a b =
-  let size = Sizeops.Size.(a.size + b.size) in
+  let size = Sizeops.(a.size + b.size) in
   match a.parent, b.parent with
   | Immutable, Immutable -> make size
   | _ ->
