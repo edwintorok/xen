@@ -179,7 +179,7 @@ let rec container_add t n =
   | UpdatableUnset | Immutable -> ()
 
 let rec container_sub t n =
-  t.size <- Sizeops.Size.(t.size - n);
+  t.size <- Sizeops.(t.size - n);
   match t.parent with
   | UpdatableParent tw ->
       tw |> TW.iter @@ fun p -> container_sub p n
