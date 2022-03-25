@@ -2,7 +2,7 @@ XEN_ROOT = $(CURDIR)/../..
 all: dune-all-check
 
 # Dune by default uses all available CPUs. Make doesn't.
-# Query the available CPUs an use all available for any of the make rules we call out to.
+# Query the available CPUs and use all available for any of the make rules we call out to.
 # -O is also needed with parallel make such that the build error and the build command causing
 #  the error are close together and not intersperesed with other output
 NPROC=$(shell getconf _NPROCESSORS_ONLN)
