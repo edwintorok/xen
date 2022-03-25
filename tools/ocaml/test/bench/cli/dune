@@ -1,0 +1,11 @@
+(library
+ (name bechamel_simple_cli)
+ (modules bechamel_simple_cli)
+ (libraries bechamel bechamel-notty unix notty.unix))
+
+(executable
+ (name bench_cli)
+ (modes native)
+ (modules bench_cli)
+ (libraries bechamel_simple_cli benchmarks))
+
