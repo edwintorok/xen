@@ -306,7 +306,6 @@ module SizedList = struct
     add acc e
     |> add item_overhead
 
-  let remove' = remove
   let remove acc e =
     remove acc e
     |> remove item_overhead
