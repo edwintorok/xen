@@ -133,8 +133,8 @@ let array size_of a =
   if Array.length a = 0 then
     make boxed
   else
-  make @@ match Sizeops.Size.to_int_opt (size_of a.(0)).size with
-  | None -> Sizeops.Size.invalid
+  make @@ match Sizeops.to_int_opt (size_of a.(0)).size with
+  | None -> Sizeops.invalid
   | Some e ->
       (* TODO: multiplication should be part of sizeops? *)
       let n = Array.length a in
