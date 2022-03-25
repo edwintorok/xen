@@ -8,6 +8,9 @@ let benchmark tests =
   Benchmark.all cfg instances tests
 
 let analyze raw_results =
+  (* a non-zero bootstrap causes an assertion failure with the Obj.reachable_words
+     benchmark in bench_sizeops if bootstrapping is used, probably because
+     it won't have enough samples as it takes a very long time to run *)
   let ols = Analyze.ols ~r_square:true ~bootstrap:0 ~predictors:[|Measure.run|] in
   let results =
     List.map (fun instance -> Analyze.all ols instance raw_results) instances
