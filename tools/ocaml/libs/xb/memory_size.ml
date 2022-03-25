@@ -155,7 +155,7 @@ let record_start _t = { size = boxed; parent = Immutable; item_overhead = unboxe
 let record_add_immutable field t =
   if set_parent field ~parent:t && t.parent = Immutable then
     t.parent <- UpdatableUnset;
-  t.size <- Sizeops.Size.(t.size + record_field + field.size);
+  t.size <- Sizeops.(t.size + record_field + field.size);
   t
 
 let record_add_mutable_const field t = record_add_immutable field t
