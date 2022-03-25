@@ -162,7 +162,7 @@ let record_add_mutable_const field t = record_add_immutable field t
 
 let record_add_mutable field t : (_, [> `ephemeral]) fields =
   (* no need to set up size updates, the results are ephemeral anyway *)
-  t.size <- Sizeops.Size.(t.size + record_field + field.size);
+  t.size <- Sizeops.(t.size + record_field + field.size);
   t
 
 let record_end t = t
