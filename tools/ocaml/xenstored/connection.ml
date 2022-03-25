@@ -40,6 +40,8 @@ and t = {
 	mutable perm: Perms.Connection.t;
 }
 
+let size_of t = failwith "TODO"
+
 let mark_as_bad con =
 	match con.dom with
 	|None -> ()
