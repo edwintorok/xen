@@ -261,7 +261,7 @@ val container_transfer: src:[< `updatable] t -> dst:[< `updatable] t -> unit
 
     O(1) complexity *)
 
-val size_of: [< forbid_updates] t -> Sizeops.Size.t
+val size_of: [< forbid_updates] t -> Sizeops.t
 (** [size_of t] is the size of [t]. Can only be inspected directly when it is a constant *)
 
 val size_of_bytes: _ t -> int
