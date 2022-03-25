@@ -316,7 +316,7 @@ let tweak_gc () =
             ; Gc.max_overhead = !Define.gc_max_overhead }
 
 
-let main () =
+let () =
 	let cf = do_argv in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then

@@ -36,7 +36,7 @@ let[@logic] invalid_size = Pervasives.max_int / 2
 (*@ predicate is_valid_size(i: integer) = 0 <= i < invalid_size *)
 
 module type SizeSig = sig
-  type t = private int (* = private int - removed for cameleer *)
+  type t (* = private int - removed for cameleer *)
   (* we cannot define a GOSPEL model here yet,
      because we want this to be an integer, and not a record containing an integer *)
   (* is it very important that the type 't' here is either completely abstract,
@@ -170,11 +170,11 @@ module type SizeSig = sig
   (*@ w = of_bytes b
       pure
       ensures is_t w
-      ensures is_valid_size b -> is_valid_size w
+      ensures is_valid_size b -> is_valid_size (to_int w)
       ensures b < 0 -> to_int_opt w = None
       *)
 
-    val pp_dump: Format.formatter -> t -> unit
+(*    val pp_dump: Format.formatter -> t -> unit*)
 end
 
 
@@ -341,7 +341,7 @@ module Size: SizeSig = struct
   (*@ w = words_of_bytes b
       requires b >= 0
       pure
-      ensures (w-1) * bytes_per_word < b <= (w+1) * bytes_per_word
+      ensures (w-1) * bytes_per_word <= b < w * bytes_per_word
     *)
   (* TODO: add formulate here using remainder vs wordsize *)
 
@@ -356,5 +356,5 @@ module Size: SizeSig = struct
       ensures b < 0 -> to_int_opt w = None
       *)
 
-  let pp_dump ppf t = Format.pp_print_int ppf t
+  (*let pp_dump ppf t = Format.pp_print_int ppf t*)
 end
