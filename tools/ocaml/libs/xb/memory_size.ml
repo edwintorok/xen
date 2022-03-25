@@ -40,13 +40,6 @@ end
 and TW : Weak.S with type data = T.t = Weak.Make(T)
 
 open T
-type ephemeral = [`ephemeral]
-
-type updatable = [`updatable | ephemeral ]
-
-type immutable = [`immutable | updatable]
-
-type constant = [`constant | immutable ]
 
 type array_compatible = [`constant]
 
