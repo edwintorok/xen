@@ -220,5 +220,5 @@ let pp_dump ppf t =
 
 let container_add_element e t =
   let (_:bool) = set_parent e ~parent:t in
-  container_add t Sizeops.Size.(e.size + t.item_overhead)
+  container_add t Sizeops.(e.size + t.item_overhead)
 
