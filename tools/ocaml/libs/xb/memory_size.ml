@@ -49,8 +49,8 @@ type forbid_updates = [`constant | `immutable] (** to be used as [< forbid_updat
 
 type +'a t = T.t
 
-let unboxed = Sizeops.Size.of_int 0 (* no extra space taken up beyond that for the field itself *)
-let boxed = Sizeops.Size.of_words 1
+let unboxed = Sizeops.of_int 0 (* no extra space taken up beyond that for the field itself *)
+let boxed = Sizeops.of_words 1
 let make size = { size; parent = Immutable; item_overhead = unboxed; container_initial = unboxed }
 
 let record_field = Sizeops.Size.of_words 0
