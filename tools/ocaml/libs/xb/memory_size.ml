@@ -55,7 +55,7 @@ let make size = { size; parent = Immutable; item_overhead = unboxed; container_i
 
 let record_field = Sizeops.of_words 0
 
-let boxed4 = Sizeops.Size.(boxed + boxed + boxed + boxed)
+let boxed4 = Sizeops.(boxed + boxed + boxed + boxed)
 
 let tracker _ = make boxed4
 
