@@ -5,7 +5,7 @@
 (formatting (enabled_for dune))
 (generate_opam_files true)
 
-(maintainers lindig@gmail.com)
+(maintainers christian.lindig@citrix.com)
 (license LGPL)
 
 (package
@@ -13,7 +13,7 @@
  (synopsis "Xen interfaces")
  (depends
   base-unix
-  (dune (and (>= 2.1) :build))
+  (dune (>= 2.1))
  )
 )
 
@@ -22,6 +22,6 @@
  (synopsis "In-memory key-value store for the Xen hypervisor")
  (depends
   base-unix
-  (dune (and (>= 2.1) :build))
+  (dune (>= 2.1))
  )
 )
