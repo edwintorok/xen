@@ -130,7 +130,7 @@ val int: int -> [> array_compatible] t
 
     O(1) complexity, it is a constant. *)
 
-val size_t: Sizeops.Size.t -> [> array_compatible] t
+val size_t: Sizeops.t -> [> array_compatible] t
 (** [size_t] computes the size of a Size.t.
 
     O(1) complexity, it is a constant. *)
