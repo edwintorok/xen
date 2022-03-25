@@ -1,5 +1,4 @@
 open Memory_size
-open Sizeops
 
 type 'a size = 'a t
 type require_nestable = Memory_size.require_nestable
