@@ -139,8 +139,8 @@ let array size_of a =
       (* TODO: multiplication should be part of sizeops? *)
       let n = Array.length a in
       let res = n * e in
-      if res < n || res < e then Sizeops.Size.invalid
-      else Sizeops.Size.of_int res
+      if res < n || res < e then Sizeops.invalid
+      else Sizeops.of_int res
 
 type ('a, 'b) fields = 'b t
 
