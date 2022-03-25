@@ -205,7 +205,7 @@ let size_of_bytes t =
   | Some x -> x * Sys.word_size / 8 (* TODO: this could still overflow *)
 
 let pp ppf t =
-  match Sizeops.Size.to_int_opt t.size with
+  match Sizeops.to_int_opt t.size with
   | None -> Format.pp_print_string ppf "OVERFLOW"
   | Some x -> Format.pp_print_int ppf x
 
