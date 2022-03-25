@@ -193,7 +193,7 @@ let container_remove_element e t =
   container_sub t Sizeops.(e.size + t.item_overhead)
 
 let container_transfer ~src ~dst =
-  let delta = Sizeops.Size.(src.size - src.container_initial ) in
+  let delta = Sizeops.(src.size - src.container_initial ) in
   container_add dst delta;
   container_clear src
 
