@@ -55,5 +55,5 @@ let all =
     [ Test.make ~name:"sizeops (private int)" (Staged.stage @@ test_with impl_sizeop)
     ; Test.make ~name:"int option" (Staged.stage @@ test_with impl_intopt)
     ; Test.make ~name:"int (unsafe, assuming no overflow)" (Staged.stage @@ test_with impl_int_unsafe)
-    ; Test.make ~name:"Obj.reachable_words)" (Staged.stage @@ test_reachable)
+    (*; Test.make ~name:"Obj.reachable_words)" (Staged.stage @@ test_reachable)*)
   ]
