@@ -13,7 +13,7 @@ val of_partialpkt : Partial.pkt -> t
 
 val to_string : t -> string
 (*@ s = to_string t
-    ensures String.length s = String.length t.data + 16
+    ensures String.length s = String.length t.data + Partial.headersize
 *)
 
 val unpack : t -> int * int * Op.operation * string
