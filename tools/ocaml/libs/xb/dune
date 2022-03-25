@@ -8,3 +8,43 @@
  (public_name xen.bus)
  (no_dynlink)
  (libraries unix xenmmap))
+
+; we are going to concatenate these files, so add line directives
+; this will ensure that error messages refer back to the original file
+; and not the generated file
+(rule
+ (progn
+   (copy# ../../test/model/sys.mli sys.linedir.mli)
+   (copy# ../../test/model/pervasives.mli pervasives.linedir.mli)
+   (copy# ../../test/model/format.mli format.linedir.mli)
+   (copy# sizeops.mli sizeops.linedir.mli)
+   (copy# sizeops.ml sizeops.linedir.ml)))
+
+(rule
+ (with-stdout-to sizeops.cameleer.ml
+  (progn
+   (echo "module type Sys = sig\n")
+   (cat %{dep:sys.linedir.mli})
+   (echo "end\n")
+   (echo "module type Pervasives = sig\n")
+   (cat %{dep:pervasives.linedir.mli})
+   (echo "end\n")
+   (echo "module type Format = sig\n")
+   (cat %{dep:format.linedir.mli})
+   (echo "end\n")
+   (echo "module type S = sig\n")
+   (run sed -e "s/= *private.*//" %{dep:sizeops.linedir.mli})
+   (echo "end\n")
+   (echo "# 40 \"dune\"\n") ; next line number
+   ; open doesn't work properly on the redefined Pervasives module in cameleer
+   (echo "let max_int = Pervasives.max_int\n")
+   (echo "module Sizeops: S = struct\n")
+   (cat %{dep:sizeops.linedir.ml})
+   (echo "end")
+  )))
+
+(rule
+ (alias cameleer-check)
+ (action (progn
+          (ignore-stdout (run ocamlc -w -a -i %{dep:sizeops.cameleer.ml}))
+          (run cameleer %{dep:sizeops.cameleer.ml} --prover=cvc4-ce --batch))))
