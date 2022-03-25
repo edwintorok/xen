@@ -190,7 +190,7 @@ let container_clear t =
 
 let container_remove_element e t =
   unset_parent e ~parent:t;
-  container_sub t Sizeops.Size.(e.size + t.item_overhead)
+  container_sub t Sizeops.(e.size + t.item_overhead)
 
 let container_transfer ~src ~dst =
   let delta = Sizeops.Size.(src.size - src.container_initial ) in
