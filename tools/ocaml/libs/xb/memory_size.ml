@@ -9,7 +9,7 @@ type size_kind =
 
 module rec T : sig
   type t =
-    { mutable size: Sizeops.Size.t
+    { mutable size: Sizeops.t
     ; mutable parent: parent
     ; item_overhead: Sizeops.Size.t (* TODO: only for updatable! *)
     ; container_initial: Sizeops.Size.t (* TODO: only for updatable! *)
