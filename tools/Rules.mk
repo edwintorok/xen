@@ -3,8 +3,8 @@
 # `all' is the default target
 all:
 
-ifneq ($(findstring clean,$(MAKECMDGOALS)),clean)
 -include $(XEN_ROOT)/config/Tools.mk
+ifneq ($(findstring clean, $(MAKECMDGOALS)),clean)
 include $(XEN_ROOT)/Config.mk
 else
 .PHONY: .phony

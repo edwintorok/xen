@@ -67,7 +67,7 @@ endif
 OBJS-OS-$(CONFIG_NetBSD) = libxl_netbsd.o
 OBJS-OS-$(CONFIG_Linux) = libxl_linux.o libxl_setresuid.o
 OBJS-OS-$(CONFIG_FreeBSD) = libxl_freebsd.o libxl_setresuid.o
-ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(findstring clean, $(MAKECMDGOALS)),clean)
 ifeq ($(OBJS-OS-y),)
 $(error Your Operating System is not supported by libxenlight, \
 please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)

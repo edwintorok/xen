@@ -4,6 +4,9 @@ ifeq ($(filter /%,$(XEN_ROOT)),)
 $(error XEN_ROOT must be absolute)
 endif
 
+# Allow phony attribute to be listed as dependency rather than fake target
+.PHONY: .phony
+
 # Convenient variables
 comma   := ,
 open    := (
@@ -27,6 +30,7 @@ XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
 XEN_OS              ?= $(shell uname -s)
 
+ifneq ($(findstring clean, $(MAKECMDGOALS)),clean)
 CONFIG_$(XEN_OS) := y
 
 SHELL     ?= /bin/sh
@@ -37,9 +41,6 @@ HOSTCFLAGS += -fno-strict-aliasing
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
-
-# Allow phony attribute to be listed as dependency rather than fake target
-.PHONY: .phony
 
 # If we are not cross-compiling, default HOSTC{C/XX} to C{C/XX}
 ifeq ($(XEN_TARGET_ARCH), $(XEN_COMPILE_ARCH))
@@ -253,3 +254,4 @@ QEMU_UPSTREAM_LOC ?= $(call or,$(wildcard $(QEMU_UPSTREAM_INTREE)),\
                                $(QEMU_UPSTREAM_URL))
 
 CONFIG_TESTS       ?= y
+endif
