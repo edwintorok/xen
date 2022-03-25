@@ -129,22 +129,22 @@ let reset_conflict_stats () =
 
 (* Scope for optimisation: different data-structure and functions to search/filter it *)
 let size_of_short ((ts, t) as x) =
-  failwith "TODO"
-  (* let size_of_t = size_of in
+  let size_of_t = size_of in
   let open Xenbus.Memory_size in
   record_start x
   |> record_add_immutable @@ float ts
   |> record_add_immutable @@ size_of_t t
-  |> record_end *)
+  |> record_end
 
-let short_running_txns = ref (SizedList.empty size_of_short)
+(* we already account for the size of the transaction elsewhere... *)
+let short_running_txns = ref []
 
 let oldest_short_running_transaction () =
 	let rec last = function
 		| [] -> None
 		| [x] -> Some x
 		| _ :: xs -> last xs
-	in last (SizedList.to_list !short_running_txns)
+	in last !short_running_txns
 
 let trim_short_running_transactions txn =
 	let cutoff = Unix.gettimeofday () -. !Define.conflict_max_history_seconds in
@@ -152,7 +152,7 @@ let trim_short_running_transactions txn =
 		| None -> (function (start_time, _) -> start_time >= cutoff)
 		| Some t -> (function (start_time, tx) -> start_time >= cutoff && tx != t)
 	in
-	short_running_txns := SizedList.filter
+	short_running_txns := List.filter
 		keep
 		!short_running_txns
 
@@ -173,7 +173,7 @@ let make ?(internal=false) id store =
 	} in
 	if id <> none && not internal then (
 		let now = Unix.gettimeofday () in
-		short_running_txns := SizedList.cons (now, txn) !short_running_txns
+		short_running_txns := (now, txn) :: !short_running_txns
 	);
 	txn
 
