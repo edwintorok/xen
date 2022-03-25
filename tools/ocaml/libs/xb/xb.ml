@@ -14,8 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
-module Op = struct include Op end
-module Packet = struct include Packet end
+module Op = Op
+module Packet = Packet
 
 exception End_of_file
 exception Eagain
