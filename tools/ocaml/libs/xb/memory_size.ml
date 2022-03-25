@@ -172,7 +172,7 @@ let container_create ~initial ~item_overhead =
   ; container_initial = initial.size }
 
 let rec container_add t n =
-  t.size <- Sizeops.Size.(t.size + n);
+  t.size <- Sizeops.(t.size + n);
   match t.parent with
   | UpdatableParent tw ->
       tw |> TW.iter @@ fun p -> container_add p n
