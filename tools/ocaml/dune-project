@@ -5,7 +5,7 @@
 (formatting (enabled_for dune))
 (generate_opam_files true)
 
-(maintainers lindig@gmail.com)
+(maintainers christian.lindig@citrix.com)
 (license LGPL)
 
 (package
