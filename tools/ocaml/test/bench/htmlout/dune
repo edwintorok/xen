@@ -10,5 +10,5 @@
  (libraries bechamel_simple_htmlout benchmarks))
 
 (rule
- (with-stdout-to benchmarks.html
+ (with-stdout-to benchmarks.json
   (run %{dep:bench_htmlout.exe})))
