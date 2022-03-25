@@ -12,3 +12,7 @@
 (rule
  (with-stdout-to benchmarks.json
   (run %{dep:bench_htmlout.exe})))
+
+(rule
+ (with-stdout-to benchmarks.html
+  (system "%{bin:bechamel-html} <%{dep:benchmarks.json}")))
