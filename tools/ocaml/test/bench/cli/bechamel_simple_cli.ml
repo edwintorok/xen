@@ -30,5 +30,6 @@ let cli tests =
   | Some (w, h) -> { Bechamel_notty.w; h }
   | None -> {Bechamel_notty.w = 80; h= 1} in
   let results, _ = tests |> benchmark |> analyze in
+  (* Fmt.pf Fmt.stdout "results: %a" Fmt.(hashtbl @@ pair string @@ hashtbl @@ pair string Analyze.OLS.pp) results *)
   img (window, results) |> eol |> output_image
 
