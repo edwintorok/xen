@@ -3,8 +3,12 @@
 # `all' is the default target
 all:
 
+ifneq ($(findstring clean,$(MAKECMDGOALS)),clean)
 -include $(XEN_ROOT)/config/Tools.mk
 include $(XEN_ROOT)/Config.mk
+else
+.PHONY: .phony
+endif
 
 XEN_FULLVERSION=$(shell env \
     XEN_EXTRAVERSION=$(XEN_EXTRAVERSION) \
