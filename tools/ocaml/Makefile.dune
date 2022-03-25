@@ -1,5 +1,5 @@
 XEN_ROOT = $(CURDIR)/../..
-all: dune-all-check
+all: dune-all-check dune-cameleer-check
 
 # Dune by default uses all available CPUs. Make doesn't.
 # Query the available CPUs and use all available for any of the make rules we call out to.
@@ -55,7 +55,7 @@ XEN_DEPS+=$(XEN_libxenguest)/libxenguest.so
 # dune would refuse to run if there are build artifacts in the source directory
 # if we detect anything then run make clean to ensure these are removed
 # don't always call 'make clean' because it takes ~1.6s
-.PHONY: dune-pre
+.PHONY: dune-pre dune-syntax-check dune-all-check dune-cameleer-check check dune-oxenstored dune-install dune-uninstall
 dune-pre: ../config.status | ../include/xen/xen.h ../dune-workspace $(XEN_DEPS)
 	$(MAKEN) clean -s
 
@@ -67,6 +67,9 @@ dune-all-check: dune-pre ../dune-workspace.dev
 	# Test build with multiple compiler versions
 	# requires opam switches for each to be already installed
 	dune build --workspace=../dune-workspace.dev @check @install @runtest
+
+dune-cameleer-check:
+	opam exec --switch=cameleer dune build @cameleer-check
 
 check: dune-pre
 	dune runtest --no-buffer
