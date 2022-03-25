@@ -24,8 +24,8 @@ end = struct
   type t =
     { mutable size: Sizeops.t
     ; mutable parent: parent
-    ; item_overhead: Sizeops.Size.t (* TODO: only for updatable! *)
-    ; container_initial: Sizeops.Size.t (* TODO: only for updatable! *)
+    ; item_overhead: Sizeops.t (* TODO: only for updatable! *)
+    ; container_initial: Sizeops.t (* TODO: only for updatable! *)
     }
 
   and parent = Immutable | UpdatableUnset | UpdatableParent of TW.t
