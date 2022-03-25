@@ -1,0 +1,14 @@
+(library
+ (name bechamel_simple_htmlout)
+ (modules bechamel_simple_htmlout)
+ (libraries bechamel bechamel-js))
+
+(executable
+ (name bench_htmlout)
+ (modes native)
+ (modules bench_htmlout)
+ (libraries bechamel_simple_htmlout benchmarks))
+
+(rule
+ (with-stdout-to benchmarks.html
+  (run %{dep:bench_htmlout.exe})))
