@@ -113,6 +113,8 @@ type t
      && is_empty_partial_buf t.partial_in
      && String.length t.partial_out = 0 *)
 
+val size_of: t -> [> `constant | `updatable] Memory_size_ds.size
+
 val init_partial_in : unit -> partial_buf
 (*@ b = init_partial_in ()
     ensures is_valid_partial_buf b
@@ -183,8 +185,8 @@ val input : t -> bool
 *)
 (* TODO *)
 
-val newcon : backend -> t
-(*@ t = newcon back
+val newcon : ?limit:int -> backend -> t
+(*@ t = newcon ?limit back
     ensures t.backend = back
     ensures is_empty t *)
 

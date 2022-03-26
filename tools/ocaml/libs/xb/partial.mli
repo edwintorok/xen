@@ -1,5 +1,5 @@
 (*@ function xenstore_payload_max : integer = 4096 *)
-
+open Memory_size_ds
 type pkt = {
   tid : int;
   rid : int;
@@ -36,3 +36,5 @@ val to_complete : pkt -> int
     ensures n = pkt.len - Buffer.length pkt.buf
     ensures n >= 0
     *)
+
+val size_of: pkt -> [> `constant | `updatable] size
