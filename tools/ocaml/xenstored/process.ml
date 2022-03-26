@@ -60,7 +60,7 @@ let split_one_path data con =
 let process_watch t cons =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.Transaction.store in
-	let ops = Transaction.get_paths t |> List.rev in
+	let ops = Transaction.get_paths t |> Xenbus.Memory_size_ds.SizedList.rev in
 	let do_op_watch op cons =
 		let recurse, oldroot, root = match (fst op) with
 		| Xenbus.Xb.Op.Write|Xenbus.Xb.Op.Mkdir -> false, None, newroot
@@ -68,7 +68,7 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
 		Connections.fire_watches ?oldroot root cons (snd op) recurse in
-	List.iter (fun op -> do_op_watch op cons) ops
+	Xenbus.Memory_size_ds.SizedList.iter (fun op -> do_op_watch op cons) ops
 
 let create_implicit_path t perm path =
 	let dirname = Store.Path.get_parent path in
@@ -387,25 +387,36 @@ let function_of_type_simple_op ty =
 
 let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
+		debug "Replying with EINVAL";
 		Packet.Error e in
 	try
 		fct con t doms cons req.Packet.data
 	with
-	| Define.Invalid_path          -> reply_error "EINVAL"
+	| Define.Invalid_path          ->
+	    debug "Invalid path";
+	    reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
 	| Define.Doesnt_exist          -> reply_error "ENOENT"
 	| Define.Lookup_Doesnt_exist _ -> reply_error "ENOENT"
 	| Define.Permission_denied     -> reply_error "EACCES"
 	| Not_found                    -> reply_error "ENOENT"
-	| Invalid_Cmd_Args             -> reply_error "EINVAL"
-	| Invalid_argument _           -> reply_error "EINVAL"
+	| Invalid_Cmd_Args             ->
+	    debug "Invalid cmd args";
+	    reply_error "EINVAL"
+	| Invalid_argument s           ->
+	    debug "Invalid argument: %s" s;
+	    reply_error "EINVAL"
 	| Transaction_again            -> reply_error "EAGAIN"
 	| Transaction_nested           -> reply_error "EBUSY"
-	| Domain_not_match             -> reply_error "EINVAL"
+	| Domain_not_match             ->
+	    debug "Domain not match";
+	    reply_error "EINVAL"
 	| Quota.Limit_reached          -> reply_error "EQUOTA"
 	| Quota.Data_too_big           -> reply_error "E2BIG"
 	| Quota.Transaction_opened     -> reply_error "EQUOTA"
-	| (Failure "int_of_string")    -> reply_error "EINVAL"
+	| (Failure "int_of_string")    ->
+	    debug "int_of_string failure";
+	    reply_error "EINVAL"
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
 
 let write_access_log ~ty ~tid ~con ~data =
@@ -449,7 +460,7 @@ let transaction_replay c t doms cons =
 		(fun () ->
 			try
 				Logging.start_transaction ~con ~tid;
-				List.iter (perform_exn ~wlog:true replay_t) (Transaction.get_operations t); (* May throw EAGAIN *)
+                                Transaction.iter_operations t (perform_exn ~wlog:true replay_t); (* May throw EAGAIN *)
 
 				Logging.end_transaction ~con ~tid;
 				Transaction.commit ~con replay_t
@@ -467,7 +478,7 @@ let transaction_replay c t doms cons =
 					let can_apply_on store = (
 						let store = Store.copy store in
 						let trial_t = Transaction.make ~internal:true Transaction.none store in
-						try List.iter (perform_exn ~wlog:false trial_t) (Transaction.get_operations t);
+						try Transaction.iter_operations t (perform_exn ~wlog:false trial_t);
 							true
 						with Transaction_again -> false
 					) in
@@ -491,7 +502,7 @@ let transaction_replay c t doms cons =
 			ignore @@ Connection.end_transaction c tid None
 		)
 
-let do_watch con _t _domains cons data =
+let do_watch con t _domains cons data =
 	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
@@ -563,7 +574,10 @@ let do_introduce con t domains cons data =
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches (Transaction.get_root t) cons Store.Path.introduce_domain;
 			ndom
-		with _ -> raise Invalid_Cmd_Args
+		with e ->
+		  Printexc.print_backtrace stderr;
+		  warn "introduce invalid command: %s" (Printexc.to_string e);
+		  raise Invalid_Cmd_Args
 	in
 	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
 		raise Domain_not_match
@@ -651,7 +665,6 @@ let maybe_ignore_transaction = function
 
 
 let () = Printexc.record_backtrace true
-
 (**
  * Nothrow guarantee.
  *)
@@ -697,22 +710,24 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
-let check_memory_usage cons con =
+let check_memory_usage store con =
 	match Connection.get_domain con with
 	| None -> () (* dom0 excluded *)
 	| Some dom ->
 	  let domid = Domain.get_id dom in
-	  (* TODO: convert words to bytes to make it easier for user *)
-	  let bad = match Connection.size_of con |> Xenbus.Sizeops.to_int_opt with
-	  | Some n when n < !Define.maxdomumemory -> false
-	  | None ->
-	      warn "domain %u: overflow in computing memory usage, considering quota exceeded"
-	      domid;
-	      true
-	  | Some actual ->
+	  let quota = Store.get_quota store in
+	  let entry = Quota.get_entry_0 quota domid in
+          (* TODO: simplify expression *)
+          let actual_sum = Xenbus.Memory_size.(add (Connection.size_of con) @@ bytes_n
+          (Xenbus.Sizeops.to_int_opt entry.Quota.size |> Option.value ~default:max_int)) in
+          let actual = Xenbus.Memory_size.size_of_bytes actual_sum in
+	  let bad =
+            if actual < !Define.maxdomumemory then false
+            else begin
 	      warn "domain %u: exceeds its memory quota: %u > %u" domid actual
 	      !Define.maxdomumemory;
 	      true
+            end
 	  in
 	  if bad then
 	    Connection.mark_as_bad con
@@ -746,7 +761,7 @@ let do_input store cons doms con =
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
-		check_memory_usage cons con
+		check_memory_usage store con
 	)
 
 let do_output _store _cons _doms con =

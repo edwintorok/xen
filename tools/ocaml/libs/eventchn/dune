@@ -7,4 +7,5 @@
  (name xeneventchn)
  (public_name xen.eventchn)
  (libraries unix)
+ (no_dynlink)
  (c_library_flags -lxenevtchn))

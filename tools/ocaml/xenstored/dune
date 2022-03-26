@@ -43,5 +43,4 @@
  (name xenstubs)
  (wrapped false)
  (libraries unix)
- (no_dynlink)
  (c_library_flags -lsystemd))
