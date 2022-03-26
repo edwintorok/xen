@@ -301,8 +301,7 @@ let tweak_gc () =
        wasted = live * space_overhead / 100
 
        For globally overriding the GC settings one can use OCAMLRUNPARAM instead as usual.
-     *)
-
+  *)
   let word_size_bytes = Sys.word_size / 8 in
   (* This code runs often, keep it very short and fast,
      in particular do NOT call Gc.stat which would walk the entire heap.
@@ -315,6 +314,7 @@ let tweak_gc () =
     Gc.set { (Gc.get ()) with
               Gc.allocation_policy = !Define.gc_allocation_policy
             ; Gc.max_overhead = !Define.gc_max_overhead }
+
 
 let () =
 	let cf = do_argv in

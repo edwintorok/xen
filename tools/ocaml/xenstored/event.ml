@@ -20,6 +20,20 @@ type t = {
 	mutable virq_port: Xeneventchn.t option;
 }
 
+open Xenbus.Memory_size
+
+
+(* Xeneventchn has some size overhead in its C stubs,
+   but we only ever have one of these per connection,
+   as long as it doesn't leak it is fine if we consider
+   only the OCaml size here *)
+let size_of t =
+  record_start t
+  |> record_add_immutable @@ unit ()
+  (* TODO: a way to mark fields with non-constant size, but with a constant upper bound *)
+  |> record_add_immutable @@ unit ()
+  |> record_end
+
 let init () = { handle = Xeneventchn.init (); virq_port = None; }
 let fd eventchn = Xeneventchn.fd eventchn.handle
 let bind_dom_exc_virq eventchn = eventchn.virq_port <- Some (Xeneventchn.bind_dom_exc_virq eventchn.handle)

@@ -16,7 +16,69 @@
  *)
 open Stdext
 
-module SymbolMap = Map.Make(Symbol)
+
+module SymbolMap = struct
+  open Xenbus
+  open Xenbus.Sizeops
+  type 'a size = 'a Memory_size.t
+
+  module M = Map.Make(Symbol)
+  type 'a t =
+    { map: 'a M.t
+    ; size: [`constant | `immutable] size
+    ; get_size: 'a -> [`constant | `immutable] size
+    }
+
+  let initial = Memory_size.unit ()
+  let empty get_size = { map = M.empty; size = initial; get_size }
+
+  let add k v t =
+    let ksize = Memory_size.string (Symbol.to_string k) in
+    let vsize = t.get_size v in
+    { map = M.add k v t.map
+    ; size = Memory_size.add t.size (Memory_size.add ksize vsize)
+    ; get_size = t.get_size
+    }
+
+  let remove k t =
+    let ksize = Memory_size.string (Symbol.to_string k) in
+    let size = match M.find_opt k t.map with
+    | None -> t.size
+    | Some vold -> Memory_size.remove t.size (Memory_size.add ksize @@ t.get_size vold)
+    in
+    { map = M.remove k t.map
+    ; size
+    ; get_size = t.get_size
+    }
+
+  let mem x t = M.mem x t.map
+  let find x t = M.find x t.map
+  let find_opt x t = M.find_opt x t.map
+
+    let update k f t =
+            let r = find_opt k t in
+            let r' = f r in
+            match r, r' with
+            | None, None -> t
+            | Some _, None -> remove k t
+            | Some r, Some r' when r == r' -> t
+            | _, Some r' -> add k r' t
+
+  let size_of t = (t.size : [< `constant | `immutable] size :> [> `constant | `immutable] size)
+
+  let iter f t = M.iter f t.map
+  let fold f t init = M.fold f t.map init
+
+  let map f t =
+    (* this is a map that preserves type, so we don't need a new get_size *)
+    let map = M.map f t.map in
+    let size = M.fold (fun k v acc ->
+      Memory_size.add acc @@ Memory_size.add (Memory_size.string @@ Symbol.to_string k) @@ t.get_size v) t.map initial in
+    { map
+    ; size
+    ; get_size = t.get_size
+    }
+end
 
 module Node = struct
 
@@ -27,8 +89,18 @@ type t = {
 	children: t SymbolMap.t;
 }
 
+open Xenbus.Memory_size
+
+let size_of t =
+  record_start t
+  |> record_add_immutable @@ string @@ Symbol.to_string t.name
+  |> record_add_immutable @@ unit () (* TODO: perms node size *)
+  |> record_add_immutable @@ string t.value
+  |> record_add_immutable @@ SymbolMap.size_of t.children
+  |> record_end
+
 let create _name _perms _value =
-	{ name = Symbol.of_string _name; perms = _perms; value = _value; children = SymbolMap.empty; }
+	{ name = Symbol.of_string _name; perms = _perms; value = _value; children = SymbolMap.empty size_of; }
 
 let get_owner node = Perms.Node.get_owner node.perms
 let get_children node = node.children
@@ -71,7 +143,7 @@ let del_childname node childname =
 	}
 
 let del_all_children node =
-	{ node with children = SymbolMap.empty }
+	{ node with children = SymbolMap.empty size_of}
 
 (* check if the current node can be accessed by the current connection with rperm permissions *)
 let check_perm node connection request =
@@ -90,6 +162,7 @@ let rec recurse fct node = fct node; SymbolMap.iter (fun _ -> recurse fct) node.
 (** [recurse_map f tree] applies [f] on each node in the tree recursively *)
 let recurse_map f =
 	let rec walk node =
+          (* TODO: could check for physical equality *)
 		f { node with children = SymbolMap.map walk node.children }
 	in
 	walk
@@ -226,20 +299,31 @@ let specials = List.map of_string [ introduce_domain; release_domain ]
 
 end
 
+module CamlBuffer = Buffer
+open Xenbus.Memory_size_ds
 (* The Store.t type *)
 type t =
 {
 	mutable stat_transaction_coalesce: int;
 	mutable stat_transaction_abort: int;
-	mutable root: Node.t;
-	mutable quota: Quota.t;
+	root: Node.t Ref.t;
+	quota: Quota.t Ref.t;
 }
 
-let get_root store = store.root
-let set_root store root = store.root <- root
+let size_of t =
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_mutable_const @@ int t.stat_transaction_coalesce
+  |> record_add_mutable_const @@ int t.stat_transaction_abort
+  |> record_add_immutable @@ Ref.size_of t.root
+  |> record_add_immutable @@ Ref.size_of t.quota
+  |> record_end
 
-let get_quota store = store.quota
-let set_quota store quota = store.quota <- quota
+let get_root store = Ref.get store.root
+let set_root store root = Ref.set store.root root
+
+let get_quota store = Ref.get store.quota
+let set_quota store quota = Ref.set store.quota quota
 
 (* modifying functions *)
 let path_mkdir store perm path =
@@ -252,9 +336,9 @@ let path_mkdir store perm path =
 			Node.check_perm node perm Perms.WRITE;
 			Node.add_child node (Node.create name node.Node.perms "") in
 	if path = [] then
-		store.root
+		(get_root store)
 	else
-		Path.apply_modify store.root path do_mkdir
+		Path.apply_modify (get_root store) path do_mkdir
 
 let path_write store perm path value =
 	let node_created = ref false in
@@ -269,10 +353,10 @@ let path_write store perm path value =
 			Node.check_perm node perm Perms.WRITE;
 			Node.add_child node (Node.create name node.Node.perms value) in
 	if path = [] then (
-		Node.check_perm store.root perm Perms.WRITE;
-		Node.set_value store.root value, false
+		Node.check_perm (get_root store) perm Perms.WRITE;
+		Node.set_value (get_root store) value, false
 	) else
-		let root = Path.apply_modify store.root path do_write in
+		let root = Path.apply_modify (get_root store) path do_write in
 		root, !node_created
 
 let path_rm store perm path =
@@ -284,15 +368,15 @@ let path_rm store perm path =
 		with Not_found ->
 			raise Define.Doesnt_exist in
 	if path = [] then (
-		Node.check_perm store.root perm Perms.WRITE;
-		Node.del_all_children store.root
+		Node.check_perm (get_root store) perm Perms.WRITE;
+		Node.del_all_children (get_root store)
 	) else
-		Path.apply_modify store.root path do_rm
+		Path.apply_modify (get_root store) path do_rm
 
 let path_setperms store perm path perms =
 	if path = [] then (
-		Node.check_perm store.root perm Perms.WRITE;
-		Node.set_perms store.root perms
+		Node.check_perm (get_root store) perm Perms.WRITE;
+		Node.set_perms (get_root store) perms
 	) else
 		let do_setperms node name =
 			let c = Node.find node name in
@@ -301,14 +385,14 @@ let path_setperms store perm path perms =
 			let nc = Node.set_perms c perms in
 			Node.replace_child node c nc
 		in
-		Path.apply_modify store.root path do_setperms
+		Path.apply_modify (get_root store) path do_setperms
 
 (* accessing functions *)
 let get_node store path =
-	Path.get_node store.root path
+	Path.get_node (get_root store) path
 
 let get_deepest_existing_node store path =
-	Path.get_deepest_existing_node store.root path
+	Path.get_deepest_existing_node (get_root store) path
 
 let read store perm path =
 	let do_read node name =
@@ -317,35 +401,35 @@ let read store perm path =
 		ent.Node.value
 	in
 	if path = [] then (
-		let ent = store.root in
+		let ent = (get_root store) in
 		Node.check_perm ent perm Perms.READ;
 		ent.Node.value
 	) else
-		Path.apply store.root path do_read
+		Path.apply (get_root store) path do_read
 
 let ls store perm path =
 	let children =
 		if path = [] then (
-			Node.check_perm store.root perm Perms.READ;
-			Node.get_children store.root
+			Node.check_perm (get_root store) perm Perms.READ;
+			Node.get_children (get_root store)
 		) else
 			let do_ls node name =
 				let cnode = Node.find node name in
 				Node.check_perm cnode perm Perms.READ;
 				cnode.Node.children in
-			Path.apply store.root path do_ls in
+			Path.apply (get_root store) path do_ls in
 	SymbolMap.fold (fun k _ accu -> Symbol.to_string k :: accu) children []
 
 let getperms store perm path =
 	if path = [] then (
-		Node.check_perm store.root perm Perms.READ;
-		Node.get_perms store.root
+		Node.check_perm (get_root store) perm Perms.READ;
+		Node.get_perms (get_root store)
 	) else
 		let fct n name =
 			let c = Node.find n name in
 			Node.check_perm c perm Perms.READ;
 			c.Node.perms in
-		Path.apply store.root path fct
+		Path.apply (get_root store) path fct
 
 let path_exists store path =
 	if path = [] then
@@ -355,7 +439,7 @@ let path_exists store path =
 			let check_exist node name =
 				ignore(Node.find node name);
 				true in
-			Path.apply store.root path check_exist
+			Path.apply (get_root store) path check_exist
 		with Not_found -> false
 
 
@@ -369,7 +453,7 @@ let traversal root_node f =
 	_traversal [] root_node
 
 let dump_store_buf root_node =
-	let buf = Buffer.create 8192 in
+	let buf = CamlBuffer.create 8192 in
 	let dump_node path node =
 		let pathstr = String.concat "/" path in
 		Printf.bprintf buf "%s/%s{%s}" pathstr (Symbol.to_string node.Node.name)
@@ -384,72 +468,73 @@ let dump_store_buf root_node =
 
 let dump_store chan root_node =
 	let buf = dump_store_buf root_node in
-	output_string chan (Buffer.contents buf);
-	Buffer.reset buf
+	output_string chan (CamlBuffer.contents buf);
+	CamlBuffer.reset buf
 
-let dump_fct store f = traversal store.root f
-let dump store out_chan = dump_store out_chan store.root
-let dump_stdout store = dump_store stdout store.root
-let dump_buffer store = dump_store_buf store.root
+let dump_fct store f = traversal (get_root store) f
+let dump store out_chan = dump_store out_chan (get_root store)
+let dump_stdout store = dump_store stdout (get_root store)
+let dump_buffer store = dump_store_buf (get_root store)
 
 
 (* modifying functions with quota udpate *)
 let set_node store path node orig_quota mod_quota =
-	let root = Path.set_node store.root path node in
-	store.root <- root;
-	Quota.merge orig_quota mod_quota store.quota
+	let root = Path.set_node (get_root store) path node in
+        set_root store root;
+	Quota.merge orig_quota mod_quota (get_quota store)
 
 let write store perm path value =
 	let node, existing = get_deepest_existing_node store path in
 	let owner = Node.get_owner node in
 	if existing || (Perms.Connection.is_dom0 perm) then
 		(* Only check the string length limit *)
-		Quota.check store.quota (-1) (String.length value)
+		Quota.check (get_quota store) (-1) (String.length value)
 	else
 		(* Check the domain entries limit too *)
-		Quota.check store.quota owner (String.length value);
+		Quota.check (get_quota store) owner (String.length value);
 	let root, node_created = path_write store perm path value in
-	store.root <- root;
+        set_root store root;
 	if node_created
-	then Quota.add_entry store.quota owner
+	then Quota.add_entry (get_quota store) owner path value
 
 let mkdir store perm path =
 	let node, existing = get_deepest_existing_node store path in
 	let owner = Node.get_owner node in
 	(* It's upt to the mkdir logic to decide what to do with existing path *)
-	if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota owner 0;
-	store.root <- path_mkdir store perm path;
+	if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check (get_quota store) owner 0;
+	set_root store @@ path_mkdir store perm path;
 	if not existing then
-	Quota.add_entry store.quota owner
+	Quota.add_entry (get_quota store) owner path ""
 
 let rm store perm path =
-	let rmed_node = Path.get_node store.root path in
+	let rmed_node = Path.get_node (get_root store) path in
 	match rmed_node with
 	| None -> raise Define.Doesnt_exist
 	| Some rmed_node ->
-		store.root <- path_rm store perm path;
-		Node.recurse (fun node -> Quota.del_entry store.quota (Node.get_owner node)) rmed_node
+		set_root store @@ path_rm store perm path;
+		Node.recurse (fun node -> Quota.del_entry (get_quota store) (Node.get_owner node) path (Node.get_value node)) rmed_node
 
 let setperms store perm path nperms =
-	match Path.get_node store.root path with
+	match Path.get_node (get_root store) path with
 	| None -> raise Define.Doesnt_exist
 	| Some node ->
 		let old_owner = Node.get_owner node in
 		let new_owner = Perms.Node.get_owner nperms in
 		if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then
 			raise Define.Permission_denied;
-		store.root <- path_setperms store perm path nperms;
-		Quota.del_entry store.quota old_owner;
-		Quota.add_entry store.quota new_owner
+		set_root store @@ path_setperms store perm path nperms;
+                let value = Node.get_value node in
+		Quota.del_entry (get_quota store) old_owner path value;
+		Quota.add_entry (get_quota store) new_owner path value
 
 let reset_permissions store domid =
 	Logging.info "store|node" "Cleaning up xenstore ACLs for domid %d" domid;
-	store.root <- Node.recurse_map (fun node ->
+	set_root store @@ Node.recurse_map (fun node ->
 		let perms = Perms.Node.remove_domid ~domid node.perms in
 		if perms <> node.perms then
 			Logging.debug "store|node" "Changed permissions for node %s" (Node.get_name node);
 		{ node with perms }
-	) store.root
+	) (get_root store)
 
 type ops = {
 	store: t;
@@ -478,14 +563,14 @@ let get_ops store perms = {
 let create () = {
 	stat_transaction_coalesce = 0;
 	stat_transaction_abort = 0;
-	root = Node.create "" Perms.Node.default0 "";
-	quota = Quota.create ();
+	root = Ref.make Node.size_of @@ Node.create "" Perms.Node.default0 "";
+	quota = Ref.make Quota.size_of @@ Quota.create ();
 }
 let copy store = {
 	stat_transaction_coalesce = store.stat_transaction_coalesce;
 	stat_transaction_abort = store.stat_transaction_abort;
-	root = store.root;
-	quota = Quota.copy store.quota;
+	root = Ref.copy (fun x -> x) store.root;
+	quota = Ref.copy Quota.copy store.quota
 }
 
 let incr_transaction_coalesce store =
@@ -495,7 +580,7 @@ let incr_transaction_abort store =
 
 let stats store =
 	let nb_nodes = ref 0 in
-	traversal store.root (fun _path _node ->
+	traversal (get_root store) (fun _path _node ->
 		incr nb_nodes
 	);
 	!nb_nodes, store.stat_transaction_abort, store.stat_transaction_coalesce

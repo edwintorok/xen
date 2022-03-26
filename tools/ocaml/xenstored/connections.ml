@@ -16,15 +16,16 @@
  *)
 
 let debug fmt = Logging.debug "connections" fmt
-
 type t = {
 	anonymous: (Unix.file_descr, Connection.t) Hashtbl.t;
 	domains: (int, Connection.t) Hashtbl.t;
 	ports: (Xeneventchn.t, Connection.t) Hashtbl.t;
-	mutable watches: Connection.watch list Trie.t;
+	mutable watches: Connection.watch List.t Trie.t;
 }
 
-let create () = {
+let create () =
+  let open Xenbus.Memory_size in
+  {
 	anonymous = Hashtbl.create 37;
 	domains = Hashtbl.create 37;
 	ports = Hashtbl.create 37;
@@ -34,14 +35,14 @@ let create () = {
 let add_anonymous cons fd =
 	let xbcon = Xenbus.Xb.open_fd fd in
 	let con = Connection.create xbcon None in
-	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con
+	Hashtbl.replace cons.anonymous (Xenbus.Xb.get_fd xbcon) con
 
 let add_domain cons dom =
 	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
-	Hashtbl.add cons.domains (Domain.get_id dom) con;
+	Hashtbl.replace cons.domains (Domain.get_id dom) con;
 	match Domain.get_port dom with
-	| Some p -> Hashtbl.add cons.ports p con;
+	| Some p -> Hashtbl.replace cons.ports p con;
 	| None -> ()
 
 let select ?(only_if = (fun _ -> true)) cons =
@@ -63,9 +64,8 @@ let find_domain_by_port cons port =
 	Hashtbl.find cons.ports port
 
 let del_watches_of_con con watches =
-	match List.filter (fun w -> Connection.get_con w != con) watches with
-	| [] -> None
-	| ws -> Some ws
+	let l = List.filter (fun w -> Connection.get_con w != con) watches in
+        if l = [] then None else Some l
 
 let del_anonymous cons con =
 	try
@@ -121,16 +121,17 @@ let add_watch cons con path token =
 	let watches =
  		if Trie.mem cons.watches key
  		then Trie.find cons.watches key
- 		else []
+                else []
 	in
- 	cons.watches <- Trie.set cons.watches key (watch :: watches);
+ 	cons.watches <- Trie.set cons.watches key (List.cons watch watches);
 	watch
 
 let del_watch cons con path token =
  	let apath, watch = Connection.del_watch con path token in
  	let key = key_of_str apath in
- 	let watches = Utils.list_remove watch (Trie.find cons.watches key) in
- 	if watches = [] then
+(* TODO: use set *)
+ 	let watches = List.filter (fun x -> x <> watch) (Trie.find cons.watches key) in
+        if watches = [] then
 		cons.watches <- Trie.unset cons.watches key
  	else
 		cons.watches <- Trie.set cons.watches key watches;
@@ -160,7 +161,7 @@ let fire_watches ?oldroot root cons path recurse =
 
 let fire_spec_watches root cons specpath =
 	iter cons (fun con ->
-		List.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		Xenbus.Memory_size_ds.SizedList.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in

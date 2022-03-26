@@ -37,6 +37,21 @@ type t =
 	mutable caused_conflicts: int64;
 }
 
+
+let size_of t =
+  let open Xenbus.Memory_size in
+  record_start t
+  |> record_add_immutable @@ int t.id
+  |> record_add_immutable @@ nativeint t.mfn
+  |> record_add_immutable @@ unit () (* TODO t.interface *)
+  |> record_add_immutable @@ Event.size_of t.eventchn
+  |> record_add_mutable_const @@ int t.remote_port
+  |> record_add_mutable_const @@ unit () (* TODO: t.port constant upper bound *)
+  |> record_add_mutable_const @@ int t.io_credit
+  |> record_add_mutable_const @@ float t.conflict_credit
+  |> record_add_mutable_const @@ int64 t.caused_conflicts
+  |> record_end
+
 let is_dom0 d = d.id = 0
 let get_id domain = domain.id
 let get_interface d = d.interface
