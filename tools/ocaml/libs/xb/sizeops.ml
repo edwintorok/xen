@@ -40,6 +40,8 @@ let[@logic] to_int_opt i = if i < 0 then None else Some i
     (* valid integers result in Some  when converted, and all Some values are built from valid
        integers *)
 
+    ensures not is_valid_size (to_int i) <-> r = None
+    (* invalid integers result in None, and all None values are invalid integers, hence the <-> *)
   *)
 
 let[@logic] invalid = -1
@@ -140,11 +142,15 @@ let (-) a b = binop_result ~res:(a - b) ~a ~b
     ensures is_t r
     (* type invariant *)
 
-      ensures b = of_int 0 -> r = a
-      (* 0 leaves the value unchanged. Although a size of an item is never truly zero, something
-         like a None reference might be considered of size 0 if the storage for the 'None' field is
-         accounted for in other ways *)
+    ensures is_valid_size (to_int a)
+            && is_valid_size (to_int b)
+            && is_valid_size ((to_int a) - (to_int b)) <-> to_int_opt r = Some ((to_int a) - (to_int b))
+    (* same as for +, but for - here *)
 
+    ensures not is_valid_size (to_int a)
+            || not is_valid_size (to_int b)
+            || not is_valid_size ((to_int a) - (to_int b)) <-> to_int_opt r = None
+    (* same as for +, but for - here *)
   *)
 
 let of_words x = of_int (x+1)
