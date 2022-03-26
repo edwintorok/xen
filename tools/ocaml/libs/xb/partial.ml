@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+open Memory_size
+open Memory_size_ds
 type pkt =
 {
 	tid: int;
@@ -51,3 +53,12 @@ let append pkt s sz =
 
 let to_complete pkt =
 	pkt.len - (Buffer.length pkt.buf)
+
+let size_of t =
+  record_start t
+  |> record_add_immutable @@ int t.tid
+  |> record_add_immutable @@ int t.rid
+  |> record_add_immutable @@ unit ()
+  |> record_add_immutable @@ int t.len
+  |> record_add_immutable @@ Buffer.size_of t.buf
+  |> record_end

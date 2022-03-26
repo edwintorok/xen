@@ -46,7 +46,6 @@ type array_compatible = [`constant]
 type require_nestable = [`constant | `immutable | `updatable]
 
 type forbid_updates = [`constant | `immutable] (** to be used as [< forbid_updates] *)
-
 type +'a t = T.t
 
 let unboxed = Sizeops.of_int 0 (* no extra space taken up beyond that for the field itself *)

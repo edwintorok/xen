@@ -14,6 +14,9 @@
  * GNU Lesser General Public License for more details.
  *)
 
+open Memory_size_ds
+open Memory_size
+
 type t =
 {
 	tid: int;
@@ -21,6 +24,14 @@ type t =
 	ty: Op.operation;
 	data: string;
 }
+
+let size_of pkt =
+  record_start pkt
+  |> record_add_immutable @@ int pkt.tid
+  |> record_add_immutable @@ int pkt.rid
+  |> record_add_immutable @@ unit ()
+  |> record_add_immutable @@ string pkt.data
+  |> record_end
 
 exception Error of string
 exception DataError of string
@@ -48,3 +59,4 @@ let get_data pkt =
 	else
 		pkt.data
 let get_rid pkt = pkt.rid
+
