@@ -77,14 +77,17 @@ type ty = No | Full of (
 	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
 )
 
+open Xenbus.Size_tracker
+module Queue = Xenbus.Sized_queue
+
 type t = {
 	ty: ty;
 	start_count: int64;
 	store: Store.t; (* This is the store that we change in write operations. *)
 	quota: Quota.t;
 	oldroot: Store.Node.t;
-	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
-	mutable operations: (Packet.request * Packet.response) list;
+	paths: (Xenbus.Xb.Op.operation * Store.Path.t) Queue.t;
+	operations: (Packet.request * Packet.response) Queue.t;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -117,6 +120,17 @@ let trim_short_running_transactions txn =
 		keep
 		!short_running_txns
 
+let size_of_resp = function
+  | Packet.Ack _ -> record_field (* a closure, lets assume "constant" usage *)
+  | Packet.Reply str | Packet.Error str -> string str
+
+let size_of_packet_req_resp (req, resp) =
+  add (string req.Packet.data) @@ size_of_resp resp
+
+let size_of_op_path (_, path) =
+  path |> Store.Path.to_string_list |> List.fold_left (fun acc e -> add acc @@ string e) empty
+  |> add record_field 
+
 let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
 	let txn = {
@@ -125,8 +139,8 @@ let make ?(internal=false) id store =
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
 		oldroot = Store.get_root store;
-		paths = [];
-		operations = [];
+		paths = Queue.create size_of_op_path;
+		operations = Queue.create size_of_packet_req_resp;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
@@ -141,15 +155,16 @@ let get_paths t = t.paths
 
 let get_root t = Store.get_root t.store
 
-let is_read_only t = t.paths = []
-let add_wop t ty path = t.paths <- (ty, path) :: t.paths
+let is_read_only t = Queue.is_empty t.paths
+let add_wop t ty path = Queue.push (ty, path) t.paths
+let iter_paths f t = Queue.iter f t.paths
 let add_operation ~perm t request response =
 	if !Define.maxrequests >= 0
 		&& not (Perms.Connection.is_dom0 perm)
-		&& List.length t.operations >= !Define.maxrequests
+		&& Queue.length t.operations >= !Define.maxrequests
 		then raise Quota.Limit_reached;
-	t.operations <- (request, response) :: t.operations
-let get_operations t = List.rev t.operations
+	Queue.push (request, response) t.operations
+let iter_operations f t = Queue.iter f t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath
 let set_write_lowpath t path = t.write_lowpath <- get_lowest path t.write_lowpath
 
@@ -195,7 +210,7 @@ let getperms t perm path =
 	r
 
 let commit ~con t =
-	let has_write_ops = List.length t.paths > 0 in
+	let has_write_ops = not (is_read_only t) in
 	let has_coalesced = ref false in
 	let has_commited =
 	match t.ty with
@@ -252,3 +267,6 @@ let commit ~con t =
 	else if not !has_coalesced
 	then Logging.commit ~tid:(get_id t) ~con;
 	has_commited
+
+let size t =
+  Queue.size t.operations

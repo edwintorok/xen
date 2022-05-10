@@ -42,3 +42,9 @@ val mul: t -> int -> t
 
 val empty: t
 (** [empty] is 0 words *)
+
+type 'a size_of = 'a -> t (** a function to calculate the size of 'a values *)
+
+val hashtbl: 'a size_of -> 'b size_of -> ('a, 'b) Hashtbl.t size_of
+(** [hashtbl key_size_of value_size_of hashtbl] calculates the size of a small [hashtbl] knowing the
+    sizes of keys through [key_size_of] and values through [value_size_of] *)

@@ -358,3 +358,22 @@ let decr_conflict_credit doms con =
 	match con.dom with
 	| None -> () (* It's a socket connection. We don't know which domain we're in, so treat it as if it's free to conflict *)
 	| Some dom -> Domains.decr_conflict_credit doms dom
+
+open Xenbus.Size_tracker
+
+let size_of_watch w =
+  add (mul record_field 5) @@
+  add (string w.token) @@
+  add (string w.path) @@
+  string w.base
+
+let size_of_watchlist l =
+  List.fold_left (fun acc w -> add acc @@ size_of_watch w) empty l
+
+let unboxed (_: int) = record_field
+
+let size t =
+  (* we assume Domain.t is at most constant in size, and do not track it *)
+  add (Xenbus.Xb.size t.xb) @@
+  add (hashtbl unboxed Transaction.size t.transactions) @@
+  hashtbl string size_of_watchlist t.watches (* FIXME: use better data structure so we can compute this more quickly *)

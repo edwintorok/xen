@@ -1,4 +1,5 @@
 type t = int
+type 'a size_of = 'a -> t
 
 let words_to_bytes = Sys.word_size / 8
 
@@ -32,3 +33,18 @@ let mul x c =
   x * c
 
 let empty = 0
+
+let hashtbl key_size_of value_size_of tbl =
+  let fold_kv k v acc =
+    add acc @@
+    add (key_size_of k) (value_size_of v)
+  in
+  let stats = Hashtbl.stats tbl in
+  (* Even an empty hash table will use memory depending on the initial table size,
+     so a hashtable with 0 elements can still use a significant amount of memory,
+     especially if we'd nest lots of small hashtables.
+     Also just deleting elements from a hashtable won't cause it to shrink its number of buckets,
+     so having a large number of items in the past and deleting them doesn't mean our usage is
+     nearly 0 *)
+  add (mul record_field stats.Hashtbl.num_buckets)
+  (Hashtbl.fold fold_kv tbl empty)

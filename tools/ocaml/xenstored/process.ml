@@ -60,7 +60,6 @@ let split_one_path data con =
 let process_watch t cons =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.Transaction.store in
-	let ops = Transaction.get_paths t |> List.rev in
 	let do_op_watch op cons =
 		let recurse, oldroot, root = match (fst op) with
 		| Xenbus.Xb.Op.Write|Xenbus.Xb.Op.Mkdir -> false, None, newroot
@@ -68,7 +67,7 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
 		Connections.fire_watches ?oldroot root cons (snd op) recurse in
-	List.iter (fun op -> do_op_watch op cons) ops
+	Transaction.iter_paths (fun op -> do_op_watch op cons) t
 
 let create_implicit_path t perm path =
 	let dirname = Store.Path.get_parent path in
@@ -449,7 +448,7 @@ let transaction_replay c t doms cons =
 		(fun () ->
 			try
 				Logging.start_transaction ~con ~tid;
-				List.iter (perform_exn ~wlog:true replay_t) (Transaction.get_operations t); (* May throw EAGAIN *)
+				Transaction.iter_operations (perform_exn ~wlog:true replay_t) t; (* May throw EAGAIN *)
 
 				Logging.end_transaction ~con ~tid;
 				Transaction.commit ~con replay_t
@@ -467,7 +466,7 @@ let transaction_replay c t doms cons =
 					let can_apply_on store = (
 						let store = Store.copy store in
 						let trial_t = Transaction.make ~internal:true Transaction.none store in
-						try List.iter (perform_exn ~wlog:false trial_t) (Transaction.get_operations t);
+						try Transaction.iter_operations (perform_exn ~wlog:false trial_t) t;
 							true
 						with Transaction_again -> false
 					) in
