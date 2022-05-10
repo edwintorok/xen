@@ -42,6 +42,8 @@ type backend = Fd of backend_fd | Xenmmap of backend_mmap
 
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 
+module Queue = Sized_queue
+
 type t =
 {
 	backend: backend;
@@ -157,8 +159,8 @@ let input con =
 
 let newcon backend = {
 	backend = backend;
-	pkt_in = Queue.create ();
-	pkt_out = Queue.create ();
+	pkt_in = Queue.create Packet.size;
+	pkt_out = Queue.create Packet.size;
 	partial_in = init_partial_in ();
 	partial_out = "";
 	}
@@ -213,3 +215,10 @@ let get_fd con =
 	match con.backend with
 	| Fd backend -> backend.fd
 	| Xenmmap _     -> raise (Failure "get_fd")
+
+open Size_tracker
+
+let size t =
+  (* only count data on top of the default empty [t] that every guest gets *)
+  add (string t.partial_out) @@
+  add (Queue.size t.pkt_in) (Queue.size t.pkt_out)

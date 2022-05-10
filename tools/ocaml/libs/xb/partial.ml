@@ -51,3 +51,9 @@ let append pkt s sz =
 
 let to_complete pkt =
 	pkt.len - (Buffer.length pkt.buf)
+
+open Size_tracker
+
+let size t =
+  (* append ensures that the buffer doesn't grow beyond 'len' *)
+  add (mul record_field 5) (of_string_length t.len)

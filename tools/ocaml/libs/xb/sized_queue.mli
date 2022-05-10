@@ -1,10 +1,10 @@
 type 'a t
 
-type 'a size_of = 'a -> int
+type 'a size_of = 'a -> Size_tracker.t
 
 val create : 'a size_of -> 'a t
 
-val size : _ t -> int
+val size : _ t -> Size_tracker.t
 
 val push : 'a -> 'a t -> unit
 

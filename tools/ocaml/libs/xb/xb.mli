@@ -96,3 +96,4 @@ val get_in_packet : t -> Packet.t
 val has_more_input : t -> bool
 val is_selectable : t -> bool
 val get_fd : t -> Unix.file_descr
+val size: t -> Size_tracker.t

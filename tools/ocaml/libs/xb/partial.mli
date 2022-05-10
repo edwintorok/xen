@@ -13,3 +13,4 @@ val xenstore_rel_path_max : int
 val of_string : string -> pkt
 val append : pkt -> string -> int -> unit
 val to_complete : pkt -> int
+val size: pkt -> Size_tracker.t
