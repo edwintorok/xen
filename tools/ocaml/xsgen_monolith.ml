@@ -1,17 +1,12 @@
 let con = Xsgen_test.connection
 
-module C = Xsgen_rtac
-
 let wrap candidate =
-  match candidate with
-  | Error (Ortac_runtime.Error e) ->
-      let errstr = Fmt.to_to_string Ortac_runtime.pp_error_report e in
-      Monolith.(Invalid (fun _ -> Print.(comment @@ string errstr)))
-  | (Error _ | Ok _) as r ->
-      (* ignore other exceptions and values:
-          Ortac will have inserted pre/post-condition checks already and
-          if there was anything wrong it would've raised an error *)
-      Monolith.Valid r
+  let real = Xsgen.memory_reachable_bytes con in
+  let calculated = Xsgen.memory_calculated_bytes con in
+  if real <= calculated then Monolith.Valid candidate
+  else
+    let msg = Printf.sprintf "calculated: %d bytes, real: %d bytes" calculated real in
+    Monolith.(Invalid (fun _ -> Print.(comment @@ string msg)))
 
 let wrap1 x = wrap
 let wrap2 x y = wrap
@@ -19,6 +14,7 @@ let wrap3 x y z = wrap
 let wrap4 x y z t = wrap
 
 (* from auto-generated rtac monolith code *)
+module C = Xsgen
 module R = C
 open Monolith
 module M = Ortac_runtime_monolith
@@ -29,6 +25,7 @@ module P =
     let perm { R.r; R.w } =
       M.print_record "" [("r", (Print.bool r)); ("w", (Print.bool w))]
   end
+
 let () =
   let transaction = declare_abstract_type ~var:"transaction" () in
   let connection = constructible (fun () -> C.connection, constant "connection") in

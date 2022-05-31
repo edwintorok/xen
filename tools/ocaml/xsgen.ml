@@ -6,16 +6,16 @@ type connection = Xenstore.Xsraw.con * Connection.t
 let none = 0
 
 let memory_calculated_bytes (_, con) =
-  con |> Connection.size_of |> Xenbus.Memory_size.size_of_bytes
+  con |> Connection.size |> Xenbus.Size_tracker.to_byte_count
 
 let memory_reachable_bytes (_, con) =
   Obj.reachable_words (Obj.repr con) * Sys.word_size / 8
 
 let memory_check con =
-  let words = memory_reachable_bytes con in
+  let bytes = memory_reachable_bytes con in
   let calculated = memory_calculated_bytes con in
-  if words <= calculated then true
-  else failwith (Printf.sprintf "calculated: %d bytes, actual: %d bytes" calculated words)
+  if bytes <= calculated then true
+  else failwith (Printf.sprintf "calculated: %d bytes, actual: %d bytes" calculated bytes)
 
 let is_output_devnull = Unix.stat "/dev/null" = Unix.fstat Unix.stdout
 (* during AFL print nothing *)
@@ -118,9 +118,8 @@ let directory (con, _) tid path =
   List.rev_map (function "" -> path | entry -> Filename.concat path entry) @@ Xsraw.directory tid path con
 
 let path_exists (_, connection) tid path =
-  let open Xenbus.Memory_size_ds in
   let store = tid |> Connection.get_transaction connection |> Transaction.get_store in
-  Store.Node.exists (Ref.get store.root) path
+  Store.Node.exists store.root path
 
 let read (con, _) tid path = Xsraw.read tid path con
 
@@ -149,7 +148,7 @@ let rev_map_perm = function
   | {r=true; w=true} -> Xsraw.PERM_RDWR
 
 let getperms (con, _) tid path =
-  let owner, others, rest = Xsraw.getperms tid path con in
+  let owner, others, _rest = Xsraw.getperms tid path con in
   { owner; others = map_perm others; (*rest = List.map (fun (domid, perm) -> domid, map_perm perm) rest*) }
 
 
@@ -159,7 +158,7 @@ let value () = "TODO"
 
 type value = string
 
-let has_watch (_, connection) path = not @@ Xenbus.Memory_size_ds.SizedList.is_empty @@ Connection.get_watches connection path
+let has_watch (_, connection) path = Connection.get_watches connection path <> []
 
 exception Eexist
 
