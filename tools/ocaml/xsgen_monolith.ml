@@ -1,12 +1,18 @@
 let con = Xsgen_test.connection
 
+let offset = ref 0
+
 let wrap candidate =
   let real = Xsgen.memory_reachable_bytes con in
   let calculated = Xsgen.memory_calculated_bytes con in
-  if real <= calculated then Monolith.Valid candidate
+  let result = if real <= calculated + !offset then Monolith.Valid candidate
   else
-    let msg = Printf.sprintf "calculated: %d bytes, real: %d bytes" calculated real in
+    let msg = Printf.sprintf "calculated: %d bytes, real: %d bytes, offset: %d bytes" calculated real !offset in
     Monolith.(Invalid (fun _ -> Print.(comment @@ string msg)))
+  in begin
+    offset := real - calculated; (* only look at the delta from last op *)
+    result
+  end
 
 let wrap1 x = wrap
 let wrap2 x y = wrap

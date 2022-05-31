@@ -5,6 +5,104 @@ type transaction = int
 type connection = Xenstore.Xsraw.con * Connection.t
 let none = 0
 
+open Sizedebug
+let operation_debug = v ~exact:true (fun _ -> Xenbus.Size_tracker.record_field) "operation"
+let packet_debug =
+  let open Xenbus in
+  record "Packet.t"
+  [ field "tid" int Packet.get_tid
+  ; field "rid" int Packet.get_rid
+  ; field "ty" operation_debug Packet.get_ty
+  ; field "data" string Packet.get_data
+  ]
+
+let backend_debug =
+  let open Xenbus.Xb in
+  let file_descr = v (fun _ -> Xenbus.Size_tracker.empty) "file_descr" in
+  let fd = record "backend_fd"
+  [ field "fd" file_descr (fun t -> t.fd)
+  ]
+  in
+  let mmap_interface = v (fun _ -> Xenbus.Size_tracker.record_field) "mmap_interface" in
+  let closure = v (fun _ -> Xenbus.Size_tracker.record_field) "closure" in
+  let mmap = record "backend_mmap"
+  [ field "mmap" mmap_interface (fun t -> t.mmap)
+  ; field "eventchn_notify" closure (fun t -> t.eventchn_notify)
+  ; field "work_again" bool (fun t -> t.work_again)
+  ]
+  in
+  variant
+  [ case "Fd" fd (function Fd fd -> Some fd | _ -> None)
+  ; case "Xenmmap" mmap (function Xenmmap m -> Some m | _ -> None)
+
+  ] "backend"
+
+let pkt_debug =
+  let open Xenbus.Partial in
+  let buf =
+    v (fun t ->
+      (* only approximate because there is also an initial buffer size here, and it may grow.. *)
+      Xenbus.Size_tracker.of_string_length @@ Buffer.length t) "Buffer"
+  in
+  record "Partial.pkt"
+  [ field "tid" int (fun t -> t.tid)
+  ; field "rid" int (fun t -> t.rid)
+  ; field "ty" operation_debug (fun t -> t.ty)
+  ; field "len" int (fun t -> t.len)
+  ; field "buf" buf (fun t -> t.buf)
+  ]
+
+let partial_buf_debug =
+  let open Xenbus.Xb in
+  variant
+  [ case "HaveHdr" pkt_debug (function HaveHdr h -> Some h | _ -> None)
+  ; case "NoHdr" (pair int bytes) (function NoHdr (a,b) -> Some (a,b) | _ -> None)
+  ] "partial_buf"
+
+let xb_debug =
+  let open Xenbus.Xb in
+  let packets = seq Queue.to_seq packet_debug "PacketQueue" in
+  record "Xb.t"
+  [ field "backend" backend_debug (fun t ->
+    let backend, _, _, _, _ = debug_view t in
+    backend)
+  ; field "pkt_in" packets
+  (fun t ->
+    let _, pkt_in, _, _, _ = debug_view t in
+    pkt_in)
+  ; field "pkt_out" packets
+  (fun t ->
+    let _, _, pkt_out, _, _ = debug_view t in
+    pkt_out)
+  ; field "partial_in" partial_buf_debug (fun t ->
+    let _, _, _, partial_buf, _ = debug_view t in
+    partial_buf
+  )
+  ; field "partial_out" string (fun t ->
+    let _, _, _, _, partial_out = debug_view t in
+    partial_out
+  )
+  ]
+
+let option el =
+  variant
+  [ case "Some" el (fun x -> x)
+  ; case "None" int (function None -> Some 0 | Some _ -> None)
+  ] "option"
+
+let connection_debug =
+  record "connection"
+  [ field "xb" xb_debug (fun t -> t.Connection.xb)
+  ; field "dom" (option domain_debug) (fun t -> t.Connection.dom)
+  ; field "transactions" (pair_seq int transaction_debug Hashtbl.to_seq) (fun t -> t.Connection.transactions)
+  ; field "next_tid" int (fun t -> t.Connection.next_tid)
+  ; field "watches" (pair_seq string @@ list watch_debug) (fun t -> t.Connection.watches)
+  ; field "nb_watches" int (fun t -> t.Connection.nb_watches)
+  ; field "anonid" int (fun t -> t.Connection.anonid)
+  ; field "stat_nb_ops" int (fun t -> t.Connection.stat_nb_ops)
+  ; field "perm" perm_debug (fun t -> t.Connection.perm)
+  ]
+
 let memory_calculated_bytes (_, con) =
   con |> Connection.size |> Xenbus.Size_tracker.to_byte_count
 

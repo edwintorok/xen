@@ -222,3 +222,6 @@ let size t =
   (* only count data on top of the default empty [t] that every guest gets *)
   add (string t.partial_out) @@
   add (Queue.size t.pkt_in) (Queue.size t.pkt_out)
+
+let debug_view t =
+  t.backend, t.pkt_in, t.pkt_out, t.partial_in, t.partial_out

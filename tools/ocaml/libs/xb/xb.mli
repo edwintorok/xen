@@ -97,3 +97,4 @@ val has_more_input : t -> bool
 val is_selectable : t -> bool
 val get_fd : t -> Unix.file_descr
 val size: t -> Size_tracker.t
+val debug_view: t -> backend * Packet.t Queue.t * Packet.t Queue.t * partial_buf * string

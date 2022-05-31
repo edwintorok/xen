@@ -373,6 +373,7 @@ let size_of_watchlist l =
 let unboxed (_: int) = record_field
 
 let size t =
+  add (Xenbus.Size_tracker.of_string_length 488) @@
   (* we assume Domain.t is at most constant in size, and do not track it *)
   add (Xenbus.Xb.size t.xb) @@
   add (hashtbl unboxed Transaction.size t.transactions) @@
