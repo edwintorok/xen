@@ -200,3 +200,5 @@ val setperms: connection -> transaction -> path -> perms -> unit
     requires transaction_is_valid con transaction && path_is_valid path
     raises Noent -> not (path_exists con transaction path)
  *)
+
+val connection_debug: connection Sizedebug.t

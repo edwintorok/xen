@@ -90,6 +90,7 @@ let pair a b =
   in
   { pp; size_of ; name = "pair"; exact = a.exact && b.exact }
 
+  (* TODO: check that it matches.... at a higher level *)
 let pair_seq pp_k pp_v to_pair_seq =
   seq to_pair_seq @@ pair pp_k pp_v
 

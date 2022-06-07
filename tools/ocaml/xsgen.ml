@@ -133,7 +133,14 @@ let domain_debug =
   ]
 
 let node = v (fun  _ -> Xenbus.Size_tracker.record_field) "node"
-let quota = v (fun  _ -> Xenbus.Size_tracker.record_field) "quota"
+let quota =
+  let open Quota in
+  record "quota"
+  [ field "maxent" int (fun t -> t.maxent)
+  ; field "maxsize" int (fun t -> t.maxsize)
+  ; field "cur" (pair_seq int int Hashtbl.to_seq "hashtbl") (fun t -> t.cur)
+
+  ]
 
 let rec store_debug =
   let open Store in
@@ -200,6 +207,10 @@ let connection_debug =
   ; field "stat_nb_ops" int (fun t -> t.Connection.stat_nb_ops)
   ; field "perm" perm_debug (fun t -> t.Connection.perm)
   ]
+
+let noop = v ~exact:false (fun _ ->
+  Xenbus.Size_tracker.mul Xenbus.Size_tracker.record_field 52) "noop"
+let connection_debug = pair noop connection_debug
 
 let memory_calculated_bytes (_, con) =
   con |> Connection.size |> Xenbus.Size_tracker.to_byte_count

@@ -7,8 +7,14 @@ let wrap candidate =
   let calculated = Xsgen.memory_calculated_bytes con in
   let result = if real <= calculated + !offset then Monolith.Valid candidate
   else
-    let msg = Printf.sprintf "calculated: %d bytes, real: %d bytes, offset: %d bytes" calculated real !offset in
-    Monolith.(Invalid (fun _ -> Print.(comment @@ string msg)))
+    let msg =
+      try
+        Sizedebug.check_exn Xsgen.connection_debug con;
+        "n/a"
+      with Failure msg -> msg
+    in
+    let msg = Printf.sprintf "calculated: %d bytes, real: %d bytes, offset: %d bytes. %s" calculated real !offset msg in
+    Monolith.(Invalid (fun _ -> Print.(comment @@ PPrint.arbitrary_string msg)))
   in begin
     offset := real - calculated; (* only look at the delta from last op *)
     result
