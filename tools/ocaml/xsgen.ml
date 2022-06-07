@@ -16,6 +16,29 @@ let packet_debug =
   ; field "data" string Packet.get_data
   ]
 
+let packet_request_debug =
+  let open Packet in
+  record "Packet.request"
+  [ field "tid" int (fun t -> t.tid)
+  ; field "rid" int (fun t -> t.rid)
+  ; field "ty" operation_debug (fun t -> t.ty)
+  ; field "data" string (fun t -> t.data)
+  ]
+
+let closure = v (fun _ -> Xenbus.Size_tracker.record_field) "closure"
+
+let packet_response_debug =
+  let open Packet in
+  variant
+  [ case "Ack" closure (function Ack _ -> Some () | _ -> None)
+  ; case "Reply" string (function Reply s -> Some s | _ -> None)
+  ; case "Error" string (function Error e -> Some e | _ -> None)
+  ] "Packet.response"
+
+let mmap_interface = v (fun _ -> Xenbus.Size_tracker.record_field) "mmap_interface"
+let event = v (fun _ -> Xenbus.Size_tracker.record_field) "event"
+let unit = v (fun _ -> Xenbus.Size_tracker.empty) "unit"
+
 let backend_debug =
   let open Xenbus.Xb in
   let file_descr = v (fun _ -> Xenbus.Size_tracker.empty) "file_descr" in
@@ -23,7 +46,6 @@ let backend_debug =
   [ field "fd" file_descr (fun t -> t.fd)
   ]
   in
-  let mmap_interface = v (fun _ -> Xenbus.Size_tracker.record_field) "mmap_interface" in
   let closure = v (fun _ -> Xenbus.Size_tracker.record_field) "closure" in
   let mmap = record "backend_mmap"
   [ field "mmap" mmap_interface (fun t -> t.mmap)
@@ -59,9 +81,15 @@ let partial_buf_debug =
   ; case "NoHdr" (pair int bytes) (function NoHdr (a,b) -> Some (a,b) | _ -> None)
   ] "partial_buf"
 
+let sized_queue_to_seq q =
+  Xenbus.Sized_queue.fold (fun a b -> b :: a) [] q
+  |> List.to_seq
+
+let sized_queue el = seq sized_queue_to_seq el
+
 let xb_debug =
   let open Xenbus.Xb in
-  let packets = seq Queue.to_seq packet_debug "PacketQueue" in
+  let packets = sized_queue packet_debug "PacketQueue" in
   record "Xb.t"
   [ field "backend" backend_debug (fun t ->
     let backend, _, _, _, _ = debug_view t in
@@ -90,13 +118,83 @@ let option el =
   ; case "None" int (function None -> Some 0 | Some _ -> None)
   ] "option"
 
+let domain_debug =
+  let open Domain in
+  record "domain"
+  [ field "id" int (fun t -> t.id)
+  ; field "mfn" nativeint (fun t -> t.mfn)
+  ; field "interface"  mmap_interface (fun t -> t.interface)
+  ; field "eventchn" event (fun t -> t.eventchn)
+  ; field "remote_port" int (fun t -> t.remote_port)
+  ; field "bad_client" bool (fun t -> t.bad_client)
+  ; field "io_credit" int (fun t -> t.io_credit)
+  ; field "conflict_credit" float (fun t -> t.conflict_credit)
+  ; field "caused_conflicts" int64 (fun t -> t.caused_conflicts)
+  ]
+
+let node = v (fun  _ -> Xenbus.Size_tracker.record_field) "node"
+let quota = v (fun  _ -> Xenbus.Size_tracker.record_field) "quota"
+
+let rec store_debug =
+  let open Store in
+  record "store"
+  [ field "stat_transaction_coalesce" int (fun t -> t.stat_transaction_coalesce)
+  ; field "stat_transaction_abort" int (fun t -> t.stat_transaction_abort)
+  ; field "root" node (fun t -> t.root) (* TODO: this is counted by the quota system instead.. *)
+  ; field "quota" quota (fun t -> t.quota)
+  ]
+
+let transaction_ty =
+  let open Transaction in
+  let full =
+    pair store_debug store_debug
+  in
+  variant
+  [ case "No" unit (function No -> Some () | _ -> None)
+  ; case "Full" full (function Full (id, orig, canon) -> Some (orig, canon) | _ -> None)
+  ] "ty"
+
+let path = seq List.to_seq string "path"
+
+let path_queue = sized_queue (pair operation_debug path) "path_queue"
+let operation_queue = sized_queue (pair packet_request_debug packet_response_debug) "operations_queue"
+
+let transaction_debug =
+  let open Transaction in
+  record "transaction"
+  [ field "ty" transaction_ty (fun t -> t.ty)
+  ; field "start_count" int64 (fun t -> t.start_count)
+  ; field "store" store_debug (fun t -> t.store)
+  ; field "quota" quota (fun t -> t.quota)
+  ; field "oldroot" node (fun t -> t.oldroot)
+  ; field "paths" path_queue (fun t -> t.paths)
+  ; field "operations" operation_queue (fun t -> t.operations)
+  ; field "read_lowpath" (option path) (fun t -> t.read_lowpath)
+  ; field "write_lowpath" (option path) (fun t -> t.write_lowpath)
+  ]
+
+let noop_conn = v (fun _ -> Xenbus.Size_tracker.record_field) "conn" (* avoid infinite rec *)
+
+let watch_debug =
+  let open Connection in
+  record "watch"
+  [ field "con" noop_conn (fun t -> t.con)
+  ; field "token" string (fun t -> t.token)
+  ; field "path" string (fun t -> t.path)
+  ; field "base" string (fun t -> t.base)
+  ; field "is_relative" bool (fun t -> t.is_relative)
+  ]
+
+let perm_debug = v (fun _ -> Xenbus.Size_tracker.record_field) "perm"
+
 let connection_debug =
+  let list el = seq List.to_seq el in
   record "connection"
   [ field "xb" xb_debug (fun t -> t.Connection.xb)
   ; field "dom" (option domain_debug) (fun t -> t.Connection.dom)
-  ; field "transactions" (pair_seq int transaction_debug Hashtbl.to_seq) (fun t -> t.Connection.transactions)
+  ; field "transactions" (pair_seq int transaction_debug Hashtbl.to_seq "transactions") (fun t -> t.Connection.transactions)
   ; field "next_tid" int (fun t -> t.Connection.next_tid)
-  ; field "watches" (pair_seq string @@ list watch_debug) (fun t -> t.Connection.watches)
+  ; field "watches" (pair_seq string (list watch_debug "watches") Hashtbl.to_seq "watches") (fun t -> t.Connection.watches)
   ; field "nb_watches" int (fun t -> t.Connection.nb_watches)
   ; field "anonid" int (fun t -> t.Connection.anonid)
   ; field "stat_nb_ops" int (fun t -> t.Connection.stat_nb_ops)
