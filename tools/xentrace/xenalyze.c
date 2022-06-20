@@ -983,6 +983,29 @@ const char * hvm_event_handler_name[HVM_EVENT_HANDLER_MAX] = {
     "vlapic"
 };
 
+#define HVM_EMUL_MAX (TRC_HVM_EMUL_LAPIC_PIC_INTR - TRC_HVM_EMUL + 1)
+
+const char * hvm_emul_name[HVM_EMUL_MAX] = {
+    "(no handler)",
+    "hpet create",
+    "pit create",
+    "rtc create",
+    "vlapic create",
+    "hpet destroy",
+    "pit destroy",
+    "rtc destroy",
+    "vlapic destroy",
+    "pit callback",
+    "vlapic callback",
+    "vpic_update_int_output",
+    "vpic vcpu_kick",
+    "__vpic_intack",
+    "vpic_irq_positive_edge",
+    "vpic_irq_negative_edge",
+    "vpic_ack_pending_irq",
+    "vlapic_accept_pic_intr",
+};
+
 enum {
     HVM_VOL_VMENTRY,
     HVM_VOL_VMEXIT,
@@ -4609,6 +4632,7 @@ void hvm_generic_postprocess_init(struct record_info *ri, struct hvm_data *h)
     if ( h->post_process != hvm_generic_postprocess )
         fprintf(warn, "%s: Strange, h->postprocess set!\n",
                 __func__);
+    assert(ri->evt.sub == 2);
     h->inflight.generic.event = ri->event;
     bcopy(h->d, h->inflight.generic.d, sizeof(unsigned int) * 4);
 }
@@ -4617,6 +4641,13 @@ void hvm_generic_postprocess(struct hvm_data *h)
 {
     long evt = 0;
     static unsigned registered[HVM_EVENT_HANDLER_MAX] = { 0 };
+
+    if ( h->inflight.generic.event >= TRC_HVM_EMUL &&
+         h->inflight.generic.event < TRC_HVM_EMUL + HVM_EMUL_MAX) {
+        /* emul events are run together with other VM EXIT processing,
+           e.g. vlapic, counting them would lead to double counting */
+        return;
+    }
 
     if ( h->inflight.generic.event )
         evt = (h->inflight.generic.event - TRC_HVM_HANDLER)
@@ -4699,21 +4730,36 @@ void hvm_generic_dump(struct record_info *ri, const char * prefix)
     char evt_number[256];
     int i, evt, is_64 = 0;
 
-    evt = ri->event - TRC_HVM_HANDLER;
+    if(ri->evt.sub == 4) {
+        evt = ri->event - TRC_HVM_EMUL;
 
-    if(evt & TRC_64_FLAG) {
-        evt &= ~(TRC_64_FLAG);
-        is_64=1;
-    }
+        if(evt < HVM_EVENT_HANDLER_MAX)
+        {
+            evt_string = hvm_emul_name[evt];
+        }
+        else
+        {
+            snprintf(evt_number, 256, "hvm_emul_handler %d", evt);
+            evt_string = evt_number;
+        }
+    } else {
+        assert(ri->evt.sub == 2);
+        evt = ri->event - TRC_HVM_HANDLER;
 
-    if(evt < HVM_EVENT_HANDLER_MAX)
-    {
-        evt_string = hvm_event_handler_name[evt];
-    }
-    else
-    {
-        snprintf(evt_number, 256, "hvm_handler %d", evt);
-        evt_string = evt_number;
+        if(evt & TRC_64_FLAG) {
+            evt &= ~(TRC_64_FLAG);
+            is_64=1;
+        }
+
+        if(evt < HVM_EVENT_HANDLER_MAX)
+        {
+            evt_string = hvm_event_handler_name[evt];
+        }
+        else
+        {
+            snprintf(evt_number, 256, "hvm_handler %d", evt);
+            evt_string = evt_number;
+        }
     }
 
     printf("%s%s %s%s [",
@@ -4856,8 +4902,11 @@ needs_vmexit:
     default:
         if(opt.dump_all)
             hvm_generic_dump(ri, "]");
-        if(opt.summary_info)
-            hvm_generic_postprocess_init(ri, h);
+        if(opt.summary_info) {
+            assert(2 == ri->evt.sub || 4 == ri->evt.sub);
+            if (2 == ri->evt.sub)
+                hvm_generic_postprocess_init(ri, h);
+        }
         break;
     }
 }
@@ -5275,7 +5324,7 @@ void hvm_process(struct pcpu_info *p)
     if(vcpu_set_data_type(p->current, VCPU_DATA_HVM))
         return;
 
-    if(ri->evt.sub == 2)
+    if(ri->evt.sub == 2 || ri->evt.sub == 4)
     {
         UPDATE_VOLUME(p, hvm[HVM_VOL_HANDLER], ri->size);
         hvm_handler_process(ri, h);
