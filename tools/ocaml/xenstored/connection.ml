@@ -40,15 +40,9 @@ and t = {
 	mutable perm: Perms.Connection.t;
 }
 
-let mark_as_bad con =
-	match con.dom with
-	|None -> ()
-	| Some domain -> Domain.mark_as_bad domain
-
 let initial_next_tid = 1
 
-let do_reconnect con =
-	Xenbus.Xb.reconnect con.xb;
+let reset con =
 	(* dom is the same *)
 	Hashtbl.clear con.transactions;
 	con.next_tid <- initial_next_tid;
@@ -58,6 +52,10 @@ let do_reconnect con =
 	con.stat_nb_ops <- 0;
 	(* perm is the same *)
 	()
+
+let do_reconnect con =
+	Xenbus.Xb.reconnect con.xb;
+	reset con
 
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
@@ -83,6 +81,14 @@ let get_domstr con =
 	match con.dom with
 	| None     -> "A" ^ (string_of_int con.anonid)
 	| Some dom -> "D" ^ (string_of_int (Domain.get_id dom))
+
+let mark_as_bad con =
+	match con.dom with
+	| None -> ()
+	| Some domain ->
+		Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
+		Domain.mark_as_bad domain;
+		reset con
 
 let make_perm dom =
 	let domid =
@@ -185,7 +191,7 @@ let del_watches con =
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions
+	Hashtbl.reset con.transactions
 
 let list_watches con =
 	let ll = Hashtbl.fold

@@ -54,6 +54,13 @@ type t =
 let init_partial_in () = NoHdr
 	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
 
+let reset t =
+		(* Clear our old connection state *)
+		Queue.clear t.pkt_in;
+		Queue.clear t.pkt_out;
+		t.partial_in <- init_partial_in ();
+		t.partial_out <- ""
+
 let reconnect t = match t.backend with
 	| Fd _ ->
 		(* should never happen, so close the connection *)
@@ -61,11 +68,7 @@ let reconnect t = match t.backend with
 	| Xenmmap backend ->
 		Xs_ring.close backend.mmap;
 		backend.eventchn_notify ();
-		(* Clear our old connection state *)
-		Queue.clear t.pkt_in;
-		Queue.clear t.pkt_out;
-		t.partial_in <- init_partial_in ();
-		t.partial_out <- ""
+		reset t
 
 let queue con pkt = Queue.push pkt con.pkt_out
 

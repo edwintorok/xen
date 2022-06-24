@@ -316,8 +316,8 @@ let do_isintroduced con _t domains _cons data =
 
 (* only in xen >= 4.2 *)
 let do_reset_watches con _t _domains cons _data =
-  Connections.del_watches cons con;
-  Connection.del_transactions con
+	Connections.del_watches cons con;
+	History.end_all_transactions con
 
 (* only in >= xen3.3                                                                                    *)
 let do_set_target con _t _domains cons data =

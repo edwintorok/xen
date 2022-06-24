@@ -39,6 +39,11 @@ let end_transaction txn con tid commit =
 	trim ~txn ();
 	success
 
+let end_all_transactions con =
+	Hashtbl.iter (fun tid txn ->
+		let (_:bool) = end_transaction txn con tid None in ()) con.Connection.transactions;
+	Connection.del_transactions con
+
 let reconnect con =
 	trim ();
 	Connection.do_reconnect con
