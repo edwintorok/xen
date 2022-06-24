@@ -40,11 +40,6 @@ and t = {
 	mutable perm: Perms.Connection.t;
 }
 
-let mark_as_bad con =
-	match con.dom with
-	|None -> ()
-	| Some domain -> Domain.mark_as_bad domain
-
 let initial_next_tid = 1
 
 let do_reconnect con =
@@ -83,6 +78,14 @@ let get_domstr con =
 	match con.dom with
 	| None     -> "A" ^ (string_of_int con.anonid)
 	| Some dom -> "D" ^ (string_of_int (Domain.get_id dom))
+
+let mark_as_bad con =
+	match con.dom with
+	|None -> ()
+	| Some domain ->
+	    Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
+	    do_reconnect con;
+	    Domain.mark_as_bad domain
 
 let make_perm dom =
 	let domid =

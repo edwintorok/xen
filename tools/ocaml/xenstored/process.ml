@@ -720,6 +720,7 @@ let check_memory_usage cons con =
          sizes := IntMap.add (connection_size_words con) con !sizes);
        let _, maxcon = IntMap.max_binding !sizes in
        (* TODO: log *)
+       do_reset_watches maxcon () () cons ();
        Connection.mark_as_bad maxcon
      end
    end
