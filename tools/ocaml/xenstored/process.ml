@@ -696,16 +696,33 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
-let check_memory_usage _cons con =
-	match Connection.get_domain con with
-	|	None -> () (* dom0 excluded *)
-	|	Some dom ->
-			let domid = Domain.get_id dom in
-			let actual = Connection.size con |> Xenbus.Size_tracker.to_byte_count in
-			if actual > !Define.maxdomumemory then begin
-				warn "domain %u: exceeds its memory quota: %u > %u" domid actual !Define.maxdomumemory;
-				Connection.mark_as_bad con
-			end
+let bytes_of w = w * Sys.word_size / 8
+
+let is_over_quota () =
+    let quick = Gc.quick_stat () in
+    bytes_of quick.Gc.heap_words >= !Define.maxdomumemory
+
+let connection_size_words con =
+  (* TODO: do not rely on Obj here *)
+  Obj.reachable_words (Obj.repr con)
+
+module IntMap = Map.Make(Int)
+
+let check_memory_usage cons con =
+   if is_over_quota () then begin
+     History.trim ();
+     (* update counters, and free mem *)
+     Gc.full_major ();
+     if is_over_quota () then begin
+       (* TODO: print *)
+       let sizes = ref IntMap.empty in
+       Connections.iter_domains cons (fun con ->
+         sizes := IntMap.add (connection_size_words con) con !sizes);
+       let _, maxcon = IntMap.max_binding !sizes in
+       (* TODO: log *)
+       Connection.mark_as_bad maxcon
+     end
+   end
 
 let do_input store cons doms con =
 	let newpacket =
