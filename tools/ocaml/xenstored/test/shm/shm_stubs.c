@@ -10,7 +10,7 @@ CAMLprim value stub_shm_open(value name, value create, value perm)
     CAMLparam3(name, create, perm);
     /* easier than using convert_flag_list on all the flags and keeping flags
        up-to-date */
-    int oflag = O_RDWR | (Bool_val(name) ? O_CREAT | O_EXCL : 0);
+    int oflag = O_RDWR | (Bool_val(create) ? (O_CREAT | O_EXCL) : 0);
     char *namestr = caml_stat_strdup(String_val(name));
     caml_enter_blocking_section();
     int fd = shm_open(namestr, oflag, Int_val(perm));

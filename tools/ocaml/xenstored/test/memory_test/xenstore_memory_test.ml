@@ -2,11 +2,14 @@ open Bos_setup
 
 let size = 4096
 let shm_create name =
-  let fd = Shm.shm_open name true 0o500 in
+  Logs.debug (fun m -> m "Creating new %s" name);
+  let fd = Shm.shm_open name true 0o600 in
   Unix.ftruncate fd size;
   fd
 
-let shm_existing name = Shm.shm_open name false 0
+let shm_existing name =
+  Logs.debug (fun m -> m "opening existing %s" name);
+  Shm.shm_open name false 0
 
 let absent =
   let base = Sys.executable_name |> Filename.basename in
@@ -15,6 +18,7 @@ let absent =
   Printf.sprintf "/%s-pid-%d" base pid
 
 let name = OS.Arg.(opt ["shm"] ~doc:"shared memory name of xenstore ring passed to shm_open" string ~absent)
+let debug = OS.Arg.flag ["d";"debug"] ~doc:"set log level to debug"
 
 let map_buffer fd =
   Logs.debug (fun m -> m "mapping buffer of size %d" size);
@@ -22,37 +26,52 @@ let map_buffer fd =
     |> Bigarray.array1_of_genarray
     |> Cstruct.of_bigarray
 
-module type Notification = sig
-  type t
-  val create: unit -> t
+    module type Notification = sig
+      type t
+      val create: unit -> t
   val notify_other_end: t -> unit
   val wait_for_other_end: t -> unit
-end
+    end
 
 let flag_client = OS.Arg.(flag ["client"] ~doc:"run in client mode")
 
 module Notify = struct
-    type t = { fd: Unix.file_descr; tmp: bytes }
+  type t = { fd_send: Unix.file_descr; fd_recv: Unix.file_descr; tmp: bytes }
 
-    let create () =
-      let fd =
-        if flag_client then Unix.stdin else
-        let server, _client = Unix.socketpair Unix.PF_UNIX Unix.SOCK_STREAM 0 in
-        (* TODO: pass client somewhere *)
-        server
-      in
-      { fd; tmp = Bytes.make 1 ' ' }
+  let spawn_client name domid rd wr =
+    Logs.debug (fun m -> m "Spawning client");
+      let pid = Unix.create_process Sys.executable_name
+      (Array.append [| Printf.sprintf "xenstore-client %d" domid
+       ; "--client"
+       ; "--shm"; name
+|] (if debug then [|"--debug"|] else [||]))
+      rd wr Unix.stderr in
+      Logs.debug (fun m -> m "Spawned client PID %d" pid);
+      at_exit (fun () -> Unix.kill pid 15)
 
-    let notify_other_end t = 
-      Logs.debug (fun m -> m "ring: notifying other end");
-      let (_:int) = Unix.send_substring t.fd "." 0 1 [] in
+  let create () =
+    let fd_recv, fd_send =
+      if flag_client then Unix.stdin, Unix.stdout else
+        begin
+          let pipe1_rd, pipe1_wr = Unix.pipe ~cloexec:false () in
+          let pipe2_rd, pipe2_wr = Unix.pipe ~cloexec:false () in
+          spawn_client name 1 pipe2_rd pipe1_wr;
+          pipe1_rd, pipe2_wr
+    end
+          in
+      { fd_recv; fd_send; tmp = Bytes.make 1 ' ' }
+
+  let notify_other_end t = 
+    Logs.debug (fun m -> m "ring: notifying other end");
+      let (_:int) = Unix.write_substring t.fd_send "." 0 1 in
       ()
 
-    let wait_for_other_end t =
-      Logs.debug (fun m -> m "ring: waiting for event");
-      let (_:int) = Unix.recv t.fd t.tmp 0 1 [] in ()
+  let wait_for_other_end t =
+    Logs.debug (fun m -> m "ring: waiting for event");
+      let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
+      Logs.debug (fun m -> m "ring: received event")
 
-  end
+end
 
 module MakeIO(R: Ring.S)(Notify: Notification) = struct
   type 'a t = 'a
@@ -65,6 +84,13 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     notif: Notify.t;
     tmp: bytes }
 
+  let debug_ring ch =
+    Logs.debug (fun m ->
+      let dbg = Xenstore_ring.Ring.to_debug_map ch.buffer in
+      m "ring state: %a"
+      Fmt.(Dump.list @@ pair string string) dbg
+      )
+
   let create () =
     Logs.debug (fun m -> m "opening shared memory page");
     let fd =
@@ -75,13 +101,14 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
       Logs.debug (fun m -> m "Initializing ring");
       Xenstore_ring.Ring.init buffer;
     end;
-    Logs.debug (fun m ->
-      let dbg = Xenstore_ring.Ring.to_debug_map buffer in
-      m "ring state: %a"
-      Fmt.(Dump.list @@ pair string string) dbg
-    );
-    { buffer; fd;
-      notif = Notify.create (); tmp = Bytes.create 1 }
+    let notif = Notify.create () in
+    if not flag_client then begin
+      (* TODO: multiple domid support, each with its own ring *)
+    end;
+    let t = { buffer; fd;
+      notif; tmp = Bytes.create 1 } in
+    debug_ring t;
+    t
 
   let destroy ch =
     Logs.debug (fun m -> m "closing shared memory file descriptor");
@@ -90,6 +117,7 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
 
   let rec read ch buf ofs len =
     let n = R.read ch.buffer buf ofs len in
+    debug_ring ch;
     if n = 0 then begin
       Notify.wait_for_other_end ch.notif;
       read ch buf ofs len
@@ -99,10 +127,11 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     let n = R.write ch.buffer buf ofs len in
     if n > 0 then Notify.notify_other_end ch.notif;
     if n < len then begin
+      debug_ring ch;
       Notify.wait_for_other_end ch.notif;
       write ch buf (ofs + n) (len - n)
     end
-end
+    end
 
 module Client = Xs_client_unix.Client(MakeIO(Xenstore_ring.Ring.Front)(Notify))
 
@@ -116,7 +145,7 @@ let rec loop_forever ps =
   | Exception exn ->
       Logs.warn (fun m -> m "Cannot parse request: %a" Fmt.exn exn)
   | Ok req ->
-    Logs.debug (fun m -> m
+      Logs.debug (fun m -> m
     "got command: %a" pp_packet req);
   let tid = Xs_protocol.get_tid req in
   let rid = Xs_protocol.get_rid req in
@@ -139,9 +168,8 @@ let client () =
     Logs.debug (fun m -> m "directory /: %a" Fmt.(Dump.list string)
     (Client.directory h "/")
     )
-  )
+    )
 
-let debug = OS.Arg.flag ["d";"debug"] ~doc:"set log level to debug"
 
 let () =
   Sys.catch_break true;

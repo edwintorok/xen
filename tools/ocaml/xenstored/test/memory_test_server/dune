@@ -1,0 +1,4 @@
+(test
+  (name memory_test_server)
+  (modes exe)
+  (libraries xenstored_test shm))

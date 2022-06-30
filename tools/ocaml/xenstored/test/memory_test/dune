@@ -1,4 +1,3 @@
 (executable
  (name xenstore_memory_test)
- (foreign_stubs (language c) (names shm_stubs))
- (libraries shared-memory-ring xenstore.unix bos.setup))
+ (libraries shared-memory-ring xenstore.unix bos.setup shm))

@@ -80,6 +80,7 @@ let read_fd back _con b len =
 let read_mmap back _con b len =
 	let s = Bytes.make len '\000' in
 	let rd = Xs_ring.read back.mmap s len in
+	Printf.eprintf "got: %d\n%!" rd;
 	Bytes.blit s 0 b 0 rd;
 	back.work_again <- (rd > 0);
 	if rd > 0 then
