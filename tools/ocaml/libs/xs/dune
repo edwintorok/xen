@@ -6,7 +6,8 @@
  (action (run ../../../config.status --file=paths.ml)))
 
 (library
- (name xenstore)
+  ; avoid conflict with mirage lib: name it differently
+ (name xenstore_xen)
  (public_name xen.store)
  (no_dynlink)
  (libraries unix xenbus))
