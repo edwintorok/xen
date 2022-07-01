@@ -121,7 +121,10 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     if n = 0 then begin
       Notify.wait_for_other_end ch.notif "read";
       read ch buf ofs len
-    end else n
+    end else begin
+      Notify.notify_other_end ch.notif;
+      n
+    end
 
   let rec write ch buf ofs len =
     debug_ring ch;
