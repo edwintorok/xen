@@ -143,16 +143,19 @@ let input con =
 		(* we complete the data *)
 		if sz > 0 then
 			Partial.append partial_pkt (Bytes.to_string b) sz;
+		Printf.eprintf "havehdr, needs %d\n" (Partial.to_complete partial_pkt);
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
 			con.partial_in <- init_partial_in ();
 			Queue.push pkt con.pkt_in;
+			prerr_endline "newpacket";
 			newpacket := true
 		)
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
 		if sz > 0 then
 			Bytes.blit b 0 buf (Partial.header_size () - i) sz;
+		prerr_endline "nohdr: ...";
 		con.partial_in <- if sz = i then
 			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf)
 	);

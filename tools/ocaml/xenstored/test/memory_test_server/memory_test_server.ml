@@ -94,8 +94,8 @@ let () =
   Connections.add_domain cons dom;
   let n = ref 0 in
   let t = ref @@ Unix.gettimeofday () in
+  (* Domain.incr_io_credit dom; (* hack *) *)
   while true do
-    Domain.incr_io_credit dom; (* hack *)
     let is_peaceful c =
       match Connection.get_domain c with
                         | None -> true (* Treat socket-connections as exempt, and free to conflict. *)
@@ -109,9 +109,8 @@ let () =
                        | None -> () | Some d -> Domain.incr_io_credit d)
                       peaceful_mw;
     let inset, outset = Connections.select cons in
-    if (List.length peaceful_mw > 0) then
-      process_domains store cons doms;
-    let rset, wset, _ = Poll.poll_select (Event.fd eventchn :: inset) outset [] 5. in
+    let timeout = if peaceful_mw <> [] then 0. else 5. in
+    let rset, wset, _ = Poll.poll_select (Event.fd eventchn :: inset) outset [] timeout in
     incr n;
     let now = Unix.gettimeofday () in
     if now > !t +. 1.  then begin
@@ -121,7 +120,7 @@ let () =
       n := 0;
       t := now
     end;
-    if List.length rset = 0 && List.length wset = 0 then begin
+    if List.length rset = 0 && List.length wset = 0 && peaceful_mw = [] then begin
       prerr_endline "Packet processing stuck: no more input available\n";
       exit 4
     end;

@@ -30,7 +30,7 @@ let map_buffer fd =
       type t
       val create: unit -> t
   val notify_other_end: t -> unit
-  val wait_for_other_end: t -> unit
+  val wait_for_other_end: t -> string -> unit
     end
 
 let flag_client = OS.Arg.(flag ["client"] ~doc:"run in client mode")
@@ -66,10 +66,10 @@ module Notify = struct
       let (_:int) = Unix.write_substring t.fd_send "." 0 1 in
       ()
 
-  let wait_for_other_end t =
-    Logs.debug (fun m -> m "ring: waiting for event");
+  let wait_for_other_end t msg =
+    Logs.debug (fun m -> m "ring: waiting for event (%s)" msg);
       let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
-      Logs.debug (fun m -> m "ring: received event")
+      Logs.debug (fun m -> m "ring: received event (%s)" msg)
 
 end
 
@@ -119,19 +119,25 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     let n = R.read ch.buffer buf ofs len in
     debug_ring ch;
     if n = 0 then begin
-      Notify.wait_for_other_end ch.notif;
+      Notify.wait_for_other_end ch.notif "read";
       read ch buf ofs len
     end else n
 
   let rec write ch buf ofs len =
+    debug_ring ch;
+    Logs.debug (fun m -> m "writing %d" len);
     let n = R.write ch.buffer buf ofs len in
-    if n > 0 then Notify.notify_other_end ch.notif;
+    if n > 0 then begin
+      Notify.notify_other_end ch.notif;
+    end;
     if n < len then begin
       debug_ring ch;
-      Notify.wait_for_other_end ch.notif;
+      Notify.wait_for_other_end ch.notif "write";
       write ch buf (ofs + n) (len - n)
-    end
-    end
+    end;
+    Logs.debug (fun m -> m "write done")
+
+end
 
 module Client = Xs_client_unix.Client(MakeIO(Xenstore_ring.Ring.Front)(Notify))
 
@@ -169,8 +175,8 @@ let client () =
     )
   );
   (* due to Bos we have Astring here *)
-  let key_prefix = String.v ~len:500 (fun _ -> 'y') in
-  let value_prefix = String.v ~len:600 (fun _ -> 'v') in
+  let key_prefix = String.v ~len:1024 (fun _ -> 'y') in
+  let value_prefix = String.v ~len:2048 (fun _ -> 'v') in
   let i = ref 0 in
   Client.transaction_one_try c (fun h ->
     (* we could probe size here? *)
