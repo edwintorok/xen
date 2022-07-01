@@ -54,7 +54,8 @@ OBJS = paths \
 	history \
 	parse_arg \
 	process \
-	xenstored
+	xenstored \
+	main
 
 INTF = symbol.cmi trie.cmi syslog.cmi systemd.cmi poll.cmi
 
