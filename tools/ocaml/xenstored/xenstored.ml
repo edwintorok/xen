@@ -268,8 +268,8 @@ end
 (* separate function to allow test code to reuse this,
    and e.g. run it in a thread, set up some mock config before, etc.
  *)
-let main () =
-	let cf = do_argv () in
+let main ?argv () =
+	let cf = do_argv ?argv () in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
 			parse_config (config_filename cf)
