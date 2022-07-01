@@ -4,7 +4,7 @@
  (modes native)
  (name xenstored_test)
  (ocamlopt_flags -afl-instrument)
- (modules (:standard \ systemd xenstored))
+ (modules (:standard \ systemd main))
  (flags (:standard -w -52))
  ;;(action (run %{test} -v --seed 364172147))
  (libraries unix xen.bus xen.mmap xenstubs xen.store))

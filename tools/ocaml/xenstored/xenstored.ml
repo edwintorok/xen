@@ -265,8 +265,11 @@ let to_file store cons fds file =
 	        (fun () -> close_out channel)
 end
 
-let _ =
-	let cf = do_argv in
+(* separate function to allow test code to reuse this,
+   and e.g. run it in a thread, set up some mock config before, etc.
+ *)
+let main () =
+	let cf = do_argv () in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
 			parse_config (config_filename cf)

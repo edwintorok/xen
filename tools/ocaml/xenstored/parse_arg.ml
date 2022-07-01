@@ -28,7 +28,7 @@ type config =
 	disable_socket: bool;
 }
 
-let do_argv =
+let do_argv () =
 	let pidfile = ref "" and tracefile = ref "" (* old xenstored compatibility *)
 	and domain_init = ref true
 	and activate_access_log = ref true
