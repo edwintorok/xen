@@ -28,7 +28,7 @@ type config =
 	disable_socket: bool;
 }
 
-let do_argv () =
+let do_argv ?(argv=Sys.argv) () =
 	let pidfile = ref "" and tracefile = ref "" (* old xenstored compatibility *)
 	and domain_init = ref true
 	and activate_access_log = ref true
@@ -58,7 +58,7 @@ let do_argv () =
 		  ("--disable-socket", Arg.Unit (fun () -> disable_socket := true), "Disable socket");
 		] in
 	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket]" in
-	Arg.parse speclist (fun _ -> ()) usage_msg;
+	try Arg.parse_argv argv speclist (fun _ -> ()) usage_msg;
 	{
 		domain_init = !domain_init;
 		activate_access_log = !activate_access_log;
@@ -71,3 +71,6 @@ let do_argv () =
 		live_reload = !live_reload;
 		disable_socket = !disable_socket;
 	}
+	with
+	| Arg.Bad errmsg -> prerr_endline errmsg; exit 2
+	| Arg.Help helpmsg -> print_endline helpmsg; exit 0
