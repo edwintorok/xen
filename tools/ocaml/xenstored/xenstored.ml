@@ -319,7 +319,7 @@ let tweak_gc () =
 (* separate function to allow test code to reuse this,
    and e.g. run it in a thread, set up some mock config before, etc.
  *)
-let main ?argv () =
+let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 	let cf = do_argv ?argv () in
 	Printf.eprintf "%b\n" cf.test_mode;
 	let pidfile =
@@ -420,6 +420,7 @@ let main ?argv () =
 		let post_rotate () = DB.to_file store cons (None) Disk.xs_daemon_database in
 		Logging.init_access_log post_rotate
 	end;
+	on_startup cons domains store eventchn;
 
 	let spec_fds =
 		(match rw_sock with None -> [] | Some x -> [ x ]) @

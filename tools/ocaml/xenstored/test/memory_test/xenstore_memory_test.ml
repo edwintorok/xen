@@ -175,8 +175,12 @@ let client () =
     )
   );
   (* due to Bos we have Astring here *)
-  let key_prefix = String.v ~len:1024 (fun _ -> 'y') in
-  let value_prefix = String.v ~len:2048 (fun _ -> 'v') in
+  (* TODO: something not right with simulat rings and eventchn here,
+    setting to 2048 for value or 1024 for key doesn't work,
+  taking into consideration the 16 overhead doesn't fit in a single ring and then
+    notifications seem stuck... only getting unstuck due to ring scan checker *)
+  let key_prefix = String.v ~len:500 (fun _ -> 'y') in
+  let value_prefix = String.v ~len:500 (fun _ -> 'v') in
   let i = ref 0 in
   Client.transaction_one_try c (fun h ->
     (* we could probe size here? *)

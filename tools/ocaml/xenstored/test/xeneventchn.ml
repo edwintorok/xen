@@ -54,7 +54,16 @@ let bind_interdomain t _domid _remote_port = incr t.port; !(t.port)
 let bind_virq t _ = incr t.port; !(t.port)
 let bind_dom_exc_virq handle = bind_virq handle Dom_exc
 let unbind _ _ = ()
-let pending t = !(t.port)
+
+let tmp = Bytes.make 1 ' '
+let pending t =
+  (* TODO: could use char to distinguish between "domains" *)
+  let (n:int) = Unix.read t.fd_recv tmp 0 1 in
+  if n = 0 then
+    failwith "Eventchn.pending: EOF";
+  (* TODO: should simulate mask/unmask *)
+  !(t.port)
+
 let unmask _ _ = ()
 
 let to_int x = x

@@ -17,11 +17,6 @@ let () =
   Logging.access_log_transaction_ops := true ;
   Logging.xenstored_log_level := Logging.Debug
 
-let cons = Connections.create ()
-let store = Store.create ()
-let eventchn = Event.init ()
-let doms = Domains.init eventchn ignore
-
 let shm_name =
   let base = Sys.executable_name |> Filename.basename in
   let pid = Unix.getpid () in
@@ -52,38 +47,48 @@ let spawn_client name domid rd wr =
     rd wr Unix.stderr in
   at_exit (fun () -> Unix.kill pid 15)
 
-let make_dom domid =
-  (* TODO: per domid shm *)
-  let evt = eventchn.Event.handle in
-  prerr_endline "Spawning client";
-  spawn_client shm_name domid  evt.Xeneventchn.client_recv evt.Xeneventchn.client_send;
-  (* TODO: duplicate code with add_domain *)
-  let mapping = Xenmmap.mmap shm_fd Xenmmap.RDWR Xenmmap.SHARED size 0 in
-  let dom = Domain.make domid 0n 0 mapping eventchn in
-  Hashtbl.add doms.Domains.table domid dom;
-  Domain.bind_interdomain dom;
-  (* TODO: like xenopsd would... *)
-  let con = Perms.Connection.create 0 in
-  let path = Printf.sprintf "/local/domain/%d/data" domid |> Store.Path.of_string in
-  (path |> Store.Path.get_hierarchy
-  |> List.iter @@ Store.mkdir store con);
-  let perms = Perms.Node.create domid Perms.NONE [] in
-  Store.setperms store con path perms;
-  dom
+let on_startup cons doms store eventchn =
+  let make_dom domid =
+    (* TODO: per domid shm *)
+    let evt = eventchn.Event.handle in
+    prerr_endline "Spawning client";
+    spawn_client shm_name domid  evt.Xeneventchn.client_recv evt.Xeneventchn.client_send;
+    (* TODO: duplicate code with add_domain *)
+    let mapping = Xenmmap.mmap shm_fd Xenmmap.RDWR Xenmmap.SHARED size 0 in
+    let dom = Domain.make domid 0n 0 mapping eventchn in
+    Hashtbl.add doms.Domains.table domid dom;
+    Domain.bind_interdomain dom;
+    (* TODO: like xenopsd would... *)
+    let con = Perms.Connection.create 0 in
+    let path = Printf.sprintf "/local/domain/%d/data" domid |> Store.Path.of_string in
+   (path |> Store.Path.get_hierarchy
+    |> List.iter @@ fun dir ->
+        if not (Store.path_exists store dir) then
+          Store.mkdir store con dir);
+    let perms = Perms.Node.create domid Perms.NONE [] in
+    Store.setperms store con path perms;
+    dom
+  in
+  let dom = make_dom 1
+  in
+  Connections.add_domain cons dom
 
-let dom = make_dom 1
-
-let tmp = Bytes.make 1 ' '
 let () =
-  Connections.add_domain cons dom;
   Logging.set_xenstored_log_destination "/dev/stderr";
   Logging.set_access_log_destination "/dev/stderr";
+  let portfile = Filename.temp_file "xenstored_port" "txt" in
+  at_exit (fun () -> Unix.unlink portfile);
+  let ch = open_out portfile in
+  output_string ch "0";
+  close_out ch;
+  Domains.xenstored_port := portfile;
+  Domains.xenstored_kva := "/dev/zero";
   let argv = [|
     "oxenstored";
     "--test";
     "--disable-socket";
     "--no-fork";
-    "--no-domain-init"
+    (* "--no-domain-init" do not use this as it turns off eventchn processing! *) 
   |] in
   prerr_endline "launching main";
-  Xenstored.main ~argv ()
+  Xenstored.main ~argv ~on_startup ()
