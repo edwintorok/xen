@@ -61,6 +61,13 @@ let make_dom domid =
   let dom = Domain.make domid 0n 0 mapping eventchn in
   Hashtbl.add doms.Domains.table domid dom;
   Domain.bind_interdomain dom;
+  (* TODO: like xenopsd would... *)
+  let con = Perms.Connection.create 0 in
+  let path = Printf.sprintf "/local/domain/%d/data" domid |> Store.Path.of_string in
+  (path |> Store.Path.get_hierarchy
+  |> List.iter @@ Store.mkdir store con);
+  let perms = Perms.Node.create domid Perms.NONE [] in
+  Store.setperms store con path perms;
   dom
 
 let dom = make_dom 1

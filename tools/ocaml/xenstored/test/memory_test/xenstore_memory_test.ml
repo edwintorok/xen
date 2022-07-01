@@ -165,11 +165,29 @@ let client () =
   let c = Client.make () in
   Client.set_logger (fun s -> Logs.debug @@ fun m -> m "xenstore-client: %s" s);
   Client.immediate c (fun h ->
-    Logs.debug (fun m -> m "directory /: %a" Fmt.(Dump.list string)
-    (Client.directory h "/")
+    Logs.debug (fun m -> m "domainpath: %s" (Client.getdomainpath h 1)
     )
-    )
-
+  );
+  (* due to Bos we have Astring here *)
+  let key_prefix = String.v ~len:500 (fun _ -> 'y') in
+  let value_prefix = String.v ~len:600 (fun _ -> 'v') in
+  let i = ref 0 in
+  Client.transaction_one_try c (fun h ->
+    (* we could probe size here? *)
+    while true do
+      incr i;
+      (* TODO: discover writable paths basedon list *)
+      let key = Printf.sprintf "data/%s%d" key_prefix !i in
+      let key_enoent = Printf.sprintf "data/no%s%d" key_prefix !i in
+      let value = Printf.sprintf "%s%d" value_prefix !i in
+      Client.write h key value;
+      (* this will have to get stored in the replay queue so that after a 
+         conflict reply can be checked to match *)
+      (try let (_:string) = Client.read h key_enoent in ()
+      with Xs_protocol.Enoent _ -> ());
+      Client.rm h key;
+    done
+  )
 
 let () =
   Sys.catch_break true;
