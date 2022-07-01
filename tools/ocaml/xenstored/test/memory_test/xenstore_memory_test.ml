@@ -29,7 +29,7 @@ let map_buffer fd =
     module type Notification = sig
       type t
       val create: unit -> t
-  val notify_other_end: t -> unit
+  val notify_other_end: t -> string -> unit
   val wait_for_other_end: t -> string -> unit
     end
 
@@ -39,13 +39,15 @@ module Notify = struct
   type t = { fd_send: Unix.file_descr; fd_recv: Unix.file_descr; tmp: bytes }
 
   let spawn_client name domid rd wr =
+    (* TODO: tmpfile *)
+    let child_stderr = Unix.openfile "/tmp/child-stderr" [Unix.O_CREAT; Unix.O_TRUNC;Unix.O_RDWR] 0o600 in
     Logs.debug (fun m -> m "Spawning client");
       let pid = Unix.create_process Sys.executable_name
       (Array.append [| Printf.sprintf "xenstore-client %d" domid
        ; "--client"
        ; "--shm"; name
 |] (if debug then [|"--debug"|] else [||]))
-      rd wr Unix.stderr in
+      rd wr child_stderr in
       Logs.debug (fun m -> m "Spawned client PID %d" pid);
       at_exit (fun () -> Unix.kill pid 15)
 
@@ -55,21 +57,24 @@ module Notify = struct
         begin
           let pipe1_rd, pipe1_wr = Unix.pipe ~cloexec:false () in
           let pipe2_rd, pipe2_wr = Unix.pipe ~cloexec:false () in
+          prerr_endline "SPAWN";
           spawn_client name 1 pipe2_rd pipe1_wr;
           pipe1_rd, pipe2_wr
     end
           in
       { fd_recv; fd_send; tmp = Bytes.make 1 ' ' }
 
-  let notify_other_end t = 
-    Logs.debug (fun m -> m "ring: notifying other end");
+  let notify_other_end t msg = 
+    Logs.debug (fun m -> m "%s: ring: notifying other end" msg);
       let (_:int) = Unix.write_substring t.fd_send "." 0 1 in
       ()
 
+  let cnt = ref 0
   let wait_for_other_end t msg =
-    Logs.debug (fun m -> m "ring: waiting for event (%s)" msg);
-      let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
-      Logs.debug (fun m -> m "ring: received event (%s)" msg)
+    incr cnt;
+    Logs.debug (fun m -> m "%s: ring: waiting for event %d" msg !cnt);
+    let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
+    Logs.debug (fun m -> m "%s: ring: received event %d" msg !cnt)
 
 end
 
@@ -84,11 +89,11 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     notif: Notify.t;
     tmp: bytes }
 
-  let debug_ring ch =
+  let debug_ring ch msg =
     Logs.debug (fun m ->
       let dbg = Xenstore_ring.Ring.to_debug_map ch.buffer in
-      m "ring state: %a"
-      Fmt.(Dump.list @@ pair string string) dbg
+      m "%s: ring state: %a" msg
+      (Fmt.hbox Fmt.(list ~sep:Fmt.sp @@ pair ~sep:Fmt.sp string string)) dbg
       )
 
   let create () =
@@ -107,7 +112,7 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     end;
     let t = { buffer; fd;
       notif; tmp = Bytes.create 1 } in
-    debug_ring t;
+    debug_ring t "create";
     t
 
   let destroy ch =
@@ -116,29 +121,37 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     if not flag_client then Shm.shm_unlink name
 
   let rec read ch buf ofs len =
+    Logs.debug (fun m -> m "read: start; len = %d" len);
+    debug_ring ch "read";
     let n = R.read ch.buffer buf ofs len in
-    debug_ring ch;
+    debug_ring ch "read";
+    Logs.debug (fun m -> m "read: got = %d" n);
     if n = 0 then begin
       Notify.wait_for_other_end ch.notif "read";
+      Logs.debug (fun m -> m "read: repeating");
       read ch buf ofs len
     end else begin
-      Notify.notify_other_end ch.notif;
+      Notify.notify_other_end ch.notif "read";
+      Logs.debug (fun m -> m "read: done %d" n);
       n
     end
 
   let rec write ch buf ofs len =
-    debug_ring ch;
-    Logs.debug (fun m -> m "writing %d" len);
+    Logs.debug (fun m -> m "write: got=%d" len);
+    debug_ring ch "write";
     let n = R.write ch.buffer buf ofs len in
+    debug_ring ch "write";
+    Logs.debug (fun m -> m "write: wrote %d/%d" n len);
     if n > 0 then begin
-      Notify.notify_other_end ch.notif;
+      Notify.notify_other_end ch.notif "write";
     end;
     if n < len then begin
-      debug_ring ch;
+      debug_ring ch "write";
       Notify.wait_for_other_end ch.notif "write";
+      Logs.debug (fun m -> m "write: recursing");
       write ch buf (ofs + n) (len - n)
     end;
-    Logs.debug (fun m -> m "write done")
+    Logs.debug (fun m -> m "write: done")
 
 end
 
@@ -173,19 +186,15 @@ let client () =
   Logs.debug (fun m -> m "initializing client");
   let c = Client.make () in
   Client.set_logger (fun s -> Logs.debug @@ fun m -> m "xenstore-client: %s" s);
-  Client.immediate c (fun h ->
+ (* Client.immediate c (fun h ->
     Logs.debug (fun m -> m "domainpath: %s" (Client.getdomainpath h 1)
     )
-  );
+  );*)
   (* due to Bos we have Astring here *)
-  (* TODO: something not right with simulat rings and eventchn here,
-    setting to 2048 for value or 1024 for key doesn't work,
-  taking into consideration the 16 overhead doesn't fit in a single ring and then
-    notifications seem stuck... only getting unstuck due to ring scan checker *)
-  let key_prefix = String.v ~len:500 (fun _ -> 'y') in
-  let value_prefix = String.v ~len:500 (fun _ -> 'v') in
+  let key_prefix = String.v ~len:1024 (fun _ -> 'y') in
+  let value_prefix = String.v ~len:2048 (fun _ -> 'v') in
   let i = ref 0 in
-  Client.transaction_one_try c (fun h ->
+  Client.immediate c (fun h ->
     (* we could probe size here? *)
     while true do
       incr i;
@@ -204,6 +213,17 @@ let client () =
 
 let () =
   Sys.catch_break true;
+  Fmt_tty.setup_std_outputs ~style_renderer:`None ();
   OS.Arg.parse_opts ();
+(*  let lockfile = Unix.openfile "/tmp/lock" [Unix.O_CREAT; Unix.O_RDWR;Unix.O_CLOEXEC] 0o600 in
+  let lock () =
+    Unix.lockf lockfile Unix.F_LOCK 0;
+  in
+  let unlock () =
+    Format.pp_print_flush Format.err_formatter ();
+    Unix.lockf lockfile Unix.F_ULOCK 0 in
+  (* locking doesn't seem to help here *)
+  Logs.set_reporter_mutex ~lock ~unlock; *)
   if debug then Logs.set_level (Some Logs.Debug);
+  Logs.debug (fun m -> m "PID %d" (Unix.getpid ()));
   if flag_client then client () else server ()
