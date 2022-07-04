@@ -26,28 +26,38 @@ let map_buffer fd =
     |> Bigarray.array1_of_genarray
     |> Cstruct.of_bigarray
 
-    module type Notification = sig
-      type t
-      val create: unit -> t
+module type Notification = sig
+  type t
+  val create: unit -> t
+  type event
+  val prepare: t -> event
+  val wait_for_other_end: t -> event -> string -> event
   val notify_other_end: t -> string -> unit
-  val wait_for_other_end: t -> string -> unit
-    end
+end
 
 let flag_client = OS.Arg.(flag ["client"] ~doc:"run in client mode")
 
 module Notify = struct
-  type t = { fd_send: Unix.file_descr; fd_recv: Unix.file_descr; tmp: bytes }
+  type t = {
+    fd_send: Unix.file_descr;
+    fd_recv: Unix.file_descr;
+    tmp: bytes;
+    (* todo: activations like interface *)
+    mutex: Mutex.t (* xc_client_unix is multithreaded *);
+    mutex_fd: Mutex.t;
+    cond_fd: Condition.t;
+    mutable events: int
+  }
 
   let spawn_client name domid rd wr =
     (* TODO: tmpfile *)
-    let child_stderr = Unix.openfile "/tmp/child-stderr" [Unix.O_CREAT; Unix.O_TRUNC;Unix.O_RDWR] 0o600 in
     Logs.debug (fun m -> m "Spawning client");
       let pid = Unix.create_process Sys.executable_name
       (Array.append [| Printf.sprintf "xenstore-client %d" domid
        ; "--client"
        ; "--shm"; name
 |] (if debug then [|"--debug"|] else [||]))
-      rd wr child_stderr in
+      rd wr Unix.stderr in
       Logs.debug (fun m -> m "Spawned client PID %d" pid);
       at_exit (fun () -> Unix.kill pid 15)
 
@@ -62,19 +72,45 @@ module Notify = struct
           pipe1_rd, pipe2_wr
     end
           in
-      { fd_recv; fd_send; tmp = Bytes.make 1 ' ' }
+      { fd_recv; fd_send; tmp = Bytes.make 1 ' '; mutex = Mutex.create (); mutex_fd = Mutex.create (); cond_fd = Condition.create (); events = 0 }
 
   let notify_other_end t msg = 
     Logs.debug (fun m -> m "%s: ring: notifying other end" msg);
       let (_:int) = Unix.write_substring t.fd_send "." 0 1 in
       ()
 
-  let cnt = ref 0
-  let wait_for_other_end t msg =
-    incr cnt;
-    Logs.debug (fun m -> m "%s: ring: waiting for event %d" msg !cnt);
-    let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
-    Logs.debug (fun m -> m "%s: ring: received event %d" msg !cnt)
+  let with_mutex t f =
+    Mutex.lock t.mutex;
+    Fun.protect ~finally:(fun () -> Mutex.unlock t.mutex) (fun () -> f t)
+
+  type event = int
+  let prepare t =
+    with_mutex t @@ fun t -> t.events
+
+  let wait_for_other_end t event msg =
+    Logs.debug (fun m -> m "%s: ring: waiting for event <> %d" msg event);
+    let next = with_mutex t @@ fun t ->
+      (* it can also be < if it wraps *)
+      if t.events = event then begin
+        (* do  not release mutex here, other threads will wait to enter,
+          and when we finally release the mutex they'll see event count changed
+          and exit
+          NO it can deadlock if we wait on smaller event...
+        *)
+        if Mutex.try_lock t.mutex_fd then begin
+          Mutex.unlock t.mutex;
+          let (_:int) = Unix.read t.fd_recv t.tmp 0 1 in
+          Mutex.lock t.mutex;
+          t.events <- t.events + 1;
+          Condition.broadcast t.cond_fd;
+          Mutex.unlock t.mutex_fd
+        end else
+          Condition.wait t.cond_fd t.mutex;
+        t.events
+      end else t.events
+    in
+    Logs.debug (fun m -> m "%s: ring: received event %d" msg next);
+    next
 
 end
 
@@ -120,24 +156,33 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     Unix.close ch.fd;
     if not flag_client then Shm.shm_unlink name
 
-  let rec read ch buf ofs len =
-    Logs.debug (fun m -> m "read: start; len = %d" len);
+  let rec read_aux ch buf ofs len event =
     debug_ring ch "read";
     let n = R.read ch.buffer buf ofs len in
     debug_ring ch "read";
     Logs.debug (fun m -> m "read: got = %d" n);
     if n = 0 then begin
-      Notify.wait_for_other_end ch.notif "read";
+      let event = Notify.wait_for_other_end ch.notif event "read" in
       Logs.debug (fun m -> m "read: repeating");
-      read ch buf ofs len
+      read_aux ch buf ofs len event
     end else begin
       Notify.notify_other_end ch.notif "read";
       Logs.debug (fun m -> m "read: done %d" n);
       n
     end
 
-  let rec write ch buf ofs len =
-    Logs.debug (fun m -> m "write: got=%d" len);
+  let read ch buf ofs len =
+    Logs.debug (fun m -> m "read: start; len = %d" len);
+    (* read event counter before reading ring and wait for event counter <>
+       this value to avoid race conditions in another thread receiving an event
+       that we waited for.
+       when an event is received all threads that were waiting on one wake up
+       and check the ring and then back to waiting
+    *)
+    Notify.prepare ch.notif
+    |> read_aux ch buf ofs len
+
+  let rec write_aux ch buf ofs len event =
     debug_ring ch "write";
     let n = R.write ch.buffer buf ofs len in
     debug_ring ch "write";
@@ -147,11 +192,16 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     end;
     if n < len then begin
       debug_ring ch "write";
-      Notify.wait_for_other_end ch.notif "write";
+      let event = Notify.wait_for_other_end ch.notif event "write" in
       Logs.debug (fun m -> m "write: recursing");
-      write ch buf (ofs + n) (len - n)
+      write_aux ch buf (ofs + n) (len - n) event
     end;
     Logs.debug (fun m -> m "write: done")
+
+  let write ch buf ofs len =
+    Logs.debug (fun m -> m "write: got=%d" len);
+    Notify.prepare ch.notif
+    |> write_aux ch buf ofs len
 
 end
 
@@ -211,19 +261,17 @@ let client () =
     done
   )
 
+(* xs_client_unix uses threads, have to set mutex on logger *)
+let () =
+  let mutex = Mutex.create () in
+  Logs.set_reporter_mutex
+    ~lock:(fun () -> Mutex.lock mutex)
+    ~unlock:(fun () -> Mutex.unlock mutex)
+
 let () =
   Sys.catch_break true;
   Fmt_tty.setup_std_outputs ~style_renderer:`None ();
   OS.Arg.parse_opts ();
-(*  let lockfile = Unix.openfile "/tmp/lock" [Unix.O_CREAT; Unix.O_RDWR;Unix.O_CLOEXEC] 0o600 in
-  let lock () =
-    Unix.lockf lockfile Unix.F_LOCK 0;
-  in
-  let unlock () =
-    Format.pp_print_flush Format.err_formatter ();
-    Unix.lockf lockfile Unix.F_ULOCK 0 in
-  (* locking doesn't seem to help here *)
-  Logs.set_reporter_mutex ~lock ~unlock; *)
   if debug then Logs.set_level (Some Logs.Debug);
   Logs.debug (fun m -> m "PID %d" (Unix.getpid ()));
   if flag_client then client () else server ()
