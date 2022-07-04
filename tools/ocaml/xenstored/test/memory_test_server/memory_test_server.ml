@@ -15,7 +15,8 @@ let () =
   Logging.access_logger := Some logger;
   Logging.access_log_special_ops := true;
   Logging.access_log_transaction_ops := true ;
-  Logging.xenstored_log_level := Logging.Debug
+  (* Logging.xenstored_log_level := Logging.Debug *)
+  Logging.xenstored_log_level := Logging.Info
 
 let shm_name =
   let base = Sys.executable_name |> Filename.basename in
@@ -42,7 +43,7 @@ let spawn_client name domid rd wr =
     [| Printf.sprintf "xenstore-client %d" domid
      ; "--client"
      ; "--shm"; name
-     ; "--debug"
+     (*  "--debug" *)
     |]
     rd wr Unix.stderr in
   at_exit (fun () -> Unix.kill pid 15)

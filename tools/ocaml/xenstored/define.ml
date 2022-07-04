@@ -35,7 +35,8 @@ let gc_allocation_policy =
   *)
   if current_policy < 2 then ref 1 else ref current_policy
 
-(* TODO: calc based on config limits and RAM% *)
+(* TODO: calc based on config limits and RAM% and allow to disable? or just set
+ *)
 let maxdomumemory = ref (4*1024*1024)
 
 let conflict_burst_limit = ref 5.0

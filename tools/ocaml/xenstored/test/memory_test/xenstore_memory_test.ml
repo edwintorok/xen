@@ -244,7 +244,7 @@ let client () =
   let key_prefix = String.v ~len:1024 (fun _ -> 'y') in
   let value_prefix = String.v ~len:2048 (fun _ -> 'v') in
   let i = ref 0 in
-  Client.immediate c (fun h ->
+  Client.transaction c (fun h ->
     (* we could probe size here? *)
     while true do
       incr i;
