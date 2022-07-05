@@ -84,6 +84,13 @@ let mark_as_bad con =
 	|None -> ()
 	| Some domain ->
 	    Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
+	    (* TODO: run just the cleanup code from reconnect,
+	    according to the protocol the server is not allowed to initate a reconnect.
+        We could consider advertising the ring error reporting feature and advertise too much memory usage in some way
+        instead of letting the guest hang forever.
+        We should consider queuing up one final error message for the guest,
+        although that would be contrary to reducing memory usage if the problem is buildup on the ring...
+	    *)
 	    do_reconnect con;
 	    Domain.mark_as_bad domain
 
