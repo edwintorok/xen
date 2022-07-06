@@ -252,6 +252,10 @@ let client () =
       let key = Printf.sprintf "data/%s%d" key_prefix !i in
       let key_enoent = Printf.sprintf "data/no%s%d" key_prefix !i in
       let value = Printf.sprintf "%s%d" value_prefix !i in
+      (* TODO: could also trigger unique watch events of various sizes Robson style
+         to consume even more memory
+         we'll probably be forced to implement as a set..
+       *)
       Client.write h key value;
       (* this will have to get stored in the replay queue so that after a 
          conflict reply can be checked to match *)

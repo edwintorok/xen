@@ -1,0 +1,2 @@
+(test
+  (name memuse) (libraries unix))
