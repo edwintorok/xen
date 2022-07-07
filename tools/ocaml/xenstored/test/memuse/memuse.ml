@@ -1,7 +1,16 @@
 module type Allocator = sig
+  (** A memory allocator, either local or remote.
+   Since we are testing the (fragmentation) behaviour of the GC
+   the code in this module should minimize memory allocations
+   outside of [init] and [finish].
+  *)
+
   type t
 
   type item
+
+  val empty : item
+  (** [empty] is an item with minimal size. *)
 
   val init : unit -> t
   (** [init ()] initializes an allocator, or returns None if no more allocators are available.
@@ -17,28 +26,43 @@ module type Allocator = sig
   val finish : t -> unit
   (** [finish t] ends the use of allocator [t] *)
 
-  val alloc : t -> int -> item Seq.t
+  val alloc : t -> int -> item array
   (** [alloc t n] allocates as many items of size [n] as possible,
       where [size_min <= n <= size_max].
       Allocations can be done in parallel but they must all be completed when the sequence completes
       to ensure we stay within our quota.
-      @return an allocated item sequence that can be deallocated without deallocating other items
+      @return an allocated item sequence that can be deallocated without deallocating other items.
+      The overhead of each item should be kept at a minimum, ideally it should be just the allocated
+      item of size [n]
       *)
 
-  val dealloc : t -> item Seq.t -> unit
+  val dealloc : t -> item -> unit
   (** [dealloc t item] deallocates [item]. Can only be called once for a given [item].
-      Deallocations can be done in parallel but they must all be completed before this function returns
-      to ensure we stay within our quota.
+      The caller will set the array entry to [empty].
    *)
 
-  val cycle_done: t -> unit
-  (** [cycle_done t] is a debugging hook *)
+  val strategy_begin : t -> unit
+  (** [strategy_begin t] is a debugging hook, called when an attack strategy starts,
+      can be used to take a baseline memory measurement
+   *)
+
+  val strategy_done : t -> unit
+  (** [strategy_done t] is a debugging hook, called when an attack cycle finishes,
+      but before the memory is cleaned up (i.e. near peak fragmentation level).
+   *)
 end
 
-module ProbeAllocator (A : sig
+module ProbeIndexedAllocator (A : sig
+  (** Typically used with a remote system,
+      so [alloc] here allocating an extra option is not a problem
+   *)
+
   type t
 
   type item
+
+  val empty : item
+  (** [empty] is a minimal sized item *)
 
   val init : unit -> t
   (** [init ()] initializes the allocator.
@@ -53,11 +77,12 @@ module ProbeAllocator (A : sig
 
   val finish : t -> unit
   (** [finish t] last call using [t] *)
-end) =
-struct
+end) : Allocator = struct
   type t = {allocator: A.t; size_min: int; size_max: int}
 
   type item = A.item
+
+  let empty = A.empty
 
   let init () =
     let t = A.init () in
@@ -91,61 +116,73 @@ struct
 
   let finish t = A.finish t.allocator
 
-  let rec alloc t n () =
-    match A.alloc t n with None -> Seq.Nil | Some v -> Seq.Cons (v, alloc t n)
+  let alloc t n =
+    let rec loop l =
+      match A.alloc t.allocator n with
+      | None ->
+          Array.of_list l
+      | Some v ->
+          loop (v :: l)
+    in
+    loop []
 
-  let dealloc t items = items |> Seq.iter (A.dealloc t)
+  let dealloc t item = A.dealloc t.allocator item
 
-  let cycle_done _t = ()
+  let strategy_begin _t = ()
+  let strategy_done _t = ()
 end
 
 type 'a allocator = (module Allocator with type t = 'a)
 
 type initialized = Alloc : 'a allocator * 'a -> initialized
 
-(** [multiple allocators] combines multiple allocators into a single one
+(** [multiple allocators] combines multiple (remote) allocators into a single one
    that calls each allocator in turn *)
 let multiple allocator_seq =
-  let allocators = Array.of_seq allocator_seq in
+  let allocators = List.of_seq allocator_seq in
   (module struct
-    type t = initialized array
+    type t = initialized list
+
+    let empty () = ()
 
     type item = unit -> unit
 
     let init () =
       allocators
-      |> Array.map @@ fun (module A : Allocator) -> Alloc ((module A), A.init ())
+      |> List.map @@ fun (module A : Allocator) -> Alloc ((module A), A.init ())
 
     let size_min t =
-      Array.fold_left
+      List.fold_left
         (fun m (Alloc ((module A), t)) -> min m (A.size_min t))
         max_int t
 
     let size_max t =
-      Array.fold_left
+      List.fold_left
         (fun m (Alloc ((module A), t)) -> max m (A.size_max t))
         min_int t
 
-    let finish = Array.iter (fun (Alloc ((module A), t)) -> A.finish t)
+    let finish = List.iter (fun (Alloc ((module A), t)) -> A.finish t)
 
     let alloc t n =
       (* allocate as much as possible from each allocator *)
       t
-      |> Array.to_seq
-      |> Seq.flat_map @@ fun (Alloc ((module A), t)) ->
-         if n >= A.size_min t && n <= A.size_max t then
-           A.alloc t n |> Seq.map @@ fun item () -> A.dealloc t (Seq.return item)
-         else
-           Seq.empty
+      |> List.map (fun (Alloc ((module A), t)) ->
+             if n >= A.size_min t && n <= A.size_max t then
+               A.alloc t n |> Array.map (fun item () -> A.dealloc t item)
+             else
+               [||]
+         )
+      |> Array.concat
 
-    let dealloc _t items =
-      (* TODO: deallocs could be grouped if we used a different type *)
-      items |> Seq.iter @@ fun f -> f ()
+    let dealloc _t item = item ()
 
-    let cycle_done t =
-      t |> Array.iter @@ fun (Alloc ((module A), t)) ->
-      A.cycle_done t
-  end: Allocator)
+    let strategy_begin t =
+      t |> List.iter @@ fun (Alloc ((module A), t)) -> A.strategy_begin t
+
+    let strategy_done t =
+      t |> List.iter @@ fun (Alloc ((module A), t)) -> A.strategy_done t
+
+end : Allocator)
 
 (** an attack strategy against an allocator *)
 module type Strategy = sig
@@ -170,7 +207,7 @@ module WorstCase (A : Allocator) : Strategy = struct
 
   type cycle = {
       size: int (* size of items allocated at this cycle *)
-    ; mutable items: A.item option array
+    ; mutable items: A.item array
   }
 
   type t = {allocator: A.t; cycles: cycle array}
@@ -184,59 +221,54 @@ module WorstCase (A : Allocator) : Strategy = struct
   let cycle_prepare ?(minsize = 1) allocator =
     let minsize = max minsize (A.size_min allocator) in
     let cycles =
-      Array.of_seq
-        (sizes (A.size_max allocator) [] minsize
-        |> List.to_seq
-        |> Seq.map @@ fun size -> {size; items= [||]}
-        )
+      sizes (A.size_max allocator) [] minsize
+      |> List.map (fun size -> {size; items= [||]})
+      |> Array.of_list
     in
     if Array.length cycles = 0 then
       None
     else
       Some {allocator; cycles}
 
-  let some x = Some x
-
   let cycle_run t =
+    A.strategy_begin t.allocator ;
+    let () = 
     t.cycles
     |> Array.iteri @@ fun i0 cycle ->
-        Logs.debug (fun m -> m "Cycle %d" i0);
+       Logs.debug (fun m -> m "Cycle %d" i0) ;
        (* allocate as many items as possible in current cycle of the current size *)
-       cycle.items <-
-         A.alloc t.allocator cycle.size |> Seq.map some |> Array.of_seq ;
-        Logs.debug (fun m -> m "Allocated");
+       cycle.items <- A.alloc t.allocator cycle.size ;
+       Logs.debug (fun m -> m "Allocated") ;
        (* deallocate some of the previous items, such that the largest continuos gap is not
           enough to fulfil the next allocation size.
           In OCaml this won't immediately deallocate the item just make it possible for the GC
           to reuse the item in the future
        *)
-       let deallocs = ref [] in
-       for j0 = 0 to i0 do
-         let a = t.cycles.(j0).items in
-         a
-         |> Array.iteri @@ fun k0 item ->
-            (* formula in paper is k ∤ 2 ^ (i-j+1), using 1-based indexes.
-               We use 0 based indexes in OCaml, hence the modified formula here
-            *)
-            if (k0 + 1) mod (1 lsl (i0 - j0 + 1)) <> 0 then
-              match item with
-              | Some dealloc ->
-                assert (a.(k0) <> None) ;
-                (* can only dealloc once *)
-                a.(k0) <- None ;
-                deallocs := dealloc :: !deallocs
-              | None -> ()
-       done ;
-       A.dealloc t.allocator @@ List.to_seq !deallocs
+       if i0 < Array.length t.cycles - 2 then
+         for j0 = 0 to i0 do
+           let a = t.cycles.(j0).items in
+           a
+           |> Array.iteri @@ fun k0 item ->
+              (* formula in paper is k ∤ 2 ^ (i-j+1), using 1-based indexes.
+                 We use 0 based indexes in OCaml, hence the modified formula here
+              *)
+              if (k0 + 1) mod (1 lsl (i0 - j0 + 1)) <> 0 && item != A.empty then (
+                a.(k0) <- A.empty ; A.dealloc t.allocator item
+              )
+         done;
+    in
+    A.strategy_done t.allocator 
 
   let cycle_cleanup t =
-    A.cycle_done t.allocator;
     t.cycles
     |> Array.iter @@ fun cycle ->
-       cycle.items
-       |> Array.to_seq
-       |> Seq.filter_map (fun x -> x)
-       |> A.dealloc t.allocator ;
+       Array.iter
+         (fun item ->
+           (* physical equality: do not deallocate empty! *)
+           if item != A.empty then
+             A.dealloc t.allocator item
+         )
+         cycle.items ;
        cycle.items <- [||]
 end
 
@@ -259,17 +291,23 @@ module MaxAlloc (A : Allocator) : Strategy = struct
 
   let cycle_run t =
     let minsize = A.size_min t.allocator in
-    let rec loop size =
+    A.strategy_begin t.allocator;
+    let rec loop items size =
       if size < minsize then
-        Seq.empty
+        Array.concat items
       else
-        Seq.append (A.alloc t.allocator size) @@ loop (size / 2)
+        loop (A.alloc t.allocator size :: items) (size / 2)
     in
-    t.items <- loop (A.size_max t.allocator) |> Array.of_seq
+    t.items <- loop [] (A.size_max t.allocator);
+    A.strategy_done t.allocator
 
   let cycle_cleanup t =
-    A.cycle_done t.allocator;
-    A.dealloc t.allocator (Array.to_seq t.items) ;
+    Array.iter
+      (fun item ->
+        if item != A.empty then
+          A.dealloc t.allocator item
+      )
+      t.items ;
     t.items <- [||]
 end
 
@@ -277,17 +315,18 @@ let run (module S : Strategy) =
   let alloc = S.A.init () in
   let rec loop minsize =
     match S.cycle_prepare ~minsize alloc with
-    | None -> ()
+    | None ->
+        ()
     | Some cycle ->
-        Logs.debug (fun m -> m "Starting cycle with size %d" minsize);
+        Logs.debug (fun m -> m "Starting cycle with size %d" minsize) ;
         S.cycle_run cycle ;
         S.cycle_cleanup cycle ;
-        S.A.finish alloc;
+        S.A.finish alloc ;
         (* due to item count limit we can't achieve optimum fragmentation and space usage,
            so have to try higher and higher sizes to start with *)
         loop (minsize * 2)
   in
-  loop (S.A.size_min alloc);
+  loop (S.A.size_min alloc) ;
   S.A.finish alloc
 
 module OCamlAllocator = struct
@@ -324,7 +363,7 @@ module OCamlAllocator = struct
     + (maxwatches * (max_split_keysize + maxtokensize))
 
   let maxmem_controllable =
-    ((keysize + valuesize) * (maxentries/2) * (maxtxn + 1))
+    ((keysize + valuesize) * (maxentries / 2) * (maxtxn + 1))
     + (maxwatches * maxtokensize)
 
   let maxalloc_size = List.fold_left max maxtokensize [keysize; valuesize]
@@ -333,69 +372,106 @@ module OCamlAllocator = struct
 
   (* ignoring item count limits, this is to test the OCaml GC *)
   module NoCountLimit = struct
-    type t = {mutable used: int}
+    type baseline = { top: int; live: int }
+    type t =
+      { mutable used: int
+      ; mutable overhead: baseline
+      ; mutable baseline_top_words: baseline option
+      }
 
-    type item = string ref
+    type item = string
 
+    let empty = ""
+
+    let default = { top =0; live = 0}
     let init () =
       Logs.debug (fun m ->
           m "allocator initialized, maxmem_controllable = %.2fMiB"
             (float maxmem_controllable /. 1024. /. 1024.)
       ) ;
-      {used= 0}
+      {used= 0; overhead = default; baseline_top_words = None}
 
     let size_min _ = minalloc_size
 
     let size_max _ = maxalloc_size
 
-    let cycle_done _t =
+    let mib = 1024. *. 1024.
+
+    let mib_of_words w = float (w * word) /. mib
+
+    let strategy_begin t =
+      match t.baseline_top_words with
+      | Some _ -> ()
+      | None ->
+          Gc.compact ();
+          let q = Gc.quick_stat () in
+          let baseline = { top = q.Gc.top_heap_words; live = q.Gc.live_words } in
+          Logs.debug (fun m -> m "taken baseline GC measurement: %.2f MiB top, %.2f MiB live"
+            (mib_of_words baseline.top) (mib_of_words baseline.live));
+          t.baseline_top_words <- Some baseline
+
+
+    let strategy_done t =
+      t.overhead <- { t.overhead with top = max t.overhead.top t.overhead.live};
       let q = Gc.quick_stat () in
       Logs.debug (fun m -> m "running GC") ;
       (* needed to get accurate live_words count from stat *)
       Gc.full_major () ;
       let s = Gc.stat () in
-      let num = q.Gc.heap_words in (* heap words prior to GC *)
-      let denum = s.Gc.live_words in (* accurate live words only known after Gc *)
+      let baseline = Option.value ~default t.baseline_top_words in
+      let baseline = { top = baseline.top + t.overhead.top; live = baseline.live + t.overhead.live } in
+      Logs.debug (fun m -> m "baseline top = %.2fMiB, live=%.2fMiB" (mib_of_words baseline.top)
+      (mib_of_words baseline.live));
+      (* heap=live when compacted in baseline *)
+      let num = mib_of_words (q.Gc.heap_words - baseline.live) in
+      (* heap words prior to GC *)
+      let denum = mib_of_words (s.Gc.live_words - baseline.live) in
+      (* accurate live words only known after Gc *)
       Logs.info (fun m ->
-        m "Ratio: %d (heap) / %d (live) = %.3f" num denum (float num /. float denum)
-      );
+          m "Ratio: %.2f MiB (heap) / %.2f MiB (live) = %.3f" num denum
+            (num /. denum)
+      ) ;
 
       Logs.debug @@ fun m ->
-      let num = s.Gc.top_heap_words in
-      let denum = s.Gc.live_words in
-      m "Ratio: %d (top) / %d (live) = %.3f" num denum (float num /. float denum)
+      let num = mib_of_words (s.Gc.top_heap_words - baseline.top) in
+      let denum = mib_of_words (s.Gc.live_words - baseline.live) in
+      m "Ratio: %.2f MiB (top) / %.2f MiB (live) = %.3f" num denum (num /. denum)
 
-    let finish t = assert (t.used = 0)
+    let finish t =
+      assert (t.used = 0);
+      t.overhead <- { t.overhead with live = 0}
 
     let alloc t n =
-      if n mod word <> 0 then Seq.empty
+      if n mod word <> 0 then
+        [||]
       else
-      let avail = max 0 (maxmem_controllable - t.used) in
-      let count = avail / n in
-      if count = 0 then
-        Seq.empty
-      else
-        let elements =
-          Array.init count @@ fun _ ->
-          let strsize = max 1 (((n/word - 1) * word) - word) in
-          (* in reality this should be a unique value to ensure oxenstored can't
-             optimize the duplicates away
-          *)
-          ref (String.make strsize 'x')
-        in
-        let result = Array.to_seq elements in
-        (* ensure they are all in the major heap, this could be done e.g. by
-           sending a bunch of noop packets *)
-        Gc.minor () ;
-        t.used <- t.used + count * n;
-        Logs.debug (fun m -> m "used %d, count=%d, n=%d" t.used count n);
-        result
+        let avail = max 0 (maxmem_controllable - t.used) in
+        let count = avail / n in
+        if count = 0 then
+          [||]
+        else
+          let elements =
+            Array.init count @@ fun _ ->
+            let strsize = max 1 ((((n / word) - 1) * word) - word) in
+            (* in reality this should be a unique value to ensure oxenstored can't
+               optimize the duplicates away
+            *)
+            String.make strsize 'x'
+          in
+          (* ensure they are all in the major heap, this could be done e.g. by
+             sending a bunch of noop packets *)
+          Gc.minor () ;
+          t.used <- t.used + (count * n) ;
+          (* the array itself is not part of what we're "allocating" *)
+          let delta = 1 + Array.length elements in
+          t.overhead <- {t.overhead with live = t.overhead.live + delta};
+          Logs.debug (fun m -> m "used %d, count=%d, n=%d" t.used count n) ;
+          elements
 
-    let dealloc t items =
-      items |> Seq.iter @@ fun item ->
-        if !item <> "" then
-          t.used <- t.used - (word * Obj.reachable_words (Obj.repr !item));
-        item := "";
+    let dealloc t item =
+      if item <> "" then
+        let n = word * (((String.length item + word) / word) + 1) in
+        t.used <- t.used - n
   end
 
   module Strategy = WorstCase (NoCountLimit)
