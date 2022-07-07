@@ -1,2 +1,3 @@
 (test
-  (name memuse) (libraries unix))
+  (modes native)
+  (name memuse_test) (libraries unix bos.setup))
