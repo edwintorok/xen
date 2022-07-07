@@ -32,6 +32,70 @@ module type Allocator = sig
    *)
 end
 
+module ProbeAllocator(A:sig
+  type t
+  type item
+
+  val init: unit -> t
+  (** [init ()] initializes the allocator.
+     Min and max supported allocation sizes will be probed automatically.
+   *)
+
+  (** [alloc t n] allocates an item of size [n] if possible *)
+  val alloc: t -> int -> item option
+
+  (** [dealloc t item] deallocates exactly item [t] *)
+  val dealloc: t -> item -> unit
+
+  (** [finish t] last call using [t] *)
+  val finish: t -> unit
+end) = struct
+    type t =
+      { allocator: A.t
+      ; size_min: int
+      ; size_max: int
+      }
+
+    type item = A.item
+
+    let init () =
+      let t = A.init () in
+      let rec loop_min size =
+        if size > Sys.max_array_length then
+          invalid_arg "Allocator not working: all sizes failed";
+        match A.alloc t size with
+        | None ->
+            (* probe sizes using powers of 2 until we succeed finding minimum *)
+            loop_min (size * 2)
+        | Some v -> A.dealloc t v; size
+      in
+      let rec loop_max oksize size =
+        match A.alloc t size with
+        | None -> oksize
+        | Some v ->
+            A.dealloc t v;
+            (* probe sizes using powers of 2 until we fail allocating:
+               the size just before the failed probe is the maximum supported *)
+            loop_max size (size * 2)
+      in
+      let size_min = loop_min 1 in
+      let size_max = loop_max size_min size_min in
+      { allocator = t; size_min; size_max}
+
+    let size_min t = t.size_min
+    let size_max t = t.size_max
+
+    let finish t = A.finish t.allocator
+
+    let rec alloc t n () =
+      match A.alloc t n with
+      | None -> Seq.Nil
+      | Some v -> Seq.Cons (v, alloc t n)
+
+    let dealloc t items =
+      items |> Seq.iter (A.dealloc t)
+end
+
 type 'a allocator = (module Allocator with type t = 'a)
 
 type initialized = Alloc : 'a allocator * 'a -> initialized
@@ -66,7 +130,9 @@ let multiple allocator_seq =
       t
       |> Array.to_seq
       |> Seq.flat_map @@ fun (Alloc ((module A), t)) ->
-         A.alloc t n |> Seq.map @@ fun item () -> A.dealloc t (Seq.return item)
+         if n >= A.size_min t && n <= A.size_max t then
+          A.alloc t n |> Seq.map @@ fun item () -> A.dealloc t (Seq.return item)
+        else Seq.empty
 
     let dealloc _t items =
       (* TODO: deallocs could be grouped if we used a different type *)
