@@ -17,12 +17,21 @@
 module Server_feature = struct
 	type t =
 	| Reconnection
+		| Error (** connection error reporting *)
+
+		let to_int = function
+			| Reconnection -> 1
+			| Error -> 2
+
+		let all = [Reconnection; Error]
 end
 
 module Server_features = Set.Make(struct
 	type t = Server_feature.t
 	let compare = compare
 end)
+
+let all = Server_features.of_list Server_feature.all
 
 external read: Xenmmap.mmap_interface -> bytes -> int -> int = "ml_interface_read"
 external write: Xenmmap.mmap_interface -> bytes -> int -> int = "ml_interface_write"
@@ -36,13 +45,22 @@ let write_substring mmap buff len =
 let get_server_features mmap =
 	(* NB only one feature currently defined above *)
 	let x = _internal_get_server_features mmap in
-	if x = 0
-	then Server_features.empty
-	else Server_features.singleton Server_feature.Reconnection
+	Server_features.filter (fun feature ->
+		(Server_feature.to_int feature) land x <> 0
+	) all
 
 let set_server_features mmap set =
 	(* NB only one feature currently defined above *)
-	let x = if set = Server_features.empty then 0 else 1 in
+	let x = Server_features.fold (fun feature acc ->
+				acc lor (Server_feature.to_int feature)) set 0 in
 	_internal_set_server_features mmap x
+
+(** [set_error intf errorcode] sets the connection error code for [intf].
+		See docs/misc/xenstore-ring.txt
+ *)
+external set_error: Xenmmap.mmap_interface -> int -> unit = "ml_interface_set_error"
+
+(** [get_error intf] retrieves the connection error code for [intf] *)
+external get_error: Xenmmap.mmap_interface -> int = "ml_interface_get_error"
 
 external close: Xenmmap.mmap_interface -> unit = "ml_interface_close" [@@noalloc]

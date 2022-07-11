@@ -170,11 +170,23 @@ let open_fd fd = newcon (Fd { fd = fd; })
 
 let open_mmap mmap notifyfct =
 	(* Advertise XENSTORE_SERVER_FEATURE_RECONNECTION *)
-	Xs_ring.set_server_features mmap (Xs_ring.Server_features.singleton Xs_ring.Server_feature.Reconnection);
+	Xs_ring.set_server_features mmap (Xs_ring.Server_features.of_list [Xs_ring.Server_feature.Reconnection; Xs_ring.Server_feature.Error]);
 	newcon (Xenmmap {
 		mmap = mmap;
 		eventchn_notify = notifyfct;
 		work_again = false; })
+
+let set_error con error = match con.backend with
+	| Fd _ ->
+		(* should never happen, so close the connection *)
+		raise End_of_file
+	| Xenmmap backend ->
+		Xs_ring.set_error backend.mmap error;
+		(* similar to reconnect, but doesn't close ring,
+			this could be used to report an error about the event channel itself,
+			so ignore errors from it *)
+		(try backend.eventchn_notify () with _ -> ());
+		reset con
 
 let close con =
 	match con.backend with
