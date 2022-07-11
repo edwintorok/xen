@@ -81,6 +81,7 @@ val input : t -> bool
 val newcon : backend -> t
 val open_fd : Unix.file_descr -> t
 val open_mmap : Xenmmap.mmap_interface -> (unit -> unit) -> t
+val set_error: t -> int -> unit
 val close : t -> unit
 val is_fd : t -> bool
 val is_mmap : t -> bool

@@ -171,6 +171,29 @@ CAMLprim value ml_interface_set_server_features(value interface, value v)
 		caml_failwith("Interface closed");
 
 	intf->server_features = Int_val(v);
+	intf->error = 0;
+
+	CAMLreturn(Val_unit);
+}
+
+CAMLprim value ml_interface_get_error(value interface)
+{
+	CAMLparam1(interface);
+	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	if (intf == (void*)MAP_FAILED)
+		caml_failwith("Interface closed");
+	CAMLreturn(Val_int(intf->error));
+}
+
+
+CAMLprim value ml_interface_set_error(value interface, value error)
+{
+    CAMLparam2(interface, error);
+	struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
+	if (intf == (void*)MAP_FAILED)
+		caml_failwith("Interface closed");
+	intf->error = Int_val(error);
+	xen_mb ();
 
 	CAMLreturn(Val_unit);
 }
@@ -195,6 +218,7 @@ CAMLprim value ml_interface_close(value interface)
 		intf->req[i] = 0xff; /* XS_INVALID = 0xffff */
 		intf->rsp[i] = 0xff;
 	}
+	intf->error = 0;
 	xen_mb ();
 	intf->connection = XENSTORE_CONNECTED;
 	CAMLreturn(Val_unit);
