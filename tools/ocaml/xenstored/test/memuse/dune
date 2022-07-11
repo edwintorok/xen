@@ -1,3 +1,9 @@
+(library
+  (name memuse)
+  (modules memuse)
+  (libraries logs)
+  )
 (test
   (modes native)
-  (name memuse_test) (libraries unix bos.setup))
+  (modules memuse_test)
+  (name memuse_test) (libraries unix bos.setup memuse))

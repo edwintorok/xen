@@ -37,7 +37,7 @@ let gc_allocation_policy =
 
 (* TODO: calc based on config limits and RAM% and allow to disable? or just set
  *)
-let maxdomumemory = ref (4*1024*1024)
+let maxdomumemory = ref (512*1024*1024)
 
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05

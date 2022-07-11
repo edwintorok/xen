@@ -1,5 +1,6 @@
 (test
   (name memory_test_server)
   (modes exe)
-  (action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe}))
+  ;(action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe}))
+  (action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe} --memuse))
   (libraries xenstored_test shm))

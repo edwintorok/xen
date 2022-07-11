@@ -30,6 +30,7 @@ let shm_fd =
 
 let size = 4096
 let () =
+  Define.maxdomumemory := 4*1024*1024;
   Unix.ftruncate shm_fd size;
   at_exit (fun () ->
     Unix.close shm_fd;
@@ -39,12 +40,13 @@ let () =
   )
 
 let spawn_client name domid rd wr =
-  let pid = Unix.create_process Sys.argv.(1)
-    [| Printf.sprintf "xenstore-client %d" domid
+  let _0 :: cmd :: rest = Sys.argv |> Array.to_list in
+  let pid = Unix.create_process cmd
+    (Array.of_list ([ Printf.sprintf "xenstore-client %d" domid
      ; "--client"
      ; "--shm"; name
      (*  "--debug" *)
-    |]
+    ] @ rest))
     rd wr Unix.stderr in
   at_exit (fun () -> Unix.kill pid 15)
 

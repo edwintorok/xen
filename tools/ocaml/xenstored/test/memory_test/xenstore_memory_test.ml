@@ -1,3 +1,4 @@
+let string_make = String.make
 open Bos_setup
 
 let size = 4096
@@ -36,6 +37,7 @@ module type Notification = sig
 end
 
 let flag_client = OS.Arg.(flag ["client"] ~doc:"run in client mode")
+let flag_memuse = OS.Arg.(flag ["memuse"] ~doc:"memory (fragmentation) usage (client mode)")
 
 module Notify = struct
   type t = {
@@ -132,6 +134,24 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
       (Fmt.hbox Fmt.(list ~sep:Fmt.sp @@ pair ~sep:Fmt.sp string string)) dbg
       )
 
+  exception Xs_ring_error of int
+  let check_ring_error_exn ch =
+    (* TODO: modify upstream xenstore_ring.ml in shared-memory-ring *)
+    let features_offset = 2048 + 4*4 in (* see xs_wire.h *)
+    let error_offset = features_offset + 2*4 in
+    let get_u32 off = Cstruct.HE.get_uint32 ch.buffer off |> Int32.to_int in
+    let features = get_u32 features_offset in
+    Logs.debug (fun m -> m "Server features: %d" features);
+    let has_error_feature = features land 2 <> 0 in
+    if has_error_feature then begin
+      debug_ring ch "ring error check";
+      let err = get_u32 error_offset in
+      Logs.debug (fun m -> m "ring error: %d" err);
+      if err <> 0 then
+        raise (Xs_ring_error err)
+    end else
+      Logs.debug (fun m -> m "server doesn't have error reporting feature")
+
   let create () =
     Logs.debug (fun m -> m "opening shared memory page");
     let fd =
@@ -162,6 +182,7 @@ module MakeIO(R: Ring.S)(Notify: Notification) = struct
     debug_ring ch "read";
     Logs.debug (fun m -> m "read: got = %d" n);
     if n = 0 then begin
+      check_ring_error_exn ch;
       let event = Notify.wait_for_other_end ch.notif event "read" in
       Logs.debug (fun m -> m "read: repeating");
       read_aux ch buf ofs len event
@@ -232,10 +253,78 @@ let server () =
   at_exit (fun () -> ServerIO.destroy io);
   loop_forever ps
 
+
+let memuse c =
+  Client.transaction_one_try c @@ fun handle ->
+  let module XSAllocatorKey = (struct
+    type t =
+      { handle: Client.handle
+      ; mutable counter: int
+      }
+
+    (* reduce client-side memory usage: do not store keys, since we can always rebuild them *)
+    type item = int
+    let empty = 0
+
+    let encode_item t n =
+      assert (n > 0 && n <= 0xffff);
+      t.counter <- t.counter + 1;
+      (t.counter lsl 16) lor n
+
+    let word = Sys.word_size / 8
+    let minsize = 16
+    let prefix = "data/"
+    let maxsize = 1024 - String.length prefix
+
+    let key_of_item idx =
+      let size = idx land 0xffff in
+      let count = idx lsr 16 in
+      let cntstr = string_of_int count in
+      let strsize = (((size / word) - 1) * word) - String.length cntstr in
+      assert (strsize > 0);
+      (* TODO: probe writable paths *)
+      (* builds a unique string of length 'size' after data/
+         by embedding a counter.
+         Minsize ensures we'll have plenty of room for the digits
+         *)
+      prefix ^ cntstr ^ (string_make strsize 'x')
+
+    let alloc t n =
+      if n < minsize || n > maxsize then None
+      else
+        let item = encode_item t n in
+        let k = key_of_item item in
+        (* TODO: use max alloc of value... *)
+        try
+          (* TODO: how to detect endconn? *)
+          (* Client.mkdir t.handle k; *)
+          Client.immediate c (fun h -> Client.mkdir h k);
+          Some item
+        with
+        | Xs_protocol.Error("EQUOTA") -> None
+        | e -> raise e
+
+    let dealloc t item =
+      let k = key_of_item item in
+      Client.immediate c (fun h -> Client.rm h k)
+      (* Client.rm t.handle k *)
+
+    let init () = { handle; counter = 1}
+    let finish _ = ()
+  end) in
+  (* TODO: using more than 1 tx requires modifying alloc interface to be a with_ style *)
+  let module KeyA = Memuse.ProbeIndexedAllocator(XSAllocatorKey) in
+  let module WC = Memuse.WorstCase(KeyA) in
+  let module MAX = Memuse.MaxAlloc(KeyA) in
+  Memuse.run (module WC)
+(* TODO: choose with enum Memuse.run (module MAX) *)
+
 let client () =
   Logs.debug (fun m -> m "initializing client");
   let c = Client.make () in
   Client.set_logger (fun s -> Logs.debug @@ fun m -> m "xenstore-client: %s" s);
+  if flag_memuse then memuse c
+  else
  (* Client.immediate c (fun h ->
     Logs.debug (fun m -> m "domainpath: %s" (Client.getdomainpath h 1)
     )

@@ -1,3 +1,3 @@
 (executable
  (name xenstore_memory_test)
- (libraries shared-memory-ring xenstore.unix bos.setup shm))
+ (libraries shared-memory-ring xenstore.unix bos.setup shm memuse))
