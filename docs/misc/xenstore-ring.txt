@@ -93,6 +93,7 @@ Value   Description
 1       Communication problems (event channel not functional)
 2       Inconsistent producer or consumer offset
 3       Protocol violation (client data package too long)
+4       Out of memory (e.g. domain not reading reply packets, or txn too large)
 
 The ring reconnection feature
 =============================
@@ -144,6 +145,7 @@ The connection error feature allows the server to signal error conditions
 leading to a stop of the communication with the client. In case such an error
 condition has occurred, the server will set the appropriate error condition in
 the Connection error indicator and will stop communication with the client.
+The server may signal the event channel if possible.
 
 Any value different from 0 is indicating an error. The value used is meant
 just for diagnostic purposes. A client reading the error value should be

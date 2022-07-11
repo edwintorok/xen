@@ -42,8 +42,7 @@ and t = {
 
 let initial_next_tid = 1
 
-let do_reconnect con =
-	Xenbus.Xb.reconnect con.xb;
+let reset con =
 	(* dom is the same *)
 	Hashtbl.clear con.transactions;
 	con.next_tid <- initial_next_tid;
@@ -53,6 +52,10 @@ let do_reconnect con =
 	con.stat_nb_ops <- 0;
 	(* perm is the same *)
 	()
+
+let do_reconnect con =
+	Xenbus.Xb.reconnect con.xb;
+	reset con
 
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
@@ -84,15 +87,9 @@ let mark_as_bad con =
 	|None -> ()
 	| Some domain ->
 	    Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
-	    (* TODO: run just the cleanup code from reconnect,
-	    according to the protocol the server is not allowed to initate a reconnect.
-        We could consider advertising the ring error reporting feature and advertise too much memory usage in some way
-        instead of letting the guest hang forever.
-        We should consider queuing up one final error message for the guest,
-        although that would be contrary to reducing memory usage if the problem is buildup on the ring...
-	    *)
-	    do_reconnect con;
-	    Domain.mark_as_bad domain
+	    Domain.mark_as_bad domain;
+	    Xenbus.Xb.set_error con.xb 4;
+	    reset con
 
 let make_perm dom =
 	let domid =
@@ -195,7 +192,7 @@ let del_watches con =
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions
+  Hashtbl.reset con.transactions
 
 let list_watches con =
 	let ll = Hashtbl.fold
