@@ -1,0 +1,11 @@
+(library
+  (name tracedebug)
+  (modules tracedebug)
+  (foreign_stubs (language c) (names clock_stubs))
+  (libraries unix threads.posix ocaml_intrinsics))
+
+(test 
+  (name tracedebug_test)
+  (modes native)
+  (modules tracedebug_test)
+  (libraries tracedebug memtrace))
