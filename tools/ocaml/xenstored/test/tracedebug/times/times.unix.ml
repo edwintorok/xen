@@ -12,7 +12,7 @@ let create n =
 let is_valid t = not (Float.is_nan t)
 let get = Float.Array.get (* not perf critical *)
 
+let precision = 6 (* gettimeofday returns time in [us], not [ns] *)
 let to_ns f =
-  (* multiplying by 1e9 would be less precise: nanoseconds would sometimes be nonzero.
-     Perform the multiplication by 1000 as an integer instead *)
+  (* more precise if we leave the final multiplication as integer *)
   f *. 1e6 |> Float.round |> Int64.of_float |> Int64.mul 1000L

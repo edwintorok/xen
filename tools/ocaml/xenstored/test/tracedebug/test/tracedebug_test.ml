@@ -5,7 +5,7 @@ end)
 
 let () =
   for _i = 1 to 10 do
-    StringEvent.record "fixed event"
+    StringEvent.record "fixed event";
   done;
 (* for i = 1 to 10 do
     eventf t (fun () -> string_of_int i)
@@ -16,5 +16,5 @@ let () =
   dump t print_endline;
   start t;
   dump t print_endline *)
-  dump [StringEvent.dump ()] print_endline
+  dump Format.err_formatter [StringEvent.dump ()]
 

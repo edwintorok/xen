@@ -9,11 +9,13 @@
   Note: exception: Atomic is a 4.12 feature, for older versions a backward compat
     https://github.com/c-cube/ocaml-atomic can be used
 *)
-
+open Tracedebug_times
 
 module type TracedEvent = sig
-  type t (** type of events to store in the trace ring *)
-  val empty: t (** the empty event *)
+  type t
+
+  val empty: t
+
   val to_string: t -> string
 end
 
@@ -84,10 +86,10 @@ end) = struct
   let record_internal ev =
       (* assumes power of 2 size *)
       let events_idx = Atomic.fetch_and_add index 1 land mask in
-      (Times.record [@ocaml.inlined]) timestamps events_idx;
+      Times.record timestamps events_idx;
       (* mask ensures we are within bounds *)
       Array.unsafe_set events events_idx ev
-  (* avoid inlining this itself to prevent making callers too large *)
+      (* avoid inlining this itself to prevent making callers too large *)
 
   (* performance critical: avoid allocation, and minimize function calls
       when disabled *)
@@ -136,16 +138,24 @@ let sorted all =
   Array.stable_sort sort_timestamp a;
   a
 
-let ns_per_s = 1_000_000_000L
-let dump all f =
+let time_frac_scale =
+  10. ** (float (9 - Times.precision)) |> Int64.of_float
+
+let pp_timestamp ppf i =
+  let open Monotonic_clock in
+  let s = Int64.unsigned_div i nsec_per_s
+  and ns = Int64.unsigned_rem i nsec_per_s in
+  let frac = Int64.unsigned_div ns time_frac_scale in
+  Format.fprintf ppf "%Lu.%0*Lus" s Times.precision frac
+
+let dump ppf all =
   let print last (timestamp, event) = 
     let delta = if Int64.(compare timestamp 0L < 0) then 0L else Int64.sub timestamp last in
-    Printf.ksprintf f "[%Ld.%09Ld](+%Ld.%09Ld) %s" (Int64.div timestamp ns_per_s) (Int64.rem timestamp ns_per_s)
-      (Int64.div delta ns_per_s) (Int64.rem delta ns_per_s) event;
+    Format.fprintf ppf "[%a](+%a) %s@," pp_timestamp timestamp pp_timestamp delta event;
     timestamp
   in
   let (_:int64) = all |> sorted |> Array.fold_left print Int64.min_int in
-  ()
+  Format.pp_print_flush ppf ()
 
 let register_gc ?(limit_log2=9) () =
   let module R = Make(GcEvent)(struct let limit_log2 = limit_log2 end) in

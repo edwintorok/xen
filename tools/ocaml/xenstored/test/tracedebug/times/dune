@@ -1,0 +1,15 @@
+(library
+ (name tracedebug_times)
+ (modules
+  (:standard times))
+ (modes native)
+ (foreign_stubs
+  (language c)
+  (names monotonic_clock_stubs))
+ (libraries
+  (select
+   times.ml
+   from
+   (ocaml_intrinsics unix -> times.intrinsics.ml)
+   (threads.posix -> times.clock.ml) ; always available, can be disabled for comparison by commenting out
+   (unix -> times.unix.ml))))

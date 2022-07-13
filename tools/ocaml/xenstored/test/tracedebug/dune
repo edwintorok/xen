@@ -1,16 +1,4 @@
 (library
-  (name tracedebug)
-  (modules tracedebug times)
-  (foreign_stubs (language c) (names clock_stubs))
-  (libraries
-  (select times.ml from
-   (ocaml_intrinsics unix bigarray -> times.intrinsics.ml)
-   (bigarray -> times.clock.ml)
-   (unix -> times.unix.ml)
-  )))
-
-(test 
-  (name tracedebug_test)
-  (modes native)
-  (modules tracedebug_test)
-  (libraries tracedebug memtrace))
+ (name tracedebug)
+ (modes native)
+ (libraries tracedebug_times))

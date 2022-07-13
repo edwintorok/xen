@@ -12,6 +12,7 @@
 
 module type TracedEvent = sig
   type t (** type of events to store in the trace ring, must be immutable *)
+
   val empty: t (** the empty event *)
 
   val to_string: t -> string
@@ -65,8 +66,8 @@ end) : sig
 
 end
 
-val dump: events list -> (string -> unit) -> unit
-(** [dump events f] prints all [events] using [f]. *)
+val dump: Format.formatter -> events list -> unit
+(** [dump formatter events] prints all [events] using [formatter]. *)
 
 val register_gc: ?limit_log2:int -> unit -> unit
 (** [register_gc t] registers a GC alarm to log some quick GC stats on major cycles. *)
