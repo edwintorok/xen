@@ -16,5 +16,7 @@ let is_valid idx = idx <> 0L
 
 let to_ns i = i
 
-(* ~600ns overhead, drop 2 digits that are completely inaccurate *)
+(* ~600ns-43000ns overhead, drop 2 digits that are completely inaccurate *)
 let precision = 7
+
+let id = "monotonic system-wide clock"

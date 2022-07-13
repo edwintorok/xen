@@ -155,6 +155,29 @@ let pp_timestamp ppf i =
   let frac = Int64.unsigned_div ns time_frac_scale in
   Format.fprintf ppf "%Lu.%0*Lus" s Times.precision frac
 
+let get_overhead () =
+  let n = 10000 in
+  let a = Times.create n in
+  for i = 0 to n-1 do
+    Times.record a i
+  done;
+  let t = Array.init n (fun i -> Times.get a i |> Times.to_ns) in
+  let avg = Int64.unsigned_div
+    (Int64.sub t.(n-1) t.(0))
+    (Int64.of_int (n-1)) in
+  let t = Array.mapi (fun i ti ->
+    if i > 0 then Int64.sub ti t.(i-1)
+    else 0L
+  ) t in 
+  let t = Array.sub t 1 (n-1) in
+  Array.fold_left (fun acc dt ->
+    (* ignore 0 values, that is just precision limit, it is not really
+       0 overhead *)
+    if dt > 0L then Int64.min acc dt else acc)
+    Int64.max_int t,
+  avg,
+  Array.fold_left Int64.max Int64.min_int t
+
 let dump ppf all =
   let print last (timestamp, pp_event) = 
     let delta = if Int64.compare last Int64.min_int = 0 then 0L else Int64.sub timestamp last in
@@ -163,6 +186,8 @@ let dump ppf all =
     Format.pp_print_cut ppf ();
     timestamp
   in
+  let o_min, o_avg, o_max = get_overhead () in
+  Format.fprintf ppf "Using clock: %s. Overhead: ~%Luns [%Luns, %Luns]@," Times.id o_avg o_min o_max;
   let (_:int64) = all |> sorted |> Array.fold_left print Int64.min_int in
   Format.pp_print_flush ppf ()
 
