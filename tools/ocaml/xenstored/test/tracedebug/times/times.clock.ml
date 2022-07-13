@@ -7,14 +7,11 @@ let record t i =
   Bytes.set_int64_ne t (8*i) (Monotonic_clock.get_ns ())
   [@@ocaml.inline]
 
-let fill t = Bytes.fill t 0 (Bytes.length t) '\x00'
-let create n = Bytes.make (n*8) '\x00'
-let get t idx =
+let get_as_ns t idx =
   Bytes.get_int64_ne t (8*idx)
 
-let is_valid idx = idx <> 0L
-
-let to_ns i = i
+let fill t = Bytes.fill t 0 (Bytes.length t) '\x00'
+let create n = Bytes.make (n*8) '\x00'
 
 (* ~600ns-43000ns overhead, drop 2 digits that are completely inaccurate *)
 let precision = 7

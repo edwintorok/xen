@@ -114,10 +114,9 @@ end) = struct
 
   let rec getall lst idx =
     let i = (idx + limit) land mask in
-    let timestamp = Times.get timestamps i in
-    if Times.is_valid timestamp then
-      let timestamp = Times.to_ns timestamp
-      and event ppf =
+    let timestamp = Times.get_as_ns timestamps i in
+    if Int64.compare timestamp 0L <> 0 then
+      let event ppf =
         try E.pp ppf events.(i)
         with e ->
           let ee = ExnEvent.get e in
@@ -161,7 +160,7 @@ let get_overhead () =
   for i = 0 to n-1 do
     Times.record a i
   done;
-  let t = Array.init n (fun i -> Times.get a i |> Times.to_ns) in
+  let t = Array.init n (fun i -> Times.get_as_ns a i) in
   let avg = Int64.unsigned_div
     (Int64.sub t.(n-1) t.(0))
     (Int64.of_int (n-1)) in
