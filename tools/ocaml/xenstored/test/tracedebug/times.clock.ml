@@ -12,4 +12,4 @@ let is_valid idx = idx <> 0L
 let get t idx =
   Bigarray.Array1.get t idx
 
-let to_s i = Int64.to_float i /. 1e9
+let to_ns i = i

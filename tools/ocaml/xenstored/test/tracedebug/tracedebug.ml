@@ -48,7 +48,7 @@ module GcEvent = struct
   let empty = get ()
 end
 
-type events = (float * string) list
+type events = (int64 * string) list
 
 module Make(E: TracedEvent)(Config: sig
   val limit_log2: int (** number of events to store = [2**limit_log2] *)
@@ -107,7 +107,7 @@ end) = struct
     let i = (idx + limit) land mask in
     let timestamp = Times.get timestamps i in
     if Times.is_valid timestamp then
-      let timestamp = Times.to_s timestamp
+      let timestamp = Times.to_ns timestamp
       and event =
         try E.to_string events.(i)
         with e ->
@@ -128,7 +128,7 @@ end) = struct
     r
 end
 
-let sort_timestamp (t0, _) (t1, _) = Float.compare t0 t1
+let sort_timestamp (t0, _) (t1, _) = Int64.compare t0 t1
 
 (* 4.14: we could use Seq.sorted_merge *)
 let sorted all =
@@ -136,13 +136,15 @@ let sorted all =
   Array.stable_sort sort_timestamp a;
   a
 
+let ns_per_s = 1_000_000_000L
 let dump all f =
   let print last (timestamp, event) = 
-    let delta = if Float.is_nan last then 0. else timestamp -. last in
-    Printf.ksprintf f "[%.9f](+%.8f) %s" timestamp delta event;
+    let delta = if Int64.(compare timestamp 0L < 0) then 0L else Int64.sub timestamp last in
+    Printf.ksprintf f "[%Ld.%09Ld](+%Ld.%09Ld) %s" (Int64.div timestamp ns_per_s) (Int64.rem timestamp ns_per_s)
+      (Int64.div delta ns_per_s) (Int64.rem delta ns_per_s) event;
     timestamp
   in
-  let (_:float) = all |> sorted |> Array.fold_left print Float.nan in
+  let (_:int64) = all |> sorted |> Array.fold_left print Int64.min_int in
   ()
 
 let register_gc ?(limit_log2=9) () =

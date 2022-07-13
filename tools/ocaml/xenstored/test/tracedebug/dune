@@ -4,9 +4,9 @@
   (foreign_stubs (language c) (names clock_stubs))
   (libraries
   (select times.ml from
-   (ocaml_xintrinsics -> times.intrinsics.ml)
+   (ocaml_intrinsics unix bigarray -> times.intrinsics.ml)
+   (bigarray -> times.clock.ml)
    (unix -> times.unix.ml)
-   (threads.posixx -> times.clock.ml)
   )))
 
 (test 

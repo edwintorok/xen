@@ -12,4 +12,7 @@ let create n =
 let is_valid t = not (Float.is_nan t)
 let get = Float.Array.get (* not perf critical *)
 
-let to_s f = Float.round (f *. 1e6) /. 1e6
+let to_ns f =
+  (* multiplying by 1e9 would be less precise: nanoseconds would sometimes be nonzero.
+     Perform the multiplication by 1000 as an integer instead *)
+  f *. 1e6 |> Float.round |> Int64.of_float |> Int64.mul 1000L
