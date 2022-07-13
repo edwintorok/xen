@@ -1,8 +1,13 @@
 (library
   (name tracedebug)
-  (modules tracedebug)
+  (modules tracedebug times)
   (foreign_stubs (language c) (names clock_stubs))
-  (libraries unix threads.posix ocaml_intrinsics))
+  (libraries
+  (select times.ml from
+   (ocaml_xintrinsics -> times.intrinsics.ml)
+   (unix -> times.unix.ml)
+   (threads.posixx -> times.clock.ml)
+  )))
 
 (test 
   (name tracedebug_test)

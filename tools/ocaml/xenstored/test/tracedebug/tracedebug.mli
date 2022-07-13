@@ -10,63 +10,63 @@
   When tracing is turned off it will have a constant memory and performance overhead.
 *)
 
-type t (** an event tracer *)
+module type TracedEvent = sig
+  type t (** type of events to store in the trace ring, must be immutable *)
+  val empty: t (** the empty event *)
 
-val create : ?limit_pow2:int -> unit -> t
-(** [create ?limit_pow2 ()] creates a new tracer, and starts tracing.
-  [limit_pow2] controls how many past events to remember.
+  val to_string: t -> string
+  (** [to_string event] formats the event as a string.
+    This will get called only when the events are dumped, much later than when
+    the event got created, hence the immutability requirement on the event
+  *)
+end
+
+module StringEvent: TracedEvent with type t = string
+module ExnEvent: sig
+  include TracedEvent
+  val get: exn -> t
+end
+
+type events
+
+module Make(E: TracedEvent)(C: sig
+  val limit_log2: int (** number of events to store = [2**limit_log2] *)
+end) : sig
+
+  val start: unit -> unit
+  (** [start ()] starts tracing. idempotent.
+     Starting the tracer doesn't wipe already recorded events.
   *)
 
-val start: t -> unit
-(** [start t] starts tracing. idempotent.
-   Starting the tracer doesn't wipe already recorded events.
-*)
-
-val stop: t -> unit
-(** [stop t] stops tracing. idempotent.
-   Stopping the tracer doesn't discard already recorded events.
-*)
-
-val reset: t -> unit
-(** [reset t] forgets all events, and then inserts a reset event.
-  Shouldn't be called concurrently with other [event] functions, or it can't guarantee
-  to delete all events.
+  val stop: unit -> unit
+  (** [stop ()] stops tracing. idempotent.
+     Stopping the tracer doesn't discard already recorded events.
   *)
 
-val dump: t -> (string -> unit) -> unit
-(** [dump t f] causes all events in [t] to be formatted as strings and printed using [f].
-    The event trace is then [reset].
-    Note that the strings may contain embedded newlines (e.g. for stacktraces)
-*)
+  val reset: unit -> unit
+  (** [reset ()] forgets all events, and then inserts a reset event.
+    Shouldn't be called concurrently with other [event] functions, or it can't guarantee
+    to delete all events.
+    *)
 
-val register_gc: t -> unit
+  val dump: unit -> events
+  (** [dump t f] causes all events in [t] to be formatted as strings and returned.
+      The event trace is then [reset].
+      Note that the strings may contain embedded newlines (e.g. for stacktraces)
+  *)
+
+  val record: E.t -> unit
+  (** [record event] records the event [event] and the current timestamp.
+  *)
+
+  val recordf: (unit -> E.t) -> unit
+  (** [recordf f] is equivalent to [record @@ f()] when tracing is turned on,
+    but avoids calling [f] when tracing is turned off. *)
+
+end
+
+val dump: events list -> (string -> unit) -> unit
+(** [dump events f] prints all [events] using [f]. *)
+
+val register_gc: ?limit_log2:int -> unit -> unit
 (** [register_gc t] registers a GC alarm to log some quick GC stats on major cycles. *)
-
-val event: t -> string -> unit
-(** [event t msg] records the event [msg].
-  [msg] should be a string that is already computed even when tracing is otherwise off.
-  If that is not the case consider using [event1], [event2], of [eventf] instead
-  to avoid the overhead of computing the string when not needed.
-*)
-
-val event_exn: t -> exn -> unit
-(** [event_exn t exn] logs the occurence of [exn].
-  It is recommended to call this as soon as possible, before the backtrace is overwritten.
-  This won't on its own trigger an event trace dump!
-*)
-
-val eventf: t -> (unit -> string) -> unit
-(** [eventf t f] is like [event t @@ f ()] when tracing is enabled, but potentially faster.
-  If [f] raises any exceptions it is caught and logged as an event, but doesn't
-  otherwise let the exception escape the function.
-  When tracing is enabled [f] is called immediately, so it is suitable for formatting mutable
-  data structures.
-*)
-
-val event1: t -> ('a -> string) -> 'a -> unit
-(** [event1 t f a] is like [eventf @@ fun () -> f a] but evaluates [f] only when
-  the trace is dumped. Thus [a] has to be an immutable data structure. *)
-
-val event2: t -> ('a -> 'b -> string) -> 'a -> 'b -> unit
-(** [event2 t f a b] is like [eventf @@ fun () -> f a b] but evaluates [f] only when
-  the trace is dumped. Thus both [a] and [b] have to be immutable data structures. *)

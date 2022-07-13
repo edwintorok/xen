@@ -11,161 +11,146 @@
 *)
 
 
-module Event = struct
-  type arg = string
-  let empty_arg = ""
-
-  type fn = unit -> string
-  let empty_fn () = ""
-
-  module Times0 = struct
-    type t = (int64, Bigarray.int64_elt, Bigarray.c_layout) Bigarray.Array1.t
-
-    (* caller ensures idx is within bounds by applying a mask based on ring size *)
-    external record: t -> int -> unit = "stub_clock_record" [@@noalloc]
-
-    let fill t = Bigarray.Array1.fill t 0L
-    let create n =
-      let t = Bigarray.Array1.create Bigarray.int64 Bigarray.c_layout n in
-      fill t;
-      t
-    let is_valid t idx =
-      Bigarray.Array1.get t idx <> 0L
-    let get t idx =
-      Bigarray.Array1.get t idx
-
-    let to_s i = Int64.to_float i /. 1e9
-  end
-
-  module Times = struct
-    open Ocaml_intrinsics.Perfmon
-
-    let calibrate _ =
-      let t0 = Unix.gettimeofday () in
-      let tsc0 = rdtsc () in
-      Unix.sleepf 0.03;
-      let t1 = Unix.gettimeofday () in
-      let tsc1 = rdtsc () in
-      (t1 -. t0) /. Int64.(sub tsc1 tsc0 |> to_float)
-
-    let tsc_min_freq, tsc_max_freq, tsc_to_s =
-      let a = Array.init 10 calibrate in
-      1. /. Array.fold_left Float.max Float.min_float a,
-      1. /. Array.fold_left Float.min Float.max_float a,
-      Array.fold_left (+.) 0. a /. float (Array.length a)
-
-    let to_s i =
-      float i *. tsc_to_s
-
-    type t = int array
-    let record t idx =
-      (* this is noalloc *)
-      t.(idx) <- Int64.to_int (rdtsc ())
-
-    let fill t = Array.fill t 0 (Array.length t) 0
-    let create n = Array.make n 0
-    let is_valid t idx = t.(idx) <> 0
-    let get t idx = t.(idx)
-  end
+module type TracedEvent = sig
+  type t (** type of events to store in the trace ring *)
+  val empty: t (** the empty event *)
+  val to_string: t -> string
 end
 
-(* avoid allocation: unpack fields into separate arrays *)
-type t =
-  { event_fns: Event.fn array
-  ; event_args: Event.arg array 
-  ; event_times: Event.Times.t
-  ; events_idx: int Atomic.t
-  ; enabled: bool Atomic.t
-  }
+module StringEvent = struct
+  type t = string
+  let empty = ""
+  let to_string t = t
+end
 
-let create ?(limit_pow2=9) () =
-  let limit = 1 lsl limit_pow2 in
-  { event_fns = Array.make limit Event.empty_fn
-  ; event_args = Array.make limit Event.empty_arg
-  ; event_times = Event.Times.create limit
-  ; events_idx = Atomic.make 0
-  ; enabled = Atomic.make true
-  }
+module ExnEvent = struct
+  type t = Printexc.raw_backtrace * exn
+  let empty = Printexc.get_raw_backtrace (), Not_found
+  let to_string (bt, exn) =
+    (* don't allow any exceptions to escape *)
+    let str =
+      try Printexc.to_string exn
+      with _ -> Printexc.to_string_default exn
+    in
+    str ^ "\n" ^ (Printexc.raw_backtrace_to_string bt)
 
-let start t = Atomic.set t.enabled true
-let stop t = Atomic.set t.enabled false
+  let get e = Printexc.get_raw_backtrace (), e
+end
 
-let fillall a v = Array.fill a 0 (Array.length a) v
+module GcEvent = struct
+  type t = Gc.stat
 
-let reset t =
-  stop t;
-  (* race condition here: some [event] functions may still be running,
-     but caller should ensure that doesn't happen
-   *)
-  Atomic.set t.events_idx 0;
-  fillall t.event_fns Event.empty_fn;
-  fillall t.event_args Event.empty_arg;
-  Event.Times.fill t.event_times;
-  start t
+  let to_string q =
+    Printf.sprintf "major GC end: %d/%d heap words (top %d), compactions %d"
+      q.Gc.live_words q.Gc.heap_words q.Gc.top_heap_words q.Gc.compactions
 
-let record t fn msg =
-  if Atomic.get t.enabled then
-    (* assumes power of 2 size *)
-    let events_idx = Atomic.fetch_and_add t.events_idx 1 land (Array.length t.event_fns - 1) in
-    Event.Times.record t.event_times events_idx;
-    t.event_fns.(events_idx) <- fn;
-    t.event_args.(events_idx) <- msg
+  let get = Gc.quick_stat
+  let empty = get ()
+end
 
-let event t msg = record t Event.empty_fn msg
-let event1 t f x = record t (fun () -> f x) ""
-let event2 t f x y = record t (fun () -> f x y) ""
+type events = (float * string) list
 
-let fmt_exn exn bt =
-  (* don't allow any exceptions to escape *)
-  let str =
-    try Printexc.to_string exn
-    with _ -> Printexc.to_string_default exn
-  in
-  str ^ "\n" ^ (Printexc.raw_backtrace_to_string bt)
+module Make(E: TracedEvent)(Config: sig
+  val limit_log2: int (** number of events to store = [2**limit_log2] *)
+end) = struct
+  (* avoid allocation: unpack fields into separate arrays *)
+  let limit =
+    assert (Config.limit_log2 > 0);
+    1 lsl Config.limit_log2
 
-let event_exn t exn =
-  let bt = Printexc.get_raw_backtrace () in
-  record t (fun () -> fmt_exn exn bt) "exception: "
+  let mask = limit - 1
 
-let eventf t f =
-  try
-    record t Event.empty_fn (f ())
-  with e ->
-    event_exn t e
+  let enabled = Atomic.make true
 
-let dump t f =
-  event t "dumping trace ring";
-  event t (Printf.sprintf "TSC frequency: %.3fGHz (%.6f GHz - %.6f GHz)"
-    (1e-9 /. Event.Times.tsc_to_s)
-    (Event.Times.tsc_min_freq *. 1e-9)
-    (Event.Times.tsc_max_freq *. 1e-9));
-  stop t;
-  let idx = Atomic.get t.events_idx in
-  let last = ref nan in
-  for i = idx to idx + Array.length t.event_args do
-    let idx = i land (Array.length t.event_fns - 1) in
-    if Event.Times.is_valid t.event_times idx then begin
-      let timestamp = Event.Times.to_s (Event.Times.get t.event_times idx)
-      and prefix = t.event_args.(idx)
-      and suffix =
-        try t.event_fns.(idx) ()
+  let index = Atomic.make 0
+
+  let events = Array.make limit E.empty
+
+  let timestamps = Times.create limit
+
+  let start () = Atomic.set enabled true
+  let stop () = Atomic.set enabled false
+
+  let reset () =
+    stop ();
+    (* race condition here: some [event] functions may still be running,
+       but caller should ensure that doesn't happen
+     *)
+    Atomic.set index 0;
+    Array.fill events 0 (Array.length events) E.empty;
+    Times.fill timestamps;
+    start ()
+
+  let record_internal ev =
+      (* assumes power of 2 size *)
+      let events_idx = Atomic.fetch_and_add index 1 land mask in
+      (Times.record [@ocaml.inlined]) timestamps events_idx;
+      (* mask ensures we are within bounds *)
+      Array.unsafe_set events events_idx ev
+  (* avoid inlining this itself to prevent making callers too large *)
+
+  (* performance critical: avoid allocation, and minimize function calls
+      when disabled *)
+  let record ev =
+    if (Atomic.get [@ocaml.inlined]) enabled then
+      record_internal ev
+    [@@ocaml.inline]
+
+  let recordf f =
+    if (Atomic.get [@ocaml.inlined]) enabled then
+      record_internal (f ())
+    [@@ocaml.inline]
+
+  (* end performance critical *)
+
+  let rec getall lst idx =
+    let i = (idx + limit) land mask in
+    let timestamp = Times.get timestamps i in
+    if Times.is_valid timestamp then
+      let timestamp = Times.to_s timestamp
+      and event =
+        try E.to_string events.(i)
         with e ->
-          let msg = fmt_exn e (Printexc.get_raw_backtrace ()) in
-          "exception formatting: " ^ msg
+          "exception formatting: " ^ (ExnEvent.to_string (ExnEvent.get e))
       in
-      if Float.is_nan !last then last := timestamp;
-      Printf.ksprintf f "[%.9f](+%.9f) %s%s" timestamp (timestamp -. !last) prefix suffix;
-      last := timestamp
-    end
-  done
+      getall ((timestamp, event) :: lst) (idx - 1)
+    else
+      (* we constructed the list by going backwards through the ring,
+         so the list is in the correct order and we only traversed as much of
+         the ring that had valid entries *)
+      lst
 
-let fmt_gc q =
-  Printf.sprintf "major GC end: %d/%d heap words (top %d), compactions %d"
-    q.Gc.live_words q.Gc.heap_words q.Gc.top_heap_words q.Gc.compactions
+  let dump () =
+    stop ();
+    let idx = Atomic.get index - 1 in
+    let r = getall [] idx in
+    reset ();
+    r
+end
 
-let register_gc t =
+let sort_timestamp (t0, _) (t1, _) = Float.compare t0 t1
+
+(* 4.14: we could use Seq.sorted_merge *)
+let sorted all =
+  let a = all |> List.map Array.of_list |> Array.concat in
+  Array.stable_sort sort_timestamp a;
+  a
+
+let dump all f =
+  let print last (timestamp, event) = 
+    let delta = if Float.is_nan last then 0. else timestamp -. last in
+    Printf.ksprintf f "[%.9f](+%.8f) %s" timestamp delta event;
+    timestamp
+  in
+  let (_:float) = all |> sorted |> Array.fold_left print Float.nan in
+  ()
+
+let register_gc ?(limit_log2=9) () =
+  let module R = Make(GcEvent)(struct let limit_log2 = limit_log2 end) in
   let on_major_cycle_end () =
-    event1 t fmt_gc (Gc.quick_stat ())
+    R.record (GcEvent.get ());
   in
   let (_:Gc.alarm) = Gc.create_alarm on_major_cycle_end in
   ()
+
+(* TODO: get access to this... *)
