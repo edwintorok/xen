@@ -22,7 +22,7 @@ let cycle_duration_ns =
       r
   | Some s -> Float.of_string s
 
-type t = int array
+type t = bytes
 
 (* records timestamps using the processor's TSC.
    assumes constant tsc rate independent of CPU frequency adjustments
@@ -30,14 +30,14 @@ type t = int array
  *)
 let record t idx =
   (* this is noalloc *)
-  Array.unsafe_set t idx (Int64.to_int (rdtsc ()))
+  Bytes.set_int64_ne t (8*idx) (rdtsc ())
   [@@ocaml.inline]
 
 let get_as_ns t idx =
-  float t.(idx) *. cycle_duration_ns |> Float.round |> Int64.of_float
+  Int64.to_float (Bytes.get_int64_ne t (8*idx)) *. cycle_duration_ns |> Float.round |> Int64.of_float
 
 let precision = 8 (* ~10-50ns overhead, drop 1 digit *)
 
-let fill t = Array.fill t 0 (Array.length t) 0
-let create n = Array.make n 0
+let fill t = Bytes.fill t 0 (Bytes.length t) '\x00'
+let create n = Bytes.make (n*8) '\x00'
 let id = Printf.sprintf "RDTSC, frequency: %.4f GHz" (1. /. cycle_duration_ns) 
