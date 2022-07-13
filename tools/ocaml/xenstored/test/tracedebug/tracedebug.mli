@@ -15,10 +15,11 @@ module type TracedEvent = sig
 
   val empty: t (** the empty event *)
 
-  val to_string: t -> string
-  (** [to_string event] formats the event as a string.
+  val pp: Format.formatter -> t -> unit
+  (** [pp formatter event] formats the event on [formatter].
     This will get called only when the events are dumped, much later than when
-    the event got created, hence the immutability requirement on the event
+    the event got created, hence the immutability requirement on the event.
+    Exceptions raised by this function are caught and dumped.
   *)
 end
 
@@ -51,10 +52,7 @@ end) : sig
     *)
 
   val dump: unit -> events
-  (** [dump t f] causes all events in [t] to be formatted as strings and returned.
-      The event trace is then [reset].
-      Note that the strings may contain embedded newlines (e.g. for stacktraces)
-  *)
+  (** [dump t f] causes all events in [t] to be formatted as strings and returned. *)
 
   val record: E.t -> unit
   (** [record event] records the event [event] and the current timestamp.

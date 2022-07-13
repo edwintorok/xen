@@ -13,7 +13,7 @@ CAMLprim int64_t stub_monotonic_clock_get_ns_unboxed(value unit)
     struct timespec ts;
     if ( clock_gettime(CLOCK_MONOTONIC, &ts) )
         uerror("clock_gettime", Val_unit);
-    return (int64_t)ts.tv_nsec + (int64_t)ts.tv_sec * 1000000000LL;
+    return (uint64_t)ts.tv_nsec + (uint64_t)ts.tv_sec * 1000000000LL;
 }
 
 /* a boxed version must be defined for bytecode */

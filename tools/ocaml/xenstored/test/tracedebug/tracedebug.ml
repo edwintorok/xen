@@ -10,31 +10,38 @@
     https://github.com/c-cube/ocaml-atomic can be used
 *)
 open Tracedebug_times
-
+let pid = Unix.getpid ()
 module type TracedEvent = sig
   type t
 
   val empty: t
 
-  val to_string: t -> string
+  val pp: Format.formatter -> t -> unit
 end
 
 module StringEvent = struct
   type t = string
   let empty = ""
-  let to_string t = t
+  let pp ppf s =
+    Format.pp_print_string ppf s
 end
 
 module ExnEvent = struct
   type t = Printexc.raw_backtrace * exn
   let empty = Printexc.get_raw_backtrace (), Not_found
-  let to_string (bt, exn) =
+
+  let pp_backtrace ppf bt =
+    Printexc.raw_backtrace_to_string bt
+    |> Format.pp_print_text ppf
+
+  let pp ppf (bt, exn) =
     (* don't allow any exceptions to escape *)
     let str =
       try Printexc.to_string exn
       with _ -> Printexc.to_string_default exn
     in
-    str ^ "\n" ^ (Printexc.raw_backtrace_to_string bt)
+    Format.fprintf ppf "@[<v>Exception: %s@,%a@]" str
+      pp_backtrace bt
 
   let get e = Printexc.get_raw_backtrace (), e
 end
@@ -42,15 +49,15 @@ end
 module GcEvent = struct
   type t = Gc.stat
 
-  let to_string q =
-    Printf.sprintf "major GC end: %d/%d heap words (top %d), compactions %d"
+  let pp ppf q =
+    Format.fprintf ppf "major GC end: %d/%d heap words (top %d), compactions %d"
       q.Gc.live_words q.Gc.heap_words q.Gc.top_heap_words q.Gc.compactions
 
   let get = Gc.quick_stat
   let empty = get ()
 end
 
-type events = (int64 * string) list
+type events = (int64 * (Format.formatter -> unit)) list
 
 module Make(E: TracedEvent)(Config: sig
   val limit_log2: int (** number of events to store = [2**limit_log2] *)
@@ -110,10 +117,11 @@ end) = struct
     let timestamp = Times.get timestamps i in
     if Times.is_valid timestamp then
       let timestamp = Times.to_ns timestamp
-      and event =
-        try E.to_string events.(i)
+      and event ppf =
+        try E.pp ppf events.(i)
         with e ->
-          "exception formatting: " ^ (ExnEvent.to_string (ExnEvent.get e))
+          let ee = ExnEvent.get e in
+          Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
       in
       getall ((timestamp, event) :: lst) (idx - 1)
     else
@@ -125,9 +133,8 @@ end) = struct
   let dump () =
     stop ();
     let idx = Atomic.get index - 1 in
-    let r = getall [] idx in
-    reset ();
-    r
+    getall [] idx
+    (* do not reset here, formatting is delayed *)
 end
 
 let sort_timestamp (t0, _) (t1, _) = Int64.compare t0 t1
@@ -149,9 +156,11 @@ let pp_timestamp ppf i =
   Format.fprintf ppf "%Lu.%0*Lus" s Times.precision frac
 
 let dump ppf all =
-  let print last (timestamp, event) = 
-    let delta = if Int64.(compare timestamp 0L < 0) then 0L else Int64.sub timestamp last in
-    Format.fprintf ppf "[%a](+%a) %s@," pp_timestamp timestamp pp_timestamp delta event;
+  let print last (timestamp, pp_event) = 
+    let delta = if Int64.compare last Int64.min_int = 0 then 0L else Int64.sub timestamp last in
+    Format.fprintf ppf "[pid %d][%a](+%a) " pid pp_timestamp timestamp pp_timestamp delta;
+    pp_event ppf;
+    Format.pp_print_cut ppf ();
     timestamp
   in
   let (_:int64) = all |> sorted |> Array.fold_left print Int64.min_int in

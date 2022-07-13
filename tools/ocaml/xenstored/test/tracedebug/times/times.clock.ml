@@ -1,5 +1,6 @@
 type t = bytes
 
+(* records timestamps using the system-wide monotonic clock *)
 let record t i =
   (* a bigarray of int64 would allocate when calling the setter,
      even the unsafe variant *)
@@ -12,13 +13,6 @@ let get t idx =
   Bytes.get_int64_ne t (8*idx)
 
 let is_valid idx = idx <> 0L
-
-let delta =
-  let t0 = Monotonic_clock.get_ns () in
-  let t1 = Monotonic_clock.get_ns () in
-  Int64.sub t1 t0
-
-let () = Printf.eprintf "E:::%Lu\n" delta
 
 let to_ns i = i
 
