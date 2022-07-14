@@ -15,13 +15,21 @@
 open Tracedebug
 let string_make = String.make
 
-module Trace = Make(StringEvent)(struct let limit_log2 = 9 end)
+let tracer = create StringEvent.empty
+let trace fmt = trace tracer fmt
+
+module RingEvent = struct
+  type t = (string * string) list (* ring snapshot *)
+
+  let tracer = create []
+
+  let record ring =
+    record1 tracer Xenstore_ring.Ring.to_debug_map ring
+end
 
 let size = 4096
-
 let shm_create name =
-
-  Logs.debug (fun m -> m "Creating new %s" name) ;
+  trace "Creating new %s" name;
   let fd = Shm.shm_open name true 0o600 in
   Unix.ftruncate fd size ; fd
 
