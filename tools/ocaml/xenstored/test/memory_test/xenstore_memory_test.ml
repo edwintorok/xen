@@ -13,9 +13,11 @@
  *)
 
 open Tracedebug
+
 let string_make = String.make
 
 let tracer = create StringEvent.empty
+
 let trace fmt = trace tracer fmt
 
 module RingEvent = struct
@@ -23,13 +25,13 @@ module RingEvent = struct
 
   let tracer = create []
 
-  let record ring =
-    record1 tracer Xenstore_ring.Ring.to_debug_map ring
+  let record ring = record1 tracer Xenstore_ring.Ring.to_debug_map ring
 end
 
 let size = 4096
+
 let shm_create name =
-  trace "Creating new %s" name;
+  trace "Creating new %s" name ;
   let fd = Shm.shm_open name true 0o600 in
   Unix.ftruncate fd size ; fd
 

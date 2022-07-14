@@ -22,13 +22,12 @@ let times_record () = Tracedebug_times.Times.record times 0
 let t = create StringEvent.empty
 
 let tracedebug_record () = record t "fixed event"
-let tracedebug_trace () =
-  trace t "formatting an integer: %d" 4
 
-let tracedebug_trace_off () =
-  stop t;
-  tracedebug_trace ();
-  start t
+let tracedebug_trace () = trace t "formatting an integer: %d" 4
+
+let tracedebug_trace_off () = stop t ; tracedebug_trace () ; start t
+
+let tracedebug_logs () = Logs.debug (fun m -> m "formatting an integer: %d" 4)
 
 let benchmarks =
   Test.make_grouped ~name:"tracedebug"
@@ -38,6 +37,7 @@ let benchmarks =
     ; Test.make ~name:"Tracedebug.record" (Staged.stage tracedebug_record)
     ; Test.make ~name:"Tracedebug.trace" (Staged.stage tracedebug_trace)
     ; Test.make ~name:"Tracedebug.trace off" (Staged.stage tracedebug_trace_off)
+    ; Test.make ~name:"Tracedebug.logs" (Staged.stage tracedebug_logs)
     ; Test.make_indexed_with_resource ~name:"Tracedebug.recordf"
         ~args:[1; 9; 13]
         Test.multiple (* TODO: Test.uniq segfaults here, bechamel bug *)
@@ -46,7 +46,16 @@ let benchmarks =
         (fun i -> Staged.stage @@ fun t -> recordf t (fun () -> string_of_int i))
     ]
 
+let null_formatter =
+  Format.formatter_of_out_functions
+    {
+      Format.out_flush= ignore
+    ; Format.out_newline= ignore
+    ; Format.out_indent= ignore
+    ; Format.out_spaces= ignore
+    ; Format.out_string= (fun _ _ _ -> ())
+    }
+
 let () =
-  Bechamel_simple_cli.cli benchmarks ;
-  let gc = register_gc () in
-  Tracedebug.pp_events Format.err_formatter [dump GcEvent.pp gc]
+  Tracedebug_logs.dump_at_exit ~dst:null_formatter ~limit_log2:9 () ;
+  Bechamel_simple_cli.cli benchmarks

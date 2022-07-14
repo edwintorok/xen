@@ -91,13 +91,20 @@ val record : 'a t -> 'a -> unit
 
 val recordf : 'a t -> (unit -> 'a) -> unit
 (** [recordf t f] is equivalent to [record t @@ f()] when tracing is turned on,
-  but avoids calling [f] when tracing is turned off. *)
+  but avoids calling [f] when tracing is turned off.
+  Examples for string formatting:
+  [recordf t (fun () -> Printf.sprintf ...)] (* allocates a string *)
+  [recordf t (fun () -> Format.asprintf ...)] (* not recommended, this allocates a buffer and a string *)
 
-val record1: 'a t -> ('b -> 'a) -> 'b -> unit
+  If all the arguments are immutable values then using [record1] is better:
+  it delays the formatting itself, and only formats when the ring is dumped
+  *)
+
+val record1 : 'a t -> ('b -> 'a) -> 'b -> unit
 (** [record1 t f x] is like [recordf t @@ fun () -> f x], but
   avoids an allocation when tracing is off. *)
 
-val trace: string t -> ('a, unit, string, unit) format4 -> 'a
+val trace : string t -> ('a, unit, string, unit) format4 -> 'a
 (** [trace t fmt ...] formats the arguments using [fmt] when tracing is enabled
   and does nothing otherwise *)
 

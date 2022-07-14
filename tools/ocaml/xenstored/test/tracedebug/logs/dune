@@ -1,0 +1,10 @@
+(library
+ (name tracedebug_logs)
+ (modules tracedebug_logs)
+ (optional)
+ (libraries logs logs.fmt tracedebug))
+
+(test
+ (name tracedebug_logs_test)
+ (modules tracedebug_logs_test)
+ (libraries tracedebug_logs))

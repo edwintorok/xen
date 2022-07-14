@@ -2,7 +2,7 @@
  (name bench_tracedebug)
  (modes native)
  (optional)
- (libraries tracedebug bechamel_simple_cli))
+ (libraries tracedebug bechamel_simple_cli tracedebug_logs logs))
 
 (rule
  (alias bench)
