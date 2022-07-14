@@ -1,4 +1,6 @@
-; enabled_if with ocaml_version only present since dune 2.5
+; enabled_if with ocaml_version for libraries only present since dune 2.5,
+; and we have to be compatible with dune 2.1 for now (version in Ubuntu)
+; enabled_if for user actions works on 2.1 though
 
 (rule
  (targets float.ml)
@@ -25,11 +27,10 @@
 
 (library
  (name tracedebug_times)
- (modes native)
  (libraries
   (select
-   times.ml
+   times.ml ; dune will pick one based on which libraries are available
    from
    (bechamel.monotonic_clock ocaml_intrinsics unix -> times.intrinsics.ml)
-   (bechamel.monotonic_clock threads.posix -> times.clock.ml) ; always available, can be disabled for comparison by commenting out
+   (bechamel.monotonic_clock -> times.clock.ml) ; always available, can be disabled for comparison by commenting out
    (unix -> times.unix.ml))))

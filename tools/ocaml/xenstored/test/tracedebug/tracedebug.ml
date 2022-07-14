@@ -1,3 +1,17 @@
+(*
+ * Copyright (C) Citrix Systems Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; version 2.1 only. with the special
+ * exception on linking described in file LICENSE.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *)
+
 (* Implementation constraints:
 
    - No dependencies outside of the libraries shipped with OCaml (makes it easier to use for unit tests during package builds)
@@ -131,8 +145,8 @@ struct
 
   let rec getall lst idx =
     let i = (idx + limit) land mask in
-    let timestamp = Times.get_as_ns timestamps i in
-    if Int64.compare timestamp 0L <> 0 then
+    match Times.get_as_ns timestamps i with
+    | Some timestamp ->
       let event ppf =
         try E.pp ppf events.(i)
         with e ->
@@ -140,7 +154,7 @@ struct
           Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
       in
       getall ((timestamp, event) :: lst) (idx - 1)
-    else
+    | None ->
       (* we constructed the list by going backwards through the ring,
          so the list is in the correct order and we only traversed as much of
          the ring that had valid entries *)
@@ -179,7 +193,11 @@ let get_overhead () =
   for i = 0 to n - 1 do
     Times.record a i
   done ;
-  let t = Array.init n (fun i -> Times.get_as_ns a i) in
+  let t = Array.init n (fun i ->
+    match Times.get_as_ns a i with
+    | None -> assert false (* we've filled all elements *)
+    | Some i -> i
+) in
   let avg = Int64.div (Int64.sub t.(n - 1) t.(0)) (Int64.of_int (n - 1)) in
   let t =
     Array.mapi

@@ -1,4 +1,29 @@
+(*
+ * Copyright (C) Citrix Systems Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; version 2.1 only. with the special
+ * exception on linking described in file LICENSE.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *)
+
 open Ocaml_intrinsics.Perfmon
+
+type t = bytes
+
+(* records timestamps using the processor's TSC.
+   assumes constant tsc rate independent of CPU frequency adjustments
+   and that TSCs across CPUs are synchronized
+*)
+let record t idx =
+  (* this is noalloc, see times.clock.ml *)
+  Bytes.set_int64_ne t (8 * idx) (rdtsc ())
+  [@@ocaml.inline]
 
 let measure_tsc_to_ns () =
   let t0 = Monotonic_clock.now () in
@@ -24,21 +49,12 @@ let cycle_duration_ns =
   | Some s ->
       Float.of_string s
 
-type t = bytes
-
-(* records timestamps using the processor's TSC.
-   assumes constant tsc rate independent of CPU frequency adjustments
-   and that TSCs across CPUs are synchronized
-*)
-let record t idx =
-  (* this is noalloc *)
-  Bytes.set_int64_ne t (8 * idx) (rdtsc ())
-  [@@ocaml.inline]
-
 let get_as_ns t idx =
-  Int64.to_float (Bytes.get_int64_ne t (8 * idx)) *. cycle_duration_ns
-  |> Float.round
-  |> Int64.of_float
+  let i = Bytes.get_int64_ne t (8 * idx) in
+  if i = 0L then
+    None
+  else
+    Some (Int64.to_float i *. cycle_duration_ns |> Float.round |> Int64.of_float)
 
 let precision = 8 (* ~10-50ns overhead, drop 1 digit *)
 

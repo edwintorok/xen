@@ -1,3 +1,5 @@
+(* compat module for OCaml <4.12 *)
+
 type 'a t
 
 val make : 'a -> 'a t

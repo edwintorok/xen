@@ -1,3 +1,5 @@
+(* compat module for Atomic for OCaml <4.12 *)
+
 type 'a t = 'a ref
 
 let make = ref

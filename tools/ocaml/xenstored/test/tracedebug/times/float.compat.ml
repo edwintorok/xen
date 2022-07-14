@@ -1,8 +1,9 @@
 (* compat module for OCaml < 4.08, implements only functions we use *)
+
 module Array = struct
   type t = float array
 
-  let unsafe_set = Array.unsafe_set
+  let set = Array.set
 
   let fill = Array.fill
 
