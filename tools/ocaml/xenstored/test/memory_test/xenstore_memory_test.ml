@@ -12,9 +12,12 @@
  * GNU Lesser General Public License for more details.
  *)
 
-open Tracedebug
 
 let string_make = String.make
+
+open Bos_setup
+open Tracedebug
+
 
 let tracer = create StringEvent.empty
 
@@ -26,17 +29,29 @@ module RingEvent = struct
   let tracer = create []
 
   let record ring = record1 tracer Xenstore_ring.Ring.to_debug_map ring
+
+  let pp ppf debugmap =
+    Fmt.pf ppf "ring state: %a"
+      (Fmt.hbox Fmt.(list ~sep:Fmt.sp @@ pair ~sep:Fmt.sp string string))
+      debugmap
 end
+
+let () =
+  Tracedebug_logs.dump_at_exit @@ fun () ->
+  [
+    Tracedebug.dump RingEvent.pp RingEvent.tracer;
+    Tracedebug.dump StringEvent.pp tracer
+  ]
 
 let size = 4096
 
 let shm_create name =
-  trace "Creating new %s" name ;
+  Logs.debug (fun m -> m "Creating new %s" name);
   let fd = Shm.shm_open name true 0o600 in
   Unix.ftruncate fd size ; fd
 
 let shm_existing name =
-  Logs.debug (fun m -> m "opening existing %s" name) ;
+  Logs.debug (fun m -> m "Opening existing %s" name);
   Shm.shm_open name false 0
 
 let absent =
@@ -116,7 +131,6 @@ module Notify = struct
       else
         let pipe1_rd, pipe1_wr = Unix.pipe ~cloexec:false () in
         let pipe2_rd, pipe2_wr = Unix.pipe ~cloexec:false () in
-        prerr_endline "SPAWN" ;
         spawn_client name 1 pipe2_rd pipe1_wr ;
         (pipe1_rd, pipe2_wr)
     in
@@ -131,7 +145,8 @@ module Notify = struct
     }
 
   let notify_other_end t msg =
-    Logs.debug (fun m -> m "%s: ring: notifying other end" msg) ;
+    (* TODO: record without allocating with multiple tracers *)
+    recordf tracer (fun () -> Printf.sprintf "%s: ring: notify other end" msg);
     let (_ : int) = Unix.write_substring t.fd_send "." 0 1 in
     ()
 
@@ -144,7 +159,7 @@ module Notify = struct
   let prepare t = with_mutex t @@ fun t -> t.events
 
   let wait_for_other_end t event msg =
-    Logs.debug (fun m -> m "%s: ring: waiting for event <> %d" msg event) ;
+    recordf tracer (fun () -> Printf.sprintf "%s: ring: waiting for event <> %d" msg event);
     let next =
       with_mutex t @@ fun t ->
       (* it can also be < if it wraps *)
@@ -167,7 +182,7 @@ module Notify = struct
       ) else
         t.events
     in
-    Logs.debug (fun m -> m "%s: ring: received event %d" msg next) ;
+    recordf tracer (fun () -> Printf.sprintf "%s: ring: received event %d" msg next) ;
     next
 end
 
@@ -186,12 +201,8 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
   }
 
   let debug_ring ch msg =
-    Logs.debug (fun m ->
-        let dbg = Xenstore_ring.Ring.to_debug_map ch.buffer in
-        m "%s: ring state: %a" msg
-          (Fmt.hbox Fmt.(list ~sep:Fmt.sp @@ pair ~sep:Fmt.sp string string))
-          dbg
-    )
+    recordf RingEvent.tracer (fun () -> Xenstore_ring.Ring.to_debug_map ch.buffer);
+    trace msg
 
   exception Xs_ring_error of int
 
@@ -202,16 +213,19 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     let error_offset = features_offset + (2 * 4) in
     let get_u32 off = Cstruct.HE.get_uint32 ch.buffer off |> Int32.to_int in
     let features = get_u32 features_offset in
-    Logs.debug (fun m -> m "Server features: %d" features) ;
+    trace "Server features: %d" features;
     let has_error_feature = features land 2 <> 0 in
     if has_error_feature then (
-      debug_ring ch "ring error check" ;
+      record tracer "ring error check";
       let err = get_u32 error_offset in
-      Logs.debug (fun m -> m "ring error: %d" err) ;
-      if err <> 0 then
-        raise (Xs_ring_error err)
+      if err <> 0 then begin
+        recordf tracer (fun () -> Printf.sprintf "ring error: %d" err) ;
+        prerr_endline "HEY";
+        exit 100
+        (* raise (Xs_ring_error err) *)
+      end
     ) else
-      Logs.debug (fun m -> m "server doesn't have error reporting feature")
+      record tracer "server doesn't have error reporting feature"
 
   let create () =
     Logs.debug (fun m -> m "opening shared memory page") ;
@@ -229,7 +243,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     let notif = Notify.create () in
     if not flag_client then
       ( (* TODO: multiple domid support, each with its own ring *) ) ;
-    let t = {buffer; fd; notif; tmp= Bytes.create 1} in
+    let t = {buffer; fd; notif; tmp= Bytes.create 1 } in
     debug_ring t "create" ; t
 
   let destroy ch =
@@ -238,23 +252,23 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     if not flag_client then Shm.shm_unlink name
 
   let rec read_aux ch buf ofs len event =
-    debug_ring ch "read" ;
+    debug_ring ch "before read" ;
     let n = R.read ch.buffer buf ofs len in
-    debug_ring ch "read" ;
-    Logs.debug (fun m -> m "read: got = %d" n) ;
+    debug_ring ch "after read" ;
+    trace "read: got = %d" n;
     if n = 0 then (
       check_ring_error_exn ch ;
       let event = Notify.wait_for_other_end ch.notif event "read" in
-      Logs.debug (fun m -> m "read: repeating") ;
+      record tracer "read: repeating";
       read_aux ch buf ofs len event
     ) else (
       Notify.notify_other_end ch.notif "read" ;
-      Logs.debug (fun m -> m "read: done %d" n) ;
+      trace "read: done %d" n;
       n
     )
 
   let read ch buf ofs len =
-    Logs.debug (fun m -> m "read: start; len = %d" len) ;
+    trace "read: start; len = %d" len;
     (* read event counter before reading ring and wait for event counter <>
        this value to avoid race conditions in another thread receiving an event
        that we waited for.
@@ -267,19 +281,19 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     debug_ring ch "write" ;
     let n = R.write ch.buffer buf ofs len in
     debug_ring ch "write" ;
-    Logs.debug (fun m -> m "write: wrote %d/%d" n len) ;
+    trace "write: wrote %d/%d" n len;
     if n > 0 then
       Notify.notify_other_end ch.notif "write" ;
     if n < len then (
       debug_ring ch "write" ;
       let event = Notify.wait_for_other_end ch.notif event "write" in
-      Logs.debug (fun m -> m "write: recursing") ;
+      record tracer "write: recursing";
       write_aux ch buf (ofs + n) (len - n) event
     ) ;
-    Logs.debug (fun m -> m "write: done")
+    record tracer "write: done"
 
   let write ch buf ofs len =
-    Logs.debug (fun m -> m "write: got=%d" len) ;
+    trace "write: got=%d" len;
     Notify.prepare ch.notif |> write_aux ch buf ofs len
 end
 
@@ -295,7 +309,7 @@ let rec loop_forever ps =
   | Exception exn ->
       Logs.warn (fun m -> m "Cannot parse request: %a" Fmt.exn exn)
   | Ok req ->
-      Logs.debug (fun m -> m "got command: %a" pp_packet req) ;
+      Logs.debug (fun m -> m "got command: %a" pp_packet req);
       let tid = Xs_protocol.get_tid req in
       let rid = Xs_protocol.get_rid req in
       Xs_protocol.Response.(print (Error "ENOTSUP") tid rid) |> PS.send ps ;
@@ -362,7 +376,7 @@ let memuse c =
         | e ->
             raise e
 
-    let dealloc t item =
+    let dealloc _t item =
       let k = key_of_item item in
       Client.immediate c (fun h -> Client.rm h k)
     (* Client.rm t.handle k *)
@@ -417,12 +431,10 @@ let client () =
         done
     )
 
-(* xs_client_unix uses threads, have to set mutex on logger *)
-let () =
-  let mutex = Mutex.create () in
-  Logs.set_reporter_mutex
-    ~lock:(fun () -> Mutex.lock mutex)
-    ~unlock:(fun () -> Mutex.unlock mutex)
+(* xs_client_unix uses threads, have to set mutex on logger,
+   use Logs_threaded.enable ()
+   but only when using builtin reporter, Tracedebug's doesn't need it
+ *)
 
 let () =
   Sys.catch_break true ;

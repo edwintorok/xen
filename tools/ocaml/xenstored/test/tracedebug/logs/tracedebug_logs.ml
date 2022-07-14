@@ -19,8 +19,11 @@ let reporter ?(app = Format.std_formatter) ?limit_log2 () =
   let dump () = Tracedebug.dump process t in
   ({Logs.report}, dump)
 
-let dump_at_exit ?app ?(dst = Format.err_formatter) ?(limit_log2 = 16) () =
+let dump_at_exit ?app ?(dst = Format.err_formatter) ?(limit_log2 = 16) others =
   Logs.set_level (Some Logs.Debug) ;
   let reporter, dump = reporter ?app ~limit_log2 () in
   Logs.set_reporter reporter ;
-  at_exit (fun () -> Tracedebug.pp_events dst [dump ()])
+  at_exit (fun () ->
+    Tracedebug.pp_events dst (dump () :: others ());
+    Format.pp_print_newline dst ()
+  )

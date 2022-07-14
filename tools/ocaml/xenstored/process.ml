@@ -708,7 +708,7 @@ let connection_size_words con =
 
 module IntMap = Map.Make(Int)
 
-let check_memory_usage cons con =
+let check_memory_usage cons _con =
    if is_over_quota () then begin
      History.trim ();
      (* update counters, and free mem *)

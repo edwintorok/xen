@@ -4,4 +4,4 @@
  ;(action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe}))
  (action
   (run %{test} %{dep:../memory_test/xenstore_memory_test.exe} --memuse))
- (libraries xenstored_test shm))
+ (libraries xenstored_test shm tracedebug tracedebug_logs logs))
