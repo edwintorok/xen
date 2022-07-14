@@ -93,6 +93,14 @@ val recordf : 'a t -> (unit -> 'a) -> unit
 (** [recordf t f] is equivalent to [record t @@ f()] when tracing is turned on,
   but avoids calling [f] when tracing is turned off. *)
 
+val record1: 'a t -> ('b -> 'a) -> 'b -> unit
+(** [record1 t f x] is like [recordf t @@ fun () -> f x], but
+  avoids an allocation when tracing is off. *)
+
+val trace: string t -> ('a, unit, string, unit) format4 -> 'a
+(** [trace t fmt ...] formats the arguments using [fmt] when tracing is enabled
+  and does nothing otherwise *)
+
 val pp_events : Format.formatter -> events list -> unit
 (** [dump formatter events] prints all [events] using [formatter],
     sorted chronogically *)

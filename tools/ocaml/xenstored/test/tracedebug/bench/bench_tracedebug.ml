@@ -22,6 +22,13 @@ let times_record () = Tracedebug_times.Times.record times 0
 let t = create StringEvent.empty
 
 let tracedebug_record () = record t "fixed event"
+let tracedebug_trace () =
+  trace t "formatting an integer: %d" 4
+
+let tracedebug_trace_off () =
+  stop t;
+  tracedebug_trace ();
+  start t
 
 let benchmarks =
   Test.make_grouped ~name:"tracedebug"
@@ -29,6 +36,8 @@ let benchmarks =
       Test.make ~name:"Times.record" (Staged.stage times_record)
     ; Test.make ~name:"Tracedebug.GcEvent.get" (Staged.stage GcEvent.get)
     ; Test.make ~name:"Tracedebug.record" (Staged.stage tracedebug_record)
+    ; Test.make ~name:"Tracedebug.trace" (Staged.stage tracedebug_trace)
+    ; Test.make ~name:"Tracedebug.trace off" (Staged.stage tracedebug_trace_off)
     ; Test.make_indexed_with_resource ~name:"Tracedebug.recordf"
         ~args:[1; 9; 13]
         Test.multiple (* TODO: Test.uniq segfaults here, bechamel bug *)

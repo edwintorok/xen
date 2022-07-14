@@ -161,6 +161,17 @@ let recordf t f =
     record_internal t (f ())
   [@@ocaml.inline]
 
+let record1 t f x =
+  if Atomic.get t.enabled then
+    record_internal t (f x)
+
+let trace t fmt =
+  if Atomic.get t.enabled then
+    let print s = record_internal t s in
+    Printf.ksprintf print fmt
+  else
+    Printf.ifprintf () fmt
+
 (* end performance critical *)
 
 let rec getall t pp lst count idx =
