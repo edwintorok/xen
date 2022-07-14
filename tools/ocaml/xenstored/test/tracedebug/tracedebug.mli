@@ -1,3 +1,17 @@
+(*
+ * Copyright (C) Citrix Systems Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; version 2.1 only. with the special
+ * exception on linking described in file LICENSE.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *)
+
 (**
   Tracedebug is a tracing module that keeps track of the most recent
   N events and can be told to dump these when something goes wrong.
@@ -71,5 +85,5 @@ end
 val dump : Format.formatter -> events list -> unit
 (** [dump formatter events] prints all [events] using [formatter]. *)
 
-val register_gc : ?limit_log2:int -> unit -> unit
+val register_gc : ?limit_log2:int -> unit -> unit -> events
 (** [register_gc t] registers a GC alarm to log some quick GC stats on major cycles. *)

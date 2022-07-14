@@ -14,14 +14,12 @@
 
 (* Implementation constraints:
 
-   - No dependencies outside of the libraries shipped with OCaml (makes it easier to use for unit tests during package builds)
-   - It can optionally integrate with other libraries without depending on them (e.g. supply a logs reporter function)
+   - has to build on OCaml 4.02.3+, no dependencies on libraries not shipped with it
+   - can optionally use functionality provided by newer versions or external libraries by using
+     dune's select mechanism (in separate modules)
    - Minimize memory allocation and CPU usage during normal operation
    - Limit maximum memory usage so that tracing can be left enabled for long running tests
-   - Dump a debug trace when an error/exception is encountered, this one will necessarily be slow
-
-   Note: exception: Atomic is a 4.12 feature, for older versions a backward compat
-     https://github.com/c-cube/ocaml-atomic can be used
+   - Dump a debug trace when an error/exception is encountered, this one can be a slowpath
 *)
 open Tracedebug_times
 
@@ -84,7 +82,18 @@ module GcEvent = struct
   let empty = get ()
 end
 
-type events = (int64 * (Format.formatter -> unit)) list
+type events = (int64 * int * (Format.formatter -> unit)) list
+
+let order = Atomic.make 0
+(* we have multiple event rings based on the type of the event,
+   and we want to always be able to sort them in chronological order.
+   Using a high resolution timestamp helps, however if that is not available
+   we could have multiple events with the same timestamp.
+   Within a single process we can use this global to ensure consistent ordering.
+   [dump] will use this together with the timestamp for sorting.
+   This won't help in disambiguating order of events between multiple processes,
+   so a high resolution timestamp is still recommended.
+*)
 
 module Make
     (E : TracedEvent) (Config : sig
@@ -92,7 +101,6 @@ module Make
       (** number of events to store = [2**limit_log2] *)
     end) =
 struct
-  (* avoid allocation: unpack fields into separate arrays *)
   let limit =
     assert (Config.limit_log2 > 0) ;
     1 lsl Config.limit_log2
@@ -103,7 +111,10 @@ struct
 
   let index = Atomic.make 0
 
+  (* avoid allocation: unpack fields into separate arrays of equal size *)
   let events = Array.make limit E.empty
+
+  let ordering = Array.make limit 0
 
   let timestamps = Times.create limit
 
@@ -113,21 +124,25 @@ struct
 
   let reset () =
     stop () ;
-    (* race condition here: some [event] functions may still be running,
+    (* race condition here: some [record] functions may still be running,
        but caller should ensure that doesn't happen
     *)
-    Atomic.set index 0 ;
     Array.fill events 0 (Array.length events) E.empty ;
     Times.fill timestamps ;
+    Atomic.set index 0 ;
     start ()
 
+  (* do not request inlining this to prevent making callers too large *)
   let record_internal ev =
     (* assumes power of 2 size *)
-    let events_idx = Atomic.fetch_and_add index 1 land mask in
+    let events_idx = Atomic.fetch_and_add index 1 land mask
+    and order_idx = Atomic.fetch_and_add order 1 in
     Times.record timestamps events_idx ;
-    (* mask ensures we are within bounds *)
-    Array.unsafe_set events events_idx ev
-  (* avoid inlining this itself to prevent making callers too large *)
+    (* mask ensures we are within bounds,
+       and some versions of times do perform bound checks
+       that can be used while testing *)
+    Array.unsafe_set events events_idx ev ;
+    Array.unsafe_set ordering events_idx order_idx
 
   (* performance critical: avoid allocation, and minimize function calls
       when disabled *)
@@ -143,31 +158,35 @@ struct
 
   (* end performance critical *)
 
-  let rec getall lst idx =
-    let i = (idx + limit) land mask in
-    match Times.get_as_ns timestamps i with
-    | Some timestamp ->
-      let event ppf =
-        try E.pp ppf events.(i)
-        with e ->
-          let ee = ExnEvent.get e in
-          Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
-      in
-      getall ((timestamp, event) :: lst) (idx - 1)
-    | None ->
-      (* we constructed the list by going backwards through the ring,
-         so the list is in the correct order and we only traversed as much of
-         the ring that had valid entries *)
-      lst
+  let rec getall lst count idx =
+    if count >= limit then
+      lst (* avoid infinite loop on a full ring *)
+    else
+      let i = (idx + limit) land mask in
+      match Times.get_as_ns timestamps i with
+      | Some timestamp ->
+          let event ppf =
+            try E.pp ppf events.(i)
+            with e ->
+              let ee = ExnEvent.get e in
+              Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
+          in
+          getall ((timestamp, ordering.(i), event) :: lst) (count + 1) (idx - 1)
+      | None ->
+          (* we constructed the list by going backwards through the ring,
+             so the list is in the correct order and we only traversed as much of
+             the ring that had valid entries *)
+          lst
 
   let dump () =
     stop () ;
     let idx = Atomic.get index - 1 in
-    getall [] idx
+    getall [] 0 idx
   (* do not reset here, formatting is delayed *)
 end
 
-let sort_timestamp (t0, _) (t1, _) = Int64.compare t0 t1
+let sort_timestamp (t0, o0, _) (t1, o1, _) =
+  match Int64.compare t0 t1 with 0 -> Int.compare o0 o1 | r -> r
 
 (* 4.14: we could use Seq.sorted_merge *)
 let sorted all =
@@ -193,11 +212,15 @@ let get_overhead () =
   for i = 0 to n - 1 do
     Times.record a i
   done ;
-  let t = Array.init n (fun i ->
-    match Times.get_as_ns a i with
-    | None -> assert false (* we've filled all elements *)
-    | Some i -> i
-) in
+  let t =
+    Array.init n (fun i ->
+        match Times.get_as_ns a i with
+        | None ->
+            assert false (* we've filled all elements *)
+        | Some i ->
+            i
+    )
+  in
   let avg = Int64.div (Int64.sub t.(n - 1) t.(0)) (Int64.of_int (n - 1)) in
   let t =
     Array.mapi
@@ -221,30 +244,34 @@ let get_overhead () =
   , Array.fold_left max Int64.min_int t
   )
 
+(* TODO: helper function to sort parent/child output based on timestamp, ordering,
+   for now we can do dune runtest --profile=release | sort
+*)
+
 let dump ppf all =
-  let print last (timestamp, pp_event) =
+  let print last (timestamp, _, pp_event) =
     let delta =
       if Int64.compare last Int64.min_int = 0 then
         0L
       else
         Int64.sub timestamp last
     in
-    Format.fprintf ppf "[pid %d][%a](+%a) " pid pp_timestamp timestamp
+    (* timestamp first in case this needs to be sorted again *)
+    (* TODO: replace with <hov 2> once we no longer rely on external sorting *)
+    Format.fprintf ppf "[%a][pid %d](+%a) @[<h>" pp_timestamp timestamp pid
       pp_timestamp delta ;
     pp_event ppf ;
-    Format.pp_print_cut ppf () ;
+    Format.fprintf ppf "@]@," ;
     timestamp
   in
   let o_min, o_avg, o_max = get_overhead () in
-  Format.fprintf ppf "Using clock: %s. Overhead: ~%Luns [%Luns, %Luns]@,"
+  Format.fprintf ppf "@[<v>Using clock: %s. Overhead: ~%Luns [%Luns, %Luns]@,"
     Times.id o_avg o_min o_max ;
   let (_ : int64) = all |> sorted |> Array.fold_left print Int64.min_int in
-  Format.pp_print_flush ppf ()
+  Format.fprintf ppf "@]@."
 
 let register_gc ?(limit_log2 = 9) () =
   let module R = Make (GcEvent) (struct let limit_log2 = limit_log2 end) in
   let on_major_cycle_end () = R.record (GcEvent.get ()) in
   let (_ : Gc.alarm) = Gc.create_alarm on_major_cycle_end in
-  ()
-
-(* TODO: get access to this... *)
+  R.dump
