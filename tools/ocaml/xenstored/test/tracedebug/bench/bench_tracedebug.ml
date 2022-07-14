@@ -15,15 +15,13 @@
 open Bechamel
 open Tracedebug
 
-module TraceStr = Make (StringEvent) (struct let limit_log2 = 9 end)
-
 let times = Tracedebug_times.Times.create 1
 
 let times_record () = Tracedebug_times.Times.record times 0
 
-let tracedebug_record () = TraceStr.record "fixed event"
+let t = create StringEvent.empty
 
-module type Tracer = module type of TraceStr
+let tracedebug_record () = record t "fixed event"
 
 let benchmarks =
   Test.make_grouped ~name:"tracedebug"
@@ -34,17 +32,12 @@ let benchmarks =
     ; Test.make_indexed_with_resource ~name:"Tracedebug.recordf"
         ~args:[1; 9; 13]
         Test.multiple (* TODO: Test.uniq segfaults here, bechamel bug *)
-        ~allocate:(fun i : (module Tracer) ->
-          (module Make (StringEvent) (struct let limit_log2 = i end))
-        )
-        ~free:ignore
-        (fun i ->
-          Staged.stage @@ fun (module T : Tracer) ->
-          T.recordf (fun () -> string_of_int i)
-        )
+        ~allocate:(fun i -> create ~limit_log2:i StringEvent.empty)
+        ~free:ignore (* using stop t on free would segfault, bechamel bug *)
+        (fun i -> Staged.stage @@ fun t -> recordf t (fun () -> string_of_int i))
     ]
 
 let () =
   Bechamel_simple_cli.cli benchmarks ;
-  let dump_gc = register_gc ~limit_log2:9 () in
-  Tracedebug.dump Format.err_formatter [dump_gc ()]
+  let gc = register_gc () in
+  Tracedebug.pp_events Format.err_formatter [dump GcEvent.pp gc]

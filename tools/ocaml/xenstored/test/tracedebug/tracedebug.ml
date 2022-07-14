@@ -95,95 +95,101 @@ let order = Atomic.make 0
    so a high resolution timestamp is still recommended.
 *)
 
-module Make
-    (E : TracedEvent) (Config : sig
-      val limit_log2 : int
-      (** number of events to store = [2**limit_log2] *)
-    end) =
-struct
-  let limit =
-    assert (Config.limit_log2 > 0) ;
-    1 lsl Config.limit_log2
+type 'a t = {
+    limit: int
+  ; mask: int
+  ; enabled: bool Atomic.t
+  ; index: int Atomic.t
+  ; events: 'a array
+  ; ordering: int array
+  ; timestamps: Times.t
+  ; empty: 'a
+}
 
-  let mask = limit - 1
+let create ?(limit_log2 = 9) empty =
+  if limit_log2 <= 0 then
+    invalid_arg (string_of_int limit_log2) ;
+  let limit = 1 lsl limit_log2 in
+  {
+    limit
+  ; mask= limit - 1
+  ; enabled= Atomic.make true
+  ; index=
+      Atomic.make 0
+      (* avoid allocation: unpack fields into separate arrays of equal size *)
+  ; events= Array.make limit empty
+  ; ordering= Array.make limit 0
+  ; timestamps= Times.create limit
+  ; empty
+  }
 
-  let enabled = Atomic.make true
+let start t = Atomic.set t.enabled true
 
-  let index = Atomic.make 0
+let stop t = Atomic.set t.enabled false
 
-  (* avoid allocation: unpack fields into separate arrays of equal size *)
-  let events = Array.make limit E.empty
+let reset t =
+  stop t ;
+  (* race condition here: some [record] functions may still be running,
+     but caller should ensure that doesn't happen
+  *)
+  Array.fill t.events 0 (Array.length t.events) t.empty ;
+  Times.fill t.timestamps ;
+  Atomic.set t.index 0 ;
+  start t
 
-  let ordering = Array.make limit 0
+(* do not request inlining this to prevent making callers too large *)
+let record_internal t ev =
+  (* assumes power of 2 size *)
+  let events_idx = Atomic.fetch_and_add t.index 1 land t.mask
+  and order_idx = Atomic.fetch_and_add order 1 in
+  Times.record t.timestamps events_idx ;
+  (* mask ensures we are within bounds,
+     and some versions of times do perform bound checks
+     that can be used while testing *)
+  Array.unsafe_set t.events events_idx ev ;
+  Array.unsafe_set t.ordering events_idx order_idx
 
-  let timestamps = Times.create limit
+(* performance critical: avoid allocation, and minimize function calls
+    when disabled *)
+let record t ev =
+  if Atomic.get t.enabled then
+    record_internal t ev
+  [@@ocaml.inline]
 
-  let start () = Atomic.set enabled true
+let recordf t f =
+  if Atomic.get t.enabled then
+    record_internal t (f ())
+  [@@ocaml.inline]
 
-  let stop () = Atomic.set enabled false
+(* end performance critical *)
 
-  let reset () =
-    stop () ;
-    (* race condition here: some [record] functions may still be running,
-       but caller should ensure that doesn't happen
-    *)
-    Array.fill events 0 (Array.length events) E.empty ;
-    Times.fill timestamps ;
-    Atomic.set index 0 ;
-    start ()
+let rec getall t pp lst count idx =
+  if count >= t.limit then
+    lst (* avoid infinite loop on a full ring *)
+  else
+    let i = idx land t.mask in
+    match Times.get_as_ns t.timestamps i with
+    | Some timestamp ->
+        let event ppf =
+          try pp ppf t.events.(i)
+          with e ->
+            let ee = ExnEvent.get e in
+            Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
+        in
+        getall t pp
+          ((timestamp, t.ordering.(i), event) :: lst)
+          (count + 1) (idx - 1)
+    | None ->
+        (* we constructed the list by going backwards through the ring,
+           so the list is in the correct order and we only traversed as much of
+           the ring that had valid entries *)
+        lst
 
-  (* do not request inlining this to prevent making callers too large *)
-  let record_internal ev =
-    (* assumes power of 2 size *)
-    let events_idx = Atomic.fetch_and_add index 1 land mask
-    and order_idx = Atomic.fetch_and_add order 1 in
-    Times.record timestamps events_idx ;
-    (* mask ensures we are within bounds,
-       and some versions of times do perform bound checks
-       that can be used while testing *)
-    Array.unsafe_set events events_idx ev ;
-    Array.unsafe_set ordering events_idx order_idx
-
-  (* performance critical: avoid allocation, and minimize function calls
-      when disabled *)
-  let record ev =
-    if Atomic.get enabled then
-      record_internal ev
-    [@@ocaml.inline]
-
-  let recordf f =
-    if Atomic.get enabled then
-      record_internal (f ())
-    [@@ocaml.inline]
-
-  (* end performance critical *)
-
-  let rec getall lst count idx =
-    if count >= limit then
-      lst (* avoid infinite loop on a full ring *)
-    else
-      let i = (idx + limit) land mask in
-      match Times.get_as_ns timestamps i with
-      | Some timestamp ->
-          let event ppf =
-            try E.pp ppf events.(i)
-            with e ->
-              let ee = ExnEvent.get e in
-              Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
-          in
-          getall ((timestamp, ordering.(i), event) :: lst) (count + 1) (idx - 1)
-      | None ->
-          (* we constructed the list by going backwards through the ring,
-             so the list is in the correct order and we only traversed as much of
-             the ring that had valid entries *)
-          lst
-
-  let dump () =
-    stop () ;
-    let idx = Atomic.get index - 1 in
-    getall [] 0 idx
-  (* do not reset here, formatting is delayed *)
-end
+let dump pp t =
+  stop t ;
+  let idx = Atomic.get t.index - 1 in
+  getall t pp [] 0 idx
+(* do not reset here, formatting is delayed *)
 
 let sort_timestamp (t0, o0, _) (t1, o1, _) =
   match Int64.compare t0 t1 with 0 -> Int.compare o0 o1 | r -> r
@@ -248,7 +254,7 @@ let get_overhead () =
    for now we can do dune runtest --profile=release | sort
 *)
 
-let dump ppf all =
+let pp_events ppf all =
   let print last (timestamp, _, pp_event) =
     let delta =
       if Int64.compare last Int64.min_int = 0 then
@@ -270,8 +276,8 @@ let dump ppf all =
   let (_ : int64) = all |> sorted |> Array.fold_left print Int64.min_int in
   Format.fprintf ppf "@]@."
 
-let register_gc ?(limit_log2 = 9) () =
-  let module R = Make (GcEvent) (struct let limit_log2 = limit_log2 end) in
-  let on_major_cycle_end () = R.record (GcEvent.get ()) in
+let register_gc ?limit_log2 () =
+  let t = create ?limit_log2 GcEvent.empty in
+  let on_major_cycle_end () = record t (GcEvent.get ()) in
   let (_ : Gc.alarm) = Gc.create_alarm on_major_cycle_end in
-  R.dump
+  t
