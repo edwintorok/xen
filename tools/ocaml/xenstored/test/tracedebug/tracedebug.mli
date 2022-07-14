@@ -47,6 +47,12 @@ module ExnEvent : sig
   val get : exn -> t
 end
 
+module GcEvent : sig
+  include TracedEvent
+
+  val get : unit -> t
+end
+
 type events
 
 module Make

@@ -1,4 +1,4 @@
 (library
  (name tracedebug)
  (modes native)
- (libraries tracedebug_times))
+ (libraries tracedebug_times unix))

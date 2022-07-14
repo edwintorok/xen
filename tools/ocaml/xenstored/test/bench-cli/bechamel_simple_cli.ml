@@ -1,3 +1,4 @@
+(* based on bechamel example code *)
 open Bechamel
 open Toolkit
 
@@ -38,5 +39,7 @@ let cli tests =
         {Bechamel_notty.w= 80; h= 1}
   in
   let results, _ = tests |> benchmark |> analyze in
+  print_newline () ;
+  (* for --no-buffer *)
   (* Fmt.pf Fmt.stdout "results: %a" Fmt.(hashtbl @@ pair string @@ hashtbl @@ pair string Analyze.OLS.pp) results *)
   img (window, results) |> eol |> output_image

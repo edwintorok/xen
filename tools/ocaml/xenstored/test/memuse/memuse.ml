@@ -129,6 +129,7 @@ end) : Allocator = struct
   let dealloc t item = A.dealloc t.allocator item
 
   let strategy_begin _t = ()
+
   let strategy_done _t = ()
 end
 
@@ -180,9 +181,9 @@ let multiple allocator_seq =
       t |> List.iter @@ fun (Alloc ((module A), t)) -> A.strategy_begin t
 
     let strategy_done t =
-      t |> List.iter @@ fun (Alloc ((module A), t)) -> A.strategy_done t
-
-end : Allocator)
+      t |> List.iter @@ fun (Alloc ((module A), t)) -> A.strategy_done t end
+  : Allocator
+  )
 
 (** an attack strategy against an allocator *)
 module type Strategy = sig
@@ -232,32 +233,33 @@ module WorstCase (A : Allocator) : Strategy = struct
 
   let cycle_run t =
     A.strategy_begin t.allocator ;
-    let () = 
-    t.cycles
-    |> Array.iteri @@ fun i0 cycle ->
-       Logs.debug (fun m -> m "Cycle %d" i0) ;
-       (* allocate as many items as possible in current cycle of the current size *)
-       cycle.items <- A.alloc t.allocator cycle.size ;
-       Logs.debug (fun m -> m "Allocated") ;
-       (* deallocate some of the previous items, such that the largest continuos gap is not
-          enough to fulfil the next allocation size.
-          In OCaml this won't immediately deallocate the item just make it possible for the GC
-          to reuse the item in the future
-       *)
-       if i0 < Array.length t.cycles - 2 then
-         for j0 = 0 to i0 do
-           let a = t.cycles.(j0).items in
-           a
-           |> Array.iteri @@ fun k0 item ->
-              (* formula in paper is k ∤ 2 ^ (i-j+1), using 1-based indexes.
-                 We use 0 based indexes in OCaml, hence the modified formula here
-              *)
-              if (k0 + 1) mod (1 lsl (i0 - j0 + 1)) <> 0 && item != A.empty then (
-                a.(k0) <- A.empty ; A.dealloc t.allocator item
-              )
-         done;
+    let () =
+      t.cycles
+      |> Array.iteri @@ fun i0 cycle ->
+         Logs.debug (fun m -> m "Cycle %d" i0) ;
+         (* allocate as many items as possible in current cycle of the current size *)
+         cycle.items <- A.alloc t.allocator cycle.size ;
+         Logs.debug (fun m -> m "Allocated") ;
+         (* deallocate some of the previous items, such that the largest continuos gap is not
+            enough to fulfil the next allocation size.
+            In OCaml this won't immediately deallocate the item just make it possible for the GC
+            to reuse the item in the future
+         *)
+         if i0 < Array.length t.cycles - 2 then
+           for j0 = 0 to i0 do
+             let a = t.cycles.(j0).items in
+             a
+             |> Array.iteri @@ fun k0 item ->
+                (* formula in paper is k ∤ 2 ^ (i-j+1), using 1-based indexes.
+                   We use 0 based indexes in OCaml, hence the modified formula here
+                *)
+                if (k0 + 1) mod (1 lsl (i0 - j0 + 1)) <> 0 && item != A.empty
+                then (
+                  a.(k0) <- A.empty ; A.dealloc t.allocator item
+                )
+           done
     in
-    A.strategy_done t.allocator 
+    A.strategy_done t.allocator
 
   let cycle_cleanup t =
     t.cycles
@@ -291,14 +293,14 @@ module MaxAlloc (A : Allocator) : Strategy = struct
 
   let cycle_run t =
     let minsize = A.size_min t.allocator in
-    A.strategy_begin t.allocator;
+    A.strategy_begin t.allocator ;
     let rec loop items size =
       if size < minsize then
         Array.concat items
       else
         loop (A.alloc t.allocator size :: items) (size / 2)
     in
-    t.items <- loop [] (A.size_max t.allocator);
+    t.items <- loop [] (A.size_max t.allocator) ;
     A.strategy_done t.allocator
 
   let cycle_cleanup t =
@@ -372,24 +374,26 @@ module OCamlAllocator = struct
 
   (* ignoring item count limits, this is to test the OCaml GC *)
   module NoCountLimit = struct
-    type baseline = { top: int; live: int }
-    type t =
-      { mutable used: int
+    type baseline = {top: int; live: int}
+
+    type t = {
+        mutable used: int
       ; mutable overhead: baseline
       ; mutable baseline_top_words: baseline option
-      }
+    }
 
     type item = string
 
     let empty = ""
 
-    let default = { top =0; live = 0}
+    let default = {top= 0; live= 0}
+
     let init () =
       Logs.debug (fun m ->
           m "allocator initialized, maxmem_controllable = %.2fMiB"
             (float maxmem_controllable /. 1024. /. 1024.)
       ) ;
-      {used= 0; overhead = default; baseline_top_words = None}
+      {used= 0; overhead= default; baseline_top_words= None}
 
     let size_min _ = minalloc_size
 
@@ -401,27 +405,38 @@ module OCamlAllocator = struct
 
     let strategy_begin t =
       match t.baseline_top_words with
-      | Some _ -> ()
+      | Some _ ->
+          ()
       | None ->
-          Gc.compact ();
+          Gc.compact () ;
           let q = Gc.quick_stat () in
-          let baseline = { top = q.Gc.top_heap_words; live = q.Gc.live_words } in
-          Logs.debug (fun m -> m "taken baseline GC measurement: %.2f MiB top, %.2f MiB live"
-            (mib_of_words baseline.top) (mib_of_words baseline.live));
+          let baseline = {top= q.Gc.top_heap_words; live= q.Gc.live_words} in
+          Logs.debug (fun m ->
+              m "taken baseline GC measurement: %.2f MiB top, %.2f MiB live"
+                (mib_of_words baseline.top)
+                (mib_of_words baseline.live)
+          ) ;
           t.baseline_top_words <- Some baseline
 
-
     let strategy_done t =
-      t.overhead <- { t.overhead with top = max t.overhead.top t.overhead.live};
+      t.overhead <- {t.overhead with top= max t.overhead.top t.overhead.live} ;
       let q = Gc.quick_stat () in
       Logs.debug (fun m -> m "running GC") ;
       (* needed to get accurate live_words count from stat *)
       Gc.full_major () ;
       let s = Gc.stat () in
       let baseline = Option.value ~default t.baseline_top_words in
-      let baseline = { top = baseline.top + t.overhead.top; live = baseline.live + t.overhead.live } in
-      Logs.debug (fun m -> m "baseline top = %.2fMiB, live=%.2fMiB" (mib_of_words baseline.top)
-      (mib_of_words baseline.live));
+      let baseline =
+        {
+          top= baseline.top + t.overhead.top
+        ; live= baseline.live + t.overhead.live
+        }
+      in
+      Logs.debug (fun m ->
+          m "baseline top = %.2fMiB, live=%.2fMiB"
+            (mib_of_words baseline.top)
+            (mib_of_words baseline.live)
+      ) ;
       (* heap=live when compacted in baseline *)
       let num = mib_of_words (q.Gc.heap_words - baseline.live) in
       (* heap words prior to GC *)
@@ -438,8 +453,8 @@ module OCamlAllocator = struct
       m "Ratio: %.2f MiB (top) / %.2f MiB (live) = %.3f" num denum (num /. denum)
 
     let finish t =
-      assert (t.used = 0);
-      t.overhead <- { t.overhead with live = 0}
+      assert (t.used = 0) ;
+      t.overhead <- {t.overhead with live= 0}
 
     let alloc t n =
       if n mod word <> 0 then
@@ -464,7 +479,7 @@ module OCamlAllocator = struct
           t.used <- t.used + (count * n) ;
           (* the array itself is not part of what we're "allocating" *)
           let delta = 1 + Array.length elements in
-          t.overhead <- {t.overhead with live = t.overhead.live + delta};
+          t.overhead <- {t.overhead with live= t.overhead.live + delta} ;
           Logs.debug (fun m -> m "used %d, count=%d, n=%d" t.used count n) ;
           elements
 

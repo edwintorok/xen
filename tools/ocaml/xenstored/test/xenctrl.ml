@@ -19,13 +19,11 @@ type domid = int
 
 (* ** xenctrl.h ** *)
 
-
-type domaininfo =
-{
-	domid             : domid;
-	dying             : bool;
-	shutdown          : bool;
-	shutdown_code     : int;
+type domaininfo = {
+    domid: domid
+  ; dying: bool
+  ; shutdown: bool
+  ; shutdown_code: int
 }
 
 exception Error of string
@@ -33,16 +31,14 @@ exception Error of string
 type handle = unit
 
 let interface_open () = ()
+
 let interface_close () = ()
 
-let domain_getinfo () domid = {
-  domid = domid;
-  dying = false;
-  shutdown = false;
-  shutdown_code = 0;
-}
+let domain_getinfo () domid =
+  {domid; dying= false; shutdown= false; shutdown_code= 0}
 
 let devzero = Unix.openfile "/dev/zero" [] 0
-let  nullmap () = Xenmmap.mmap devzero Xenmmap.RDWR Xenmmap.PRIVATE 4096 0
+
+let nullmap () = Xenmmap.mmap devzero Xenmmap.RDWR Xenmmap.PRIVATE 4096 0
 
 let map_foreign_range _ _ _ _ = nullmap ()
