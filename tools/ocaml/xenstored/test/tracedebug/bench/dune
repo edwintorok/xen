@@ -1,0 +1,11 @@
+(executable
+ (name bench_tracedebug)
+ (modes native)
+ (optional)
+ (libraries tracedebug bechamel_simple_cli))
+
+(rule
+ (alias bench)
+ (action
+  (run ./bench_tracedebug.exe))
+ (enabled_if %{lib-available:bechamel_simple_cli}))
