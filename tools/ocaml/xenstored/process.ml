@@ -720,6 +720,7 @@ let check_memory_usage cons _con =
          sizes := IntMap.add (connection_size_words con) con !sizes);
        let _, maxcon = IntMap.max_binding !sizes in
        (* TODO: log *)
+       info "Marking domain %s as bad" (Connection.get_domstr maxcon);
        do_reset_watches maxcon () () cons ();
        Connection.mark_as_bad maxcon;
        Gc.compact ()

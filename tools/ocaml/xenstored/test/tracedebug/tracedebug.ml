@@ -95,10 +95,7 @@ let order = Atomic.make 0
    so a high resolution timestamp is still recommended.
 *)
 
-type 'a event =
-  { mutable ordering: int
-  ; mutable item: 'a
-  }
+type 'a event = {mutable ordering: int; mutable item: 'a}
 
 type 'a t = {
     limit: int
@@ -107,11 +104,10 @@ type 'a t = {
   ; index: int Atomic.t
   ; timestamps: Times.t
   ; events: 'a event array
-  ; empty: 'a event
+  ; empty: 'a
 }
 
 let create ?(limit_log2 = 9) empty =
-  let empty = {ordering=0;item= empty} in
   if limit_log2 <= 0 then
     invalid_arg (string_of_int limit_log2) ;
   let limit = 1 lsl limit_log2 in
@@ -122,7 +118,9 @@ let create ?(limit_log2 = 9) empty =
   ; index=
       Atomic.make 0
       (* avoid allocation: unpack fields into separate arrays of equal size *)
-  ; events= Array.make limit empty
+  ; events=
+      Array.init limit (fun _ -> {ordering= 0; item= empty})
+      (* mutable: must be newly allocated *)
   ; timestamps= Times.create limit
   ; empty
   }
@@ -136,7 +134,12 @@ let reset t =
   (* race condition here: some [record] functions may still be running,
      but caller should ensure that doesn't happen
   *)
-  Array.fill t.events 0 (Array.length t.events) t.empty ;
+  Array.iter
+    (fun ev ->
+      ev.ordering <- 0 ;
+      ev.item <- t.empty
+    )
+    t.events ;
   Times.fill t.timestamps ;
   Atomic.set t.index 0 ;
   start t
@@ -151,7 +154,7 @@ let record_internal t ev =
      and some versions of times do perform bound checks
      that can be used while testing *)
   let event = Array.unsafe_get t.events events_idx in
-  event.ordering <- order_idx;
+  event.ordering <- order_idx ;
   event.item <- ev
 
 (* performance critical: avoid allocation, and minimize function calls
@@ -187,15 +190,14 @@ let rec getall t pp lst count idx =
     match Times.get_as_ns t.timestamps i with
     | Some timestamp ->
         let ev = t.events.(i) in
+        let ordering, item = (ev.ordering, ev.item) in
         let event ppf =
-          try pp ppf ev.item
+          try pp ppf item
           with e ->
             let ee = ExnEvent.get e in
             Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
         in
-        getall t pp
-          ((timestamp, ev.ordering, event) :: lst)
-          (count + 1) (idx - 1)
+        getall t pp ((timestamp, ordering, event) :: lst) (count + 1) (idx - 1)
     | None ->
         (* we constructed the list by going backwards through the ring,
            so the list is in the correct order and we only traversed as much of

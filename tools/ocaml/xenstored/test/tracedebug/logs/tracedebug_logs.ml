@@ -24,6 +24,6 @@ let dump_at_exit ?app ?(dst = Format.err_formatter) ?(limit_log2 = 16) others =
   let reporter, dump = reporter ?app ~limit_log2 () in
   Logs.set_reporter reporter ;
   at_exit (fun () ->
-    Tracedebug.pp_events dst (dump () :: others ());
-    Format.pp_print_newline dst ()
+      Tracedebug.pp_events dst (dump () :: others ()) ;
+      Format.pp_print_newline dst ()
   )

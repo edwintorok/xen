@@ -1,6 +1,5 @@
 open Xenstored_test
 
-
 let () = Tracedebug_logs.dump_at_exit (fun () -> [])
 
 let log_write ?(level = Logging.Debug) s =
@@ -108,9 +107,14 @@ let () =
        (* "--no-domain-init" do not use this as it turns off eventchn processing! *)
     |]
   in
-  let (_:Sys.signal_behavior) = Sys.signal Sys.sigchld (Sys.Signal_handle (fun _ ->
-    prerr_endline "Child quit, exiting";
-    exit 2
-  )) in
+  let (_ : Sys.signal_behavior) =
+    Sys.signal Sys.sigchld
+      (Sys.Signal_handle
+         (fun _ ->
+           prerr_endline "Child quit, exiting" ;
+           exit 2
+         )
+      )
+  in
   prerr_endline "launching main" ;
   Xenstored.main ~argv ~on_startup ()

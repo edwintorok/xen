@@ -23,8 +23,9 @@ let () =
   done ;
   for i = 1 to 10 do
     recordf t1 (fun () -> string_of_int i) ;
-    record t2 "ith event"
+    record t2 ("ith event " ^ string_of_int i)
   done ;
   Gc.full_major () ;
+  (* TODO: check that the results are correct! distinct events, etc *)
   pp_events Format.err_formatter
     [dump StringEvent.pp t1; dump StringEvent.pp t2; dump GcEvent.pp gc]
