@@ -7,5 +7,4 @@
 (rule
  (alias bench)
  (action
-  (run ./bench_tracedebug.exe))
- (enabled_if %{lib-available:bechamel_simple_cli}))
+  (run ./bench_tracedebug.exe)))

@@ -19,8 +19,6 @@ open Tracedebug
 
 let tracer = create StringEvent.empty
 
-let trace fmt = trace tracer fmt
-
 module RingEvent = struct
   type t = (string * string) list (* ring snapshot *)
 
@@ -206,7 +204,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     recordf RingEvent.tracer (fun () ->
         Xenstore_ring.Ring.to_debug_map ch.buffer
     ) ;
-    trace msg
+    record tracer msg
 
   exception Xs_ring_error of int
 
@@ -217,7 +215,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     let error_offset = features_offset + (2 * 4) in
     let get_u32 off = Cstruct.HE.get_uint32 ch.buffer off |> Int32.to_int in
     let features = get_u32 features_offset in
-    trace "Server features: %d" features ;
+    Logs.debug (fun m -> m "Server features: %d" features );
     let has_error_feature = features land 2 <> 0 in
     if has_error_feature then (
       record tracer "ring error check" ;
@@ -258,7 +256,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     debug_ring ch "before read" ;
     let n = R.read ch.buffer buf ofs len in
     debug_ring ch "after read" ;
-    trace "read: got = %d" n ;
+    Logs.debug (fun m -> m "read: got = %d" n );
     if n = 0 then (
       check_ring_error_exn ch ;
       let event = Notify.wait_for_other_end ch.notif event "read" in
@@ -266,12 +264,12 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
       read_aux ch buf ofs len event
     ) else (
       Notify.notify_other_end ch.notif "read" ;
-      trace "read: done %d" n ;
+      Logs.debug (fun m -> m "read: done %d" n );
       n
     )
 
   let read ch buf ofs len =
-    trace "read: start; len = %d" len ;
+    Logs.debug (fun m -> m "read: start; len = %d" len );
     (* read event counter before reading ring and wait for event counter <>
        this value to avoid race conditions in another thread receiving an event
        that we waited for.
@@ -284,7 +282,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     debug_ring ch "write" ;
     let n = R.write ch.buffer buf ofs len in
     debug_ring ch "write" ;
-    trace "write: wrote %d/%d" n len ;
+    Logs.debug (fun m -> m "write: wrote %d/%d" n len );
     if n > 0 then
       Notify.notify_other_end ch.notif "write" ;
     if n < len then (
@@ -296,7 +294,7 @@ module MakeIO (R : Ring.S) (Notify : Notification) = struct
     record tracer "write: done"
 
   let write ch buf ofs len =
-    trace "write: got=%d" len ;
+    Logs.debug (fun m -> m "write: got=%d" len );
     Notify.prepare ch.notif |> write_aux ch buf ofs len
 end
 

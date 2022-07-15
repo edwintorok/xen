@@ -173,13 +173,6 @@ let record1 t f x =
   if Atomic.get t.enabled then
     record_internal t (f x)
 
-let trace t fmt =
-  if Atomic.get t.enabled then
-    let print s = record_internal t s in
-    Printf.ksprintf print fmt
-  else
-    Printf.ifprintf () fmt
-
 (* end performance critical *)
 
 let rec getall t pp lst count idx =
@@ -211,7 +204,7 @@ let dump pp t =
 (* do not reset here, formatting is delayed *)
 
 let sort_timestamp (t0, o0, _) (t1, o1, _) =
-  match Int64.compare t0 t1 with 0 -> Int.compare o0 o1 | r -> r
+  match Int64.compare t0 t1 with 0 -> compare (o0:int) (o1:int) | r -> r
 
 (* 4.14: we could use Seq.sorted_merge *)
 let sorted all =
