@@ -95,18 +95,23 @@ let order = Atomic.make 0
    so a high resolution timestamp is still recommended.
 *)
 
+type 'a event =
+  { mutable ordering: int
+  ; mutable item: 'a
+  }
+
 type 'a t = {
     limit: int
   ; mask: int
   ; enabled: bool Atomic.t
   ; index: int Atomic.t
-  ; events: 'a array
-  ; ordering: int array
   ; timestamps: Times.t
-  ; empty: 'a
+  ; events: 'a event array
+  ; empty: 'a event
 }
 
 let create ?(limit_log2 = 9) empty =
+  let empty = {ordering=0;item= empty} in
   if limit_log2 <= 0 then
     invalid_arg (string_of_int limit_log2) ;
   let limit = 1 lsl limit_log2 in
@@ -118,7 +123,6 @@ let create ?(limit_log2 = 9) empty =
       Atomic.make 0
       (* avoid allocation: unpack fields into separate arrays of equal size *)
   ; events= Array.make limit empty
-  ; ordering= Array.make limit 0
   ; timestamps= Times.create limit
   ; empty
   }
@@ -146,8 +150,9 @@ let record_internal t ev =
   (* mask ensures we are within bounds,
      and some versions of times do perform bound checks
      that can be used while testing *)
-  Array.unsafe_set t.events events_idx ev ;
-  Array.unsafe_set t.ordering events_idx order_idx
+  let event = Array.unsafe_get t.events events_idx in
+  event.ordering <- order_idx;
+  event.item <- ev
 
 (* performance critical: avoid allocation, and minimize function calls
     when disabled *)
@@ -181,14 +186,15 @@ let rec getall t pp lst count idx =
     let i = idx land t.mask in
     match Times.get_as_ns t.timestamps i with
     | Some timestamp ->
+        let ev = t.events.(i) in
         let event ppf =
-          try pp ppf t.events.(i)
+          try pp ppf ev.item
           with e ->
             let ee = ExnEvent.get e in
             Format.fprintf ppf "@,Exception formatting: %a" ExnEvent.pp ee
         in
         getall t pp
-          ((timestamp, t.ordering.(i), event) :: lst)
+          ((timestamp, ev.ordering, event) :: lst)
           (count + 1) (idx - 1)
     | None ->
         (* we constructed the list by going backwards through the ring,

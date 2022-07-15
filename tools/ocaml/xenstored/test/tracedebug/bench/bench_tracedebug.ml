@@ -57,5 +57,5 @@ let null_formatter =
     }
 
 let () =
-  Tracedebug_logs.dump_at_exit ~dst:null_formatter ~limit_log2:9 () ;
+  Tracedebug_logs.dump_at_exit ~dst:null_formatter ~limit_log2:9 (fun () -> []) ;
   Bechamel_simple_cli.cli benchmarks
