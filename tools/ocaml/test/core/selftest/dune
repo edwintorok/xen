@@ -1,0 +1,15 @@
+(tests
+ (modes
+  (byte exe) ; no C stubs, no need for byte_complete
+  (native exe))
+ (names selftest)
+ (action
+  (progn
+   (run %{test})
+   (run ./selftest.bc)))
+ (libraries tracer_core))
+
+(alias
+  (name runtest2)
+ (enabled_if (and %{lib-available:foobar}))
+  )

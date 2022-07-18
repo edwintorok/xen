@@ -1,0 +1,11 @@
+; choose implementation based on 32-bit/64-bit of target
+; a different mli is needed due to `private int` on 64-bit
+
+(copy_files# uint62-64-%{arch_sixtyfour}/uint62.ml{,i})
+
+(library
+ (name tracer_core)
+ (modules
+  (:standard uint62))
+ ; uint62 is a generated file, must list explicitly
+ )
