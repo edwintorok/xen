@@ -1,5 +1,3 @@
-open Tracer_core
-
 let uint62_max = Uint62.of_int64 (-1L) |> Uint62.to_int64
 
 let check_roundtrip i64 =

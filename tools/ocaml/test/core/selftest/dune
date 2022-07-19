@@ -10,6 +10,6 @@
  (libraries tracer_core))
 
 (alias
-  (name runtest2)
- (enabled_if (and %{lib-available:foobar}))
-  )
+ (name runtest2)
+ (enabled_if
+  (and %{lib-available:foobar})))

@@ -18,6 +18,10 @@ A more comprehensive suite is available in `../ext`.
     * other libraries can enhance the functionality here, and can be chosen using
     dune `select` for executables, or `optional` for libraries
 
+    * it is recommended to keep the `select`-ed files a short one-liner,
+    just including the module built as an optional library: this ensures that
+    other variants get compile-tested regularly too
+
     * internal libraries that in their entirety only function when external
     libraries are present should be in `../ext` instead
 
@@ -34,6 +38,9 @@ A more comprehensive suite is available in `../ext`.
     aren't usable for development (they are not incremental and lack LSP support).
     For now version 2.1, although that may be bumped to 2.7 in the future
     after updating the CI.
+
+    * Dune virtual libraries are not used because they prevent inlining from working,
+    and they may require a newer version of Dune
 
 * Be careful that the test code may or may not run in a Xen VM, do not
 start using its xenstore by default, unless explicitly requested on the cmdline

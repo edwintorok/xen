@@ -1,0 +1,6 @@
+(copy_files# ../../core/timestamp.mli)
+
+(library
+ (name tracer_intrinsics)
+ (optional)
+ (libraries ocaml_intrinsics tracer_monotonic uint62 unix))

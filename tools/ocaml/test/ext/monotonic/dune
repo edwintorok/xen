@@ -1,0 +1,6 @@
+(copy_files# ../../core/timestamp.mli)
+
+(library
+ (name tracer_monotonic)
+ (optional)
+ (libraries mirage-clock-unix uint62))
