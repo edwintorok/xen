@@ -2,12 +2,4 @@
 ; a different mli is needed due to `private int` on 64-bit
 
 (library
- (name tracer_core)
- (libraries
-  uint62
-  (select
-   timestamp.ml
-   from
-   ;   (tracer_intrinsics -> timestamp.intrinsics.ml)
-   (tracer_monotonic -> timestamp.monotonic.ml)
-   (tracer_unix -> timestamp.unix.ml))))
+ (name tracer_core))
