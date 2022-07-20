@@ -2,8 +2,7 @@ open Tracer_core
 
 let () =
   let t = Array.init 100 (fun _ -> Timestamp.now ()) in
-  Int64.div
-  (Timestamp.sub_ns ~t1:t.(99) ~t0:t.(0) |> Option.get) 100L
+  Int64.div (Timestamp.sub_ns ~t1:t.(99) ~t0:t.(0) |> Option.get) 100L
   |> Printf.printf "overhead: %Ld ns\n"
 
 let test () =
