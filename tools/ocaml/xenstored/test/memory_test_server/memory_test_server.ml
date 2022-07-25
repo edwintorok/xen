@@ -39,7 +39,7 @@ let () =
   )
 
 let spawn_client name domid rd wr =
-  let (_0 :: cmd :: rest) = Sys.argv |> Array.to_list in
+  let (_0 :: _config :: cmd :: rest) = Sys.argv |> Array.to_list in
   let pid =
     Unix.create_process cmd
       (Array.of_list

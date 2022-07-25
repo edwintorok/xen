@@ -3,5 +3,5 @@
  (modes exe)
  ;(action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe}))
  (action
-  (run %{test} %{dep:../memory_test/xenstore_memory_test.exe} --memuse))
+  (run %{test} --config-file=%{dep:../../oxenstored.conf} %{dep:../memory_test/xenstore_memory_test.exe} --memuse))
  (libraries xenstored_test shm tracedebug tracedebug_logs logs))
