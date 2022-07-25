@@ -88,6 +88,7 @@ type t = {
 	oldroot: Store.Node.t;
 	paths: (Xenbus.Xb.Op.operation * Store.Path.t) Queue.t;
 	operations: (Packet.request * Packet.response) Queue.t;
+	mutable quota_reached: bool;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }
@@ -141,6 +142,7 @@ let make ?(internal=false) id store =
 		oldroot = Store.get_root store;
 		paths = Queue.create size_of_op_path;
 		operations = Queue.create size_of_packet_req_resp;
+		quota_reached = false;
 		read_lowpath = None;
 		write_lowpath = None;
 	} in
@@ -155,14 +157,19 @@ let get_paths t = t.paths
 
 let get_root t = Store.get_root t.store
 
+let check_quota_exn ~perm t =
+	if !Define.maxrequests >= 0
+		&& not (Perms.Connection.is_dom0 perm)
+		&& (t.quota_reached || Queue.length t.operations >= !Define.maxrequests)
+		then begin
+		  t.quota_reached <- true;
+		  raise Quota.Limit_reached;
+		end
+
 let is_read_only t = Queue.is_empty t.paths
 let add_wop t ty path = Queue.push (ty, path) t.paths
 let iter_paths f t = Queue.iter f t.paths
 let add_operation ~perm t request response =
-	if !Define.maxrequests >= 0
-		&& not (Perms.Connection.is_dom0 perm)
-		&& Queue.length t.operations >= !Define.maxrequests
-		then raise Quota.Limit_reached;
 	Queue.push (request, response) t.operations
 let iter_operations f t = Queue.iter f t.operations
 let set_read_lowpath t path = t.read_lowpath <- get_lowest path t.read_lowpath

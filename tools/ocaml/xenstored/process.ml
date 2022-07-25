@@ -388,6 +388,7 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
 		Packet.Error e in
 	try
+		Transaction.check_quota_exn ~perm:(Connection.get_perm con) t;
 		fct con t doms cons req.Packet.data
 	with
 	| Define.Invalid_path          -> reply_error "EINVAL"
