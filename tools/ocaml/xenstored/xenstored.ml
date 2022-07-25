@@ -314,7 +314,9 @@ let tweak_gc () =
   if quick.Gc.heap_words > !Define.gc_max_overhead / word_size_bytes then
     Gc.set { (Gc.get ()) with
               Gc.allocation_policy = !Define.gc_allocation_policy
-            ; Gc.max_overhead = !Define.gc_max_overhead }
+            ; Gc.max_overhead = !Define.gc_max_overhead };
+  if Process.is_over_quota ~pct:95 () then
+    let (_:int) = Gc.major_slice 0 in ()
 
 (* separate function to allow test code to reuse this,
    and e.g. run it in a thread, set up some mock config before, etc.
@@ -487,6 +489,7 @@ let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
 			(last_scan_time := now; Domains.iter domains ring_scan_checker);
 		tweak_gc ();
+		let (_:int) = Gc.major_slice 0 in
 
 		(* make sure we don't print general stats faster than 2 min *)
 		if now > (!last_stat_time +. 120.) then (

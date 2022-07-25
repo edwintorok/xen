@@ -699,9 +699,17 @@ let process_packet ~store ~cons ~doms ~con ~req =
 
 let bytes_of w = w * Sys.word_size / 8
 
-let is_over_quota () =
+let is_over_quota ?(pct=100) () =
     let quick = Gc.quick_stat () in
-    bytes_of quick.Gc.heap_words >= !Define.maxdomumemory
+    let heap_bytes = bytes_of quick.Gc.heap_words
+    and configured = !Define.maxdomumemory * pct / 100 in
+    let is_over = heap_bytes >= configured in
+    if is_over then begin
+      debug "memory_usage: %s quota: %d bytes heap >= %d bytes configured"
+        (if (pct = 100) then "over" else "approaching")
+        heap_bytes configured
+    end;
+    is_over
 
 let connection_size_words con =
   (* TODO: do not rely on Obj here *)
@@ -716,22 +724,31 @@ let connection_size_bytes con =
 module IntMap = Map.Make(Int)
 
 let check_memory_usage cons _con =
+   if is_over_quota ~pct:90 () then begin
+     (* as we approach quota free nonessential memory,
+        do not call the GC immediately though to avoid performance issues
+      *)
+     debug "memory_usage: trimming history";
+     History.trim_all ();
+     (* when more memory is allocated the GC will run as usual and
+        free this memory *)
+   end;
    if is_over_quota () then begin
-     History.trim ();
-     (* update counters, and free mem *)
-     Gc.full_major ();
-     if is_over_quota () then begin
-       (* TODO: print *)
-       let sizes = ref IntMap.empty in
-       Connections.iter_domains cons (fun con ->
-         sizes := IntMap.add (connection_size_bytes con) con !sizes);
-       let _, maxcon = IntMap.max_binding !sizes in
-       (* TODO: log *)
-       info "Marking domain %s as bad" (Connection.get_domstr maxcon);
-       do_reset_watches maxcon () () cons ();
-       Connection.mark_as_bad maxcon;
-       Gc.compact ()
-     end
+     (* we could do a Gc, and check again whether enough memory got freed,
+        but that could lead to us running a full GC each packet,
+        once we're over quota we need to remove the remove at least one domain!
+      *)
+     let sizes = ref IntMap.empty in
+     Connections.iter_domains cons (fun con ->
+       let size = connection_size_bytes con in
+       info "Domain %s: %d bytes" (Connection.get_domstr con) size;
+       sizes := IntMap.add size con !sizes
+      );
+     let _, maxcon = IntMap.max_binding !sizes in
+     warn "Marking domain %s as bad" (Connection.get_domstr maxcon);
+     do_reset_watches maxcon () () cons ();
+     Connection.mark_as_bad maxcon;
+     Gc.compact ()
    end
 
 let do_input store cons doms con =
