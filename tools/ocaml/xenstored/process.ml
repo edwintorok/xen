@@ -704,7 +704,13 @@ let is_over_quota () =
 
 let connection_size_words con =
   (* TODO: do not rely on Obj here *)
+  (* TODO: max between this and size_words *)
+  (* TODO: or use this as ref in unit tests/fuzz? *)
   Obj.reachable_words (Obj.repr con)
+
+let connection_size_bytes con =
+  Connection.size con
+  |> Xenbus.Size_tracker.to_byte_count
 
 module IntMap = Map.Make(Int)
 
@@ -717,7 +723,7 @@ let check_memory_usage cons _con =
        (* TODO: print *)
        let sizes = ref IntMap.empty in
        Connections.iter_domains cons (fun con ->
-         sizes := IntMap.add (connection_size_words con) con !sizes);
+         sizes := IntMap.add (connection_size_bytes con) con !sizes);
        let _, maxcon = IntMap.max_binding !sizes in
        (* TODO: log *)
        info "Marking domain %s as bad" (Connection.get_domstr maxcon);
