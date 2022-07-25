@@ -56,9 +56,36 @@ let spawn_client name domid rd wr =
   in
   at_exit (fun () -> Unix.kill pid 15)
 
+let override_defaults () =
+  (* defaults used in production, test that memory quotas can cope with the
+     increased defaults *)
+  Quota.maxent := 8192;
+  Define.maxwatch := 512;
+  Logging.xenstored_log_level := Logging.Debug
+
+
+let debug = Logging.debug "memory_test_server"
+
+let print_defaults () =
+  let log (key, intval) =
+    debug "%s = %d" key intval
+  in
+  List.iter log
+  [
+	("quota-maxwatch", !Define.maxwatch);
+	("quota-transaction", !Define.maxtransaction);
+	("quota-domu-memory", !Define.maxdomumemory);
+	("quota-maxentity", !Quota.maxent);
+	("quota-maxsize", !Quota.maxsize);
+	("quota-maxrequests", !Define.maxrequests);
+	("quota-path-max", !Define.path_max);
+  ] 
+
 let on_startup cons doms store eventchn =
   Logging.set_xenstored_logger logger ;
   Logging.access_logger := Some logger ;
+  override_defaults ();
+  print_defaults ();
   let make_dom domid =
     (* TODO: per domid shm *)
     let evt = eventchn.Event.handle in
@@ -104,6 +131,7 @@ let () =
      ; "--test"
      ; "--disable-socket"
      ; "--no-fork"
+     ; "--config-file=" ^ Sys.argv.(1)
        (* "--no-domain-init" do not use this as it turns off eventchn processing! *)
     |]
   in
