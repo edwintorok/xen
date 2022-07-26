@@ -1,0 +1,4 @@
+space_overhead=80%, max_overhead=500%, 1791.62MiB, end: 92.46MiB, compactions: 3 in 40.4298s
+space_overhead=80%, max_overhead=100%, 1513.52MiB, end: 121.43MiB, compactions: 5 in 35.5635s
+space_overhead=60%, max_overhead=65%, 1728.32MiB, end: 93.53MiB, compactions: 7 in 37.2154s
+space_overhead=40%, max_overhead=45%, 2024.64MiB, end: 93.53MiB, compactions: 9 in 40.9871s

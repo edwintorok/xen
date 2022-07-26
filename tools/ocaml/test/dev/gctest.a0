@@ -1,0 +1,14 @@
+space_overhead=80%, max_overhead=500%, 1762.40MiB, end: 92.46MiB, compactions: 3 in 39.866s
+space_overhead=80%, max_overhead=100%, 1513.52MiB, end: 121.43MiB, compactions: 5 in 34.8058s
+space_overhead=60%, max_overhead=65%, 1728.32MiB, end: 93.53MiB, compactions: 7 in 37.8169s
+space_overhead=40%, max_overhead=45%, 1760.55MiB, end: 93.53MiB, compactions: 9 in 41.332s
+space_overhead=40%, max_overhead=80%, 1760.55MiB, end: 93.53MiB, compactions: 11 in 41.3227s
+space_overhead=80%, max_overhead=90%, 1760.55MiB, end: 107.56MiB, compactions: 13 in 39.5754s
+space_overhead=80%, max_overhead=1%, 1530.91MiB, end: 107.56MiB, compactions: 17 in 46.2568s
+space_overhead=40%, max_overhead=80%, 1760.55MiB, end: 93.53MiB, compactions: 25 in 45.4759s
+space_overhead=40%, max_overhead=45%, 1760.55MiB, end: 93.53MiB, compactions: 27 in 40.6912s
+space_overhead=40%, max_overhead=1%, 1760.55MiB, end: 93.53MiB, compactions: 33 in 68.362s
+space_overhead=60%, max_overhead=65%, 1760.55MiB, end: 93.53MiB, compactions: 48 in 61.141s
+space_overhead=60%, max_overhead=10%, 2024.64MiB, end: 93.53MiB, compactions: 53 in 60.4969s
+space_overhead=10%, max_overhead=80%, 1760.55MiB, end: 69.27MiB, compactions: 59 in 70.2412s
+space_overhead=10%, max_overhead=15%, 1742.71MiB, end: 69.27MiB, compactions: 65 in 115.601s
