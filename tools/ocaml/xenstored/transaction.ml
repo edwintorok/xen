@@ -276,7 +276,11 @@ let commit ~con t =
 	has_commited
 
 let size t =
-  (* TODO!!! *)
+  (* no need to measure quota diff on tree:
+    any new entries there will also be in operations,
+    although until we optimize packet storage to share symbols
+    it'll be double the memory
+    *)
   add
   (Queue.size t.paths)
-  (Queue.size t.operations)
+  (Xenbus.Size_tracker.mul (Queue.size t.operations) 2)

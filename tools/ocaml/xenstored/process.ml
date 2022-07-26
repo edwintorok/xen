@@ -730,13 +730,20 @@ let connection_size_words con =
   (* TODO: or use this as ref in unit tests/fuzz? *)
   Obj.reachable_words (Obj.repr con)
 
-let connection_size_bytes con =
-  Connection.size con
+let connection_size_bytes store con =
+  let domid = match Connection.get_domain con with
+  | None -> 0
+  | Some dom -> Domain.get_id dom
+  in
+  let entry = Quota.get_entry Store.(get_quota store) domid in
+  Xenbus.Size_tracker.add
+  entry.Quota.size
+  Connection.(size con)
   |> Xenbus.Size_tracker.to_byte_count
 
 module IntMap = Map.Make(Int)
 
-let check_memory_usage cons _con =
+let check_memory_usage store cons _con =
    if is_over_quota ~pct:90 cons then begin
      (* as we approach quota free nonessential memory,
         do not call the GC immediately though to avoid performance issues
@@ -753,7 +760,7 @@ let check_memory_usage cons _con =
       *)
      let sizes = ref IntMap.empty in
      Connections.iter_domains cons (fun con ->
-       let size = connection_size_bytes con in
+       let size = connection_size_bytes store con in
        info "Domain %s: %d bytes (%d bytes)" (Connection.get_domstr con) size
        (connection_size_words con |> bytes_of);
        sizes := IntMap.add size con !sizes
@@ -793,7 +800,7 @@ let do_input store cons doms con =
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
-		check_memory_usage cons con
+		check_memory_usage store cons con
 	)
 
 let do_output _store _cons _doms con =
