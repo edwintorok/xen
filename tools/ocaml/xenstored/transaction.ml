@@ -281,5 +281,5 @@ let size t =
     it'll be double the memory
     *)
   add
-  (Queue.size t.paths)
-  (Xenbus.Size_tracker.mul (Queue.size t.operations) 2)
+  (queue size_of_op_path t.paths)
+  (Xenbus.Size_tracker.mul (queue size_of_packet_req_resp t.operations) 2)
