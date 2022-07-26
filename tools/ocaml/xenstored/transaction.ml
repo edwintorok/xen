@@ -276,4 +276,7 @@ let commit ~con t =
 	has_commited
 
 let size t =
-  Queue.size t.operations
+  (* TODO!!! *)
+  add
+  (Queue.size t.paths)
+  (Queue.size t.operations)
