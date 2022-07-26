@@ -34,6 +34,12 @@ let mul x c =
 
 let empty = 0
 
+let queue size_of queue =
+  let fold acc item =
+    add acc @@ size_of item
+  in
+  Queue.fold fold 0 queue
+
 let hashtbl key_size_of value_size_of tbl =
   let fold_kv k v acc =
     add acc @@

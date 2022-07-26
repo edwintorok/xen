@@ -78,7 +78,6 @@ type ty = No | Full of (
 )
 
 open Xenbus.Size_tracker
-module Queue = Xenbus.Sized_queue
 
 type t = {
 	ty: ty;
@@ -140,8 +139,8 @@ let make ?(internal=false) id store =
 		store = if id = none then store else Store.copy store;
 		quota = Quota.copy store.Store.quota;
 		oldroot = Store.get_root store;
-		paths = Queue.create size_of_op_path;
-		operations = Queue.create size_of_packet_req_resp;
+		paths = Queue.create ();
+		operations = Queue.create ();
 		quota_reached = false;
 		read_lowpath = None;
 		write_lowpath = None;

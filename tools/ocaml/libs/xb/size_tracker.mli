@@ -45,6 +45,10 @@ val empty: t
 
 type 'a size_of = 'a -> t (** a function to calculate the size of 'a values *)
 
+val queue: 'a size_of -> 'a Queue.t size_of
+(** [queue element_size_of queue] calculates the size of a queue
+  by summing up individual element sizes computed using [elemtn_size_of] *)
+
 val hashtbl: 'a size_of -> 'b size_of -> ('a, 'b) Hashtbl.t size_of
 (** [hashtbl key_size_of value_size_of hashtbl] calculates the size of a small [hashtbl] knowing the
     sizes of keys through [key_size_of] and values through [value_size_of] *)
