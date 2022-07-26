@@ -101,6 +101,7 @@ let parse_config filename =
 		("quota-maxwatch", Config.Set_int Define.maxwatch);
 		("quota-transaction", Config.Set_int Define.maxtransaction);
 		("quota-domu-memory", Config.Set_int Define.maxdomumemory);
+		("quota-total-memory-percent", Config.Set_int Define.maxtotalmemorypercent);
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
@@ -266,7 +267,7 @@ let to_file store cons fds file =
 	        (fun () -> close_out channel)
 end
 
-let tweak_gc () =
+let tweak_gc cons =
     (* By default OCaml's GC only returns memory to the OS when it exceeds a configurable
        'max overhead' setting.
        The default is 500%, that is 5/6th of the OCaml heap needs to be free and only 1/6th live
@@ -311,25 +312,53 @@ let tweak_gc () =
      from inside a finaliser.
   *)
   let quick = Gc.quick_stat () in
+  (* TODO: set always, and this is wrong anyway because it is NOT in bytes... *)
   if quick.Gc.heap_words > !Define.gc_max_overhead / word_size_bytes then
     Gc.set { (Gc.get ()) with
               Gc.allocation_policy = !Define.gc_allocation_policy
             ; Gc.max_overhead = !Define.gc_max_overhead };
-  if Process.is_over_quota ~pct:95 () then
+  if Process.is_over_quota ~pct:95 cons then
     let (_:int) = Gc.major_slice 0 in ()
+
+
+let rec find_memtotal ch =
+  match String.split ':' @@ input_line ch with
+  | ["MemTotal"; rest] ->
+      begin match String.split ' ' @@ String.trim rest with
+      | [kb; "kB"]  -> Int64.(mul (Int64.of_string kb) 1024L)
+      | _ -> failwith "Cannot parse MemTotal line"
+      end
+  | _ -> find_memtotal ch
+
+let get_dom0_total_memory () =
+  let ch = open_in "/proc/meminfo" in (* Should work on Linux and FreeBSD *)
+  find_memtotal ch
+
+let calc_memory_limits () =
+  if !Define.maxdomumemory < 0 then begin
+    let tokensize = Connection.xenstore_payload_max - !Define.path_max - 1 - 16 in
+    Define.maxdomumemory := !Quota.maxent * (!Define.path_max + !Quota.maxsize) + !Define.maxwatch * tokensize
+  end;
+  info "quota-domu-memory = %d" !Define.maxdomumemory;
+  try
+    let pct = Int64.of_int !Define.maxtotalmemorypercent in
+    Define.maxtotalmemorybytes := Int64.(div (mul pct @@ get_dom0_total_memory ()) 100L) |> Process.to_int_size;
+    info "quota-total-memory = %d" !Define.maxtotalmemorybytes
+  with e ->
+    warn "Failed to get total memory: %s" (Printexc.to_string e)
 
 (* separate function to allow test code to reuse this,
    and e.g. run it in a thread, set up some mock config before, etc.
  *)
 let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 	let cf = do_argv ?argv () in
-	Printf.eprintf "%s\n" (config_filename cf);
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
 			parse_config (config_filename cf)
 		else
 			default_pidfile
 		in
+	calc_memory_limits ();
 
     if not cf.test_mode then
 	(try
@@ -488,7 +517,7 @@ let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 		(* scan all the xs rings as a safenet for ill-behaved clients *)
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
 			(last_scan_time := now; Domains.iter domains ring_scan_checker);
-		tweak_gc ();
+		tweak_gc cons;
 		let (_:int) = Gc.major_slice 0 in
 
 		(* make sure we don't print general stats faster than 2 min *)

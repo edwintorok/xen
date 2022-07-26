@@ -31,6 +31,8 @@ let create () = {
 	watches = Trie.create ()
 }
 
+let count t = Hashtbl.length t.anonymous + Hashtbl.length t.domains
+
 let add_anonymous cons fd =
 	let xbcon = Xenbus.Xb.open_fd fd in
 	let con = Connection.create xbcon None in

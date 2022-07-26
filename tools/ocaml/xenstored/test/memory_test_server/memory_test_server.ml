@@ -118,6 +118,7 @@ let on_startup cons doms store eventchn =
 let () =
   Logging.set_xenstored_log_destination "/dev/stderr" ;
   Logging.set_access_log_destination "/dev/stderr" ;
+  Logging.set_xenstored_logger logger ;
   let portfile = Filename.temp_file "xenstored_port" "txt" in
   at_exit (fun () -> Unix.unlink portfile) ;
   let ch = open_out portfile in

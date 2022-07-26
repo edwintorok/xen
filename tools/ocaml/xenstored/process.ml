@@ -699,10 +699,23 @@ let process_packet ~store ~cons ~doms ~con ~req =
 
 let bytes_of w = w * Sys.word_size / 8
 
-let is_over_quota ?(pct=100) () =
+let to_int_size i64 =
+  Int64.min i64 (Int64.of_int max_int)
+  |> Int64.to_int
+
+let get_memory_limit n =
+  (* even if Dom0 has no "quota" it still uses memory, so have to count it *)
+  let limit_connections = Int64.(mul (of_int n) (of_int !Define.maxdomumemory)) in
+  let calc_limit =
+    Int64.(div (mul limit_connections Int64.(of_int @@ 100 + !Define.gc_max_overhead)) 100L) in
+  Int64.min calc_limit (Int64.of_int !Define.maxtotalmemorybytes)
+  |> to_int_size
+
+let is_over_quota ?(pct=100) cons =
     let quick = Gc.quick_stat () in
-    let heap_bytes = bytes_of quick.Gc.heap_words
-    and configured = !Define.maxdomumemory * pct / 100 in
+    let heap_bytes = bytes_of quick.Gc.heap_words in
+    let n = Connections.count cons in
+    let configured = get_memory_limit n * pct / 100 in
     let is_over = heap_bytes >= configured in
     if is_over then begin
       debug "memory_usage: %s quota: %d bytes heap >= %d bytes configured"
@@ -724,7 +737,7 @@ let connection_size_bytes con =
 module IntMap = Map.Make(Int)
 
 let check_memory_usage cons _con =
-   if is_over_quota ~pct:90 () then begin
+   if is_over_quota ~pct:90 cons then begin
      (* as we approach quota free nonessential memory,
         do not call the GC immediately though to avoid performance issues
       *)
@@ -733,7 +746,7 @@ let check_memory_usage cons _con =
      (* when more memory is allocated the GC will run as usual and
         free this memory *)
    end;
-   if is_over_quota () then begin
+   if is_over_quota cons then begin
      (* we could do a Gc, and check again whether enough memory got freed,
         but that could lead to us running a full GC each packet,
         once we're over quota we need to remove the remove at least one domain!
@@ -741,7 +754,8 @@ let check_memory_usage cons _con =
      let sizes = ref IntMap.empty in
      Connections.iter_domains cons (fun con ->
        let size = connection_size_bytes con in
-       info "Domain %s: %d bytes" (Connection.get_domstr con) size;
+       info "Domain %s: %d bytes (%d bytes)" (Connection.get_domstr con) size
+       (connection_size_words con |> bytes_of);
        sizes := IntMap.add size con !sizes
       );
      let _, maxcon = IntMap.max_binding !sizes in
