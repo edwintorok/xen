@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  *)
 
+open Xenbus
+
 exception Limit_reached
 exception Data_too_big
 exception Transaction_opened
@@ -23,15 +25,39 @@ let activate = ref true
 let maxent = ref (10000)
 let maxsize = ref (4096)
 
+module DomainQuota = struct
+	type t =
+		{ entries: int
+		; size: Size_tracker.t
+		}
+
+	let empty = { entries = 0; size = Size_tracker.zero }
+
+	let is_empty t = t.entries = 0
+
+	let to_string () e =
+		Printf.sprintf "%d (%u words)" e.entries @@ Size_tracker.to_byte_count e.size
+
+	let add a b =
+		{ entries = a.entries + b.entries
+		; size = Size_tracker.add a.size b.size
+		}
+
+	let sub a b =
+		{ entries = a.entries - b.entries
+		; size = Size_tracker.sub a.size b.size
+		}
+end
+
 type t = {
 	maxent: int;               (* max entities per domU *)
 	maxsize: int;              (* max size of data store in one node *)
-	cur: (Xenctrl.domid, int) Hashtbl.t; (* current domains quota *)
+	cur: (Xenctrl.domid, DomainQuota.t) Hashtbl.t; (* current domains quota *)
 }
 
 let to_string quota domid =
 	if Hashtbl.mem quota.cur domid
-	then Printf.sprintf "dom%i quota: %i/%i" domid (Hashtbl.find quota.cur domid) quota.maxent
+	then Printf.sprintf "dom%i quota: %a/%i" domid DomainQuota.to_string (Hashtbl.find quota.cur domid) quota.maxent
 	else Printf.sprintf "dom%i quota: not set" domid
 
 let create () =
@@ -48,7 +74,7 @@ let _check quota id size =
 	);
 	if id > 0 && Hashtbl.mem quota.cur id then
 		let entry = Hashtbl.find quota.cur id in
-		if entry >= quota.maxent then (
+		if entry.entries >= quota.maxent then (
 			warn "domain %u cannot create entry: quota reached" id;
 			raise Limit_reached
 		)
@@ -60,7 +86,7 @@ let check quota id size =
 let get_entry quota id = Hashtbl.find quota.cur id
 
 let set_entry quota id nb =
-	if nb = 0
+	if DomainQuota.is_empty nb
 	then Hashtbl.remove quota.cur id
 	else begin
 	if Hashtbl.mem quota.cur id then
@@ -69,20 +95,29 @@ let set_entry quota id nb =
 		Hashtbl.add quota.cur id nb
 	end
 
-let del_entry quota id =
+let size_of_path path v =
+	let path_size = List.fold_left (fun acc s -> Size_tracker.add acc @@ Size_tracker.string s) Size_tracker.zero path
+	and vsize = Size_tracker.string v in
+	DomainQuota.{ entries = 1; size = Size_tracker.add path_size vsize }
+
+let del_entry quota id path v =
 	try
 		let nb = get_entry quota id in
-		set_entry quota id (nb - 1)
+		set_entry quota id (DomainQuota.sub nb @@ size_of_path path v)
 	with Not_found -> ()
 
-let add_entry quota id =
-	let nb = try get_entry quota id with Not_found -> 0 in
-	set_entry quota id (nb + 1)
+
+let add_entry quota id path v =
+	let nb = try get_entry quota id with Not_found -> DomainQuota.empty in
+	set_entry quota id (DomainQuota.add nb @@ size_of_path path v)
 
 let add quota diff =
-	Hashtbl.iter (fun id nb -> set_entry quota id (get_entry quota id + nb)) diff.cur
+	Hashtbl.iter (fun id nb -> set_entry quota id (DomainQuota.add (get_entry quota id) nb)) diff.cur
+
+let get_entry_0 quota id = try get_entry quota id with Not_found -> DomainQuota.empty
 
 let merge orig_quota mod_quota dest_quota =
-	  Hashtbl.iter (fun id nb -> let diff = nb - (try get_entry orig_quota id with Not_found -> 0) in
-				if diff <> 0 then
-					set_entry dest_quota id ((try get_entry dest_quota id with Not_found -> 0) + diff)) mod_quota.cur
+	Hashtbl.iter (fun id nb ->
+					let diff = DomainQuota.sub nb @@ get_entry_0 orig_quota id in
+					if diff.entries <> 0 then
+						set_entry dest_quota id (DomainQuota.add (get_entry_0 dest_quota id) diff)) mod_quota.cur
