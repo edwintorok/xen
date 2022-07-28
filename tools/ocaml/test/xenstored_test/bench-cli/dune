@@ -1,0 +1,4 @@
+(library
+ (name bechamel_simple_cli)
+ (optional)
+ (libraries bechamel bechamel-notty unix notty.unix))

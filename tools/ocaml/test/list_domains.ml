@@ -9,9 +9,9 @@ let print_dominfo dominfo =
   and paused = bool_as_char dominfo.Xenlight.Dominfo.paused 'p'
   and shutdown = bool_as_char dominfo.Xenlight.Dominfo.shutdown 's'
   and dying = bool_as_char dominfo.Xenlight.Dominfo.dying 'd'
-  and memory = dominfo.Xenlight.Dominfo.current_memkb
-  in
-  printf "Dom %d: %c%c%c%c%c %LdKB\n" id running blocked paused shutdown dying memory
+  and memory = dominfo.Xenlight.Dominfo.current_memkb in
+  printf "Dom %d: %c%c%c%c%c %LdKB\n" id running blocked paused shutdown dying
+    memory
 
 let _ =
   let logger = Xtl.create_stdio_logger (*~level:Xentoollog.Debug*) () in
@@ -19,8 +19,5 @@ let _ =
   try
     let domains = Xenlight.Dominfo.list ctx in
     List.iter (fun d -> print_dominfo d) domains
-  with Xenlight.Error(err, fn) -> begin
-    printf "Caught Exception: %s: %s\n" (Xenlight.string_of_error err) fn;
-  end
-
-
+  with Xenlight.Error (err, fn) ->
+    printf "Caught Exception: %s: %s\n" (Xenlight.string_of_error err) fn

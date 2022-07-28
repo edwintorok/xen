@@ -1,0 +1,22 @@
+; enabled_if with ocaml_version for libraries only present since dune 2.5,
+; and we have to be compatible with dune 2.1 for now (version in Ubuntu)
+; enabled_if for user actions works on 2.1 though
+
+(rule
+ (targets packed64.ml)
+ (enabled_if
+  (< %{ocaml_version} 4.08))
+ (action
+  (copy# packed64.compat.ml packed64.ml)))
+
+(rule
+ (targets packed64.ml)
+ (enabled_if
+  (>= %{ocaml_version} 4.08))
+ (action
+  (copy# packed64.408.ml packed64.ml)))
+
+(library
+ (name tracedebug)
+ (modes native)
+ (libraries tracedebug_times unix threads.posix))

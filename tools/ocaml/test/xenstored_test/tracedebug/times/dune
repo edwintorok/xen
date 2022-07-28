@@ -1,0 +1,36 @@
+; enabled_if with ocaml_version for libraries only present since dune 2.5,
+; and we have to be compatible with dune 2.1 for now (version in Ubuntu)
+; enabled_if for user actions works on 2.1 though
+
+(rule
+ (targets float.ml)
+ (enabled_if
+  (< %{ocaml_version} 4.08))
+ (action
+  (copy float.compat.ml float.ml)))
+
+(rule
+ (targets atomic.ml)
+ (enabled_if
+  (< %{ocaml_version} 5.0))
+ ; present since 4.12 but only really needed since 5
+ (action
+  (copy atomic.compat.ml atomic.ml)))
+
+(rule
+ (targets atomic.mli)
+ (enabled_if
+  (< %{ocaml_version} 5.0))
+ ; present since 4.12 but only really needed since 5
+ (action
+  (copy atomic.compat.mli atomic.mli)))
+
+(library
+ (name tracedebug_times)
+ (libraries
+  (select
+   times.ml ; dune will pick one based on which libraries are available
+   from
+   (bechamel.monotonic_clock ocaml_intrinsics unix -> times.intrinsics.ml)
+   (bechamel.monotonic_clock -> times.clock.ml) ; always available, can be disabled for comparison by commenting out
+   (unix -> times.unix.ml))))

@@ -1,0 +1,15 @@
+(rule
+ ; comment out reference to /proc files: unit test will provide fake ones instead
+ (action
+  (with-stdout-to
+   oxenstored-test.conf
+   (run sed -e "s/xenstored-/#/" %{dep:../../../xenstored/oxenstored.conf}))))
+
+(test
+ (name memory_test_server)
+ (modes exe)
+ ;(action (run %{test} %{dep:../memory_test/xenstore_memory_test.exe}))
+ (action
+  (run %{test} %{dep:oxenstored-test.conf}
+    %{dep:../memory_test/xenstore_memory_test.exe} --memuse))
+ (libraries xenstored_test shm tracedebug tracedebug_logs logs))

@@ -354,6 +354,7 @@ let tweak_gc_periodic cons =
  *)
 let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 	let cf = do_argv ?argv () in
+	Printf.eprintf "%s\n" (config_filename cf);
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
 			parse_config (config_filename cf)
