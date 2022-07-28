@@ -11,3 +11,4 @@ val get_tid : t -> int
 val get_ty : t -> Op.operation
 val get_data : t -> string
 val get_rid : t -> int
+val size: t -> Size_tracker.t

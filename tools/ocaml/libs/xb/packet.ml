@@ -48,3 +48,8 @@ let get_data pkt =
 	else
 		pkt.data
 let get_rid pkt = pkt.rid
+
+
+let size t =
+	let open Size_tracker in
+	add (mul record_field 4) (string t.data)

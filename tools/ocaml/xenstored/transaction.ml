@@ -77,6 +77,8 @@ type ty = No | Full of (
 	Store.t        (* A pointer to the canonical store: its root changes on each transaction-commit *)
 )
 
+open Xenbus.Size_tracker
+
 type t = {
 	ty: ty;
 	start_count: int64;
@@ -116,6 +118,17 @@ let trim_short_running_transactions txn =
 	short_running_txns := List.filter
 		keep
 		!short_running_txns
+
+let size_of_resp = function
+	| Packet.Ack _ -> record_field (* a closure, lets assume "constant" usage *)
+	| Packet.Reply str | Packet.Error str -> string str
+
+let size_of_packet_req_resp (req, resp) =
+	add (string req.Packet.data) @@ size_of_resp resp
+
+let size_of_op_path (_, path) =
+	path |> Store.Path.to_string_list |> List.fold_left (fun acc e -> add acc @@ string e) zero
+	|> add record_field
 
 let make ?(internal=false) id store =
 	let ty = if id = none then No else Full(id, Store.copy store, store) in
@@ -252,3 +265,14 @@ let commit ~con t =
 	else if not !has_coalesced
 	then Logging.commit ~tid:(get_id t) ~con;
 	has_commited
+
+let size t =
+	(*
+		no need to measure quota diff on tree:
+		any new entries there will also be in operations,
+		although until we optimize packet storage to share symbols
+		it'll be double the memory
+	*)
+	add
+	(list size_of_op_path t.paths)
+	(Xenbus.Size_tracker.mul (list size_of_packet_req_resp t.operations) 2)

@@ -213,3 +213,10 @@ let get_fd con =
 	match con.backend with
 	| Fd backend -> backend.fd
 	| Xenmmap _     -> raise (Failure "get_fd")
+
+open Size_tracker
+
+let size t =
+	(* only count data on top of the default empty [t] that every guest gets *)
+	add (string t.partial_out) @@
+	add (Size_tracker.queue Packet.size t.pkt_in) (Size_tracker.queue Packet.size t.pkt_out)
