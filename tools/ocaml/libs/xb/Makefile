@@ -12,11 +12,11 @@ OCAMLOPTFLAGS += -for-pack Xenbus
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
-PREINTF = op.cmi partial.cmi packet.cmi
-PREOBJS = op partial packet xs_ring
+PREINTF = op.cmi size_tracker.cmi partial.cmi packet.cmi
+PREOBJS = op size_tracker partial packet xs_ring
 PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
-OBJS = op partial packet xs_ring xb
-INTF = op.cmi packet.cmi xb.cmi
+OBJS = op size_tracker partial packet xs_ring xb
+INTF = op.cmi size_tracker.cmi packet.cmi xb.cmi
 LIBS = xenbus.cma xenbus.cmxa
 
 ALL_OCAML_OBJS = $(OBJS) $(PREOJBS)
