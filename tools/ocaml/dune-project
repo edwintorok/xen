@@ -2,7 +2,6 @@
 
 (name xen)
 
-(formatting (enabled_for dune))
 (generate_opam_files true)
 
 (maintainers christian.lindig@citrix.com)
