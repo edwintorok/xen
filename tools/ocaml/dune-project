@@ -22,6 +22,10 @@
  (synopsis "In-memory key-value store for the Xen hypervisor")
  (depends
   base-unix
+  (ocaml (>= 4.02.3))
   (dune (>= 2.1))
+  (bechamel (and (>= 0.3) :with-test))
+  (bechamel-notty (and (>= 0.3) :with-test))
+  (ocaml_intrinsics (and (>= v0.15.0) :with-test))
  )
 )
