@@ -352,7 +352,7 @@ let tweak_gc_periodic cons =
 (* separate function to allow test code to reuse this,
    and e.g. run it in a thread, set up some mock config before, etc.
  *)
-let main ?argv () =
+let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 	let cf = do_argv ?argv () in
 	let pidfile =
 		if Sys.file_exists (config_filename cf) then
@@ -363,6 +363,8 @@ let main ?argv () =
 	calc_memory_limits ();
 
 	tweak_gc ();
+
+    if not cf.test_mode then
 	(try
 		Unixext.mkdir_rec (Filename.dirname pidfile) 0o755
 	with _ ->
@@ -382,6 +384,7 @@ let main ?argv () =
 		printf "Xen Storage Daemon, version %d.%d\n%!"
 			Define.xenstored_major Define.xenstored_minor;
 
+    if not cf.test_mode then
 	(try Unixext.pidfile_write pidfile with _ -> ());
 
 	(* for compatilibity with old xenstored *)
@@ -452,6 +455,7 @@ let main ?argv () =
 		let post_rotate () = DB.to_file store cons (None) Disk.xs_daemon_database in
 		Logging.init_access_log post_rotate
 	end;
+	on_startup cons domains store eventchn;
 
 	let spec_fds =
 		(match rw_sock with None -> [] | Some x -> [ x ]) @
