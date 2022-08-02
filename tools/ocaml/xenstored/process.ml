@@ -725,6 +725,9 @@ let is_over_quota ?(pct=100) cons =
 		end;
 		is_over
 
+let connection_size_words con =
+	Obj.reachable_words (Obj.repr con)
+
 let connection_size_bytes store con =
 	let domid = match Connection.get_domain con with
 	| None -> 0
@@ -761,11 +764,11 @@ let check_memory_usage_periodic store cons doms =
 	in
 	!marked
 
-let check_memory_usage_slow store cons =
+let check_memory_usage_slow _store cons =
 	let sizes = ref IntMap.empty in
 	let () = Connections.iter_domains cons @@ fun con ->
 	if not (Connection.is_dom0 con) then begin
-		let size = connection_size_bytes store con in
+		let size = connection_size_words con |> bytes_of in
 		info "Domain %s: %d bytes referenced" (Connection.get_domstr con) size;
 		sizes := IntMap.add size con !sizes
 	end
