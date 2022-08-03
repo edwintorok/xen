@@ -89,6 +89,7 @@ let mark_as_bad con =
 	| Some domain ->
 		Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
 		Domain.mark_as_bad domain;
+		Xenbus.Xb.set_error con.xb 4;
 		reset con
 
 let mark_as_memquota_reached con ~reason =
