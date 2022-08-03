@@ -25,6 +25,13 @@ let maxwatch = ref (50)
 let maxtransaction = ref (20)
 let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
+let gc_max_overhead = ref 120
+(*  percentage: when 120*wasted/live > max_overhead a GC compaction is triggered *)
+
+let maxdomumemory = ref (-1)
+let maxtotalmemorypercent = ref 50
+let maxtotalmemorybytes = ref (-1)
+
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05
 let conflict_rate_limit_is_aggregate = ref true

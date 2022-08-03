@@ -697,6 +697,31 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
+let bytes_of words = words * Sys.word_size / 8
+
+let to_int_size i64 =
+	min i64 (Int64.of_int max_int)
+	|> Int64.to_int
+
+let get_memory_limit n =
+	(* even if Dom0 has no "quota" it still uses memory, so have to count it *)
+	let limit_connections = Int64.(mul (of_int n) (of_int !Define.maxdomumemory)) in
+	let calc_limit =
+	Int64.(div (mul limit_connections Int64.(of_int @@ 100 + !Define.gc_max_overhead)) 100L) in
+	min calc_limit (Int64.of_int !Define.maxtotalmemorybytes)
+	|> to_int_size
+
+let check_memory_usage _cons con =
+	match Connection.get_domain con with
+	| None -> () (* dom0 excluded *)
+	| Some dom ->
+			let domid = Domain.get_id dom in
+			let actual = Connection.size con |> Xenbus.Size_tracker.to_byte_count in
+			if actual > !Define.maxdomumemory then begin
+				warn "domain %u: exceeds its memory quota: %u > %u" domid actual !Define.maxdomumemory;
+				Connection.mark_as_bad con
+			end
+
 let do_input store cons doms con =
 	let newpacket =
 		try
@@ -725,6 +750,7 @@ let do_input store cons doms con =
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
+		check_memory_usage cons con
 	)
 
 let do_output _store _cons _doms con =

@@ -100,6 +100,8 @@ let parse_config filename =
 		("quota-activate", Config.Set_bool Quota.activate);
 		("quota-maxwatch", Config.Set_int Define.maxwatch);
 		("quota-transaction", Config.Set_int Define.maxtransaction);
+		("quota-domu-memory", Config.Set_int Define.maxdomumemory);
+		("quota-total-memory-percent", Config.Set_int Define.maxtotalmemorypercent);
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
@@ -262,8 +264,27 @@ let to_channel store cons rw chan =
 let to_file store cons fds file =
 	let channel = open_out_gen [ Open_wronly; Open_creat; Open_trunc; ] 0o600 file in
 	finally (fun () -> to_channel store cons fds channel)
-	        (fun () -> close_out channel)
+			(fun () -> close_out channel)
 end
+
+let get_dom0_total_memory () =
+	(* Should work on Linux and FreeBSD *)
+	let ic = Scanf.Scanning.from_file "/proc/meminfo" in
+	Scanf.bscanf ic "MemTotal: %Lu kB" @@ fun kb ->
+	Int64.(mul kb 1024L)
+
+let calc_memory_limits () =
+	if !Define.maxdomumemory < 0 then begin
+		let tokensize = Connection.xenstore_payload_max - !Define.path_max - 1 - 16 in
+		Define.maxdomumemory := !Quota.maxent * (!Define.path_max + !Quota.maxsize) + !Define.maxwatch * tokensize
+	end;
+	info "quota-domu-memory = %d" !Define.maxdomumemory;
+	try
+		let pct = Int64.of_int !Define.maxtotalmemorypercent in
+		Define.maxtotalmemorybytes := Int64.(div (mul pct @@ get_dom0_total_memory ()) 100L) |> Process.to_int_size;
+		info "quota-total-memory = %d" !Define.maxtotalmemorybytes
+	with e ->
+		warn "Failed to get total memory: %s" (Printexc.to_string e)
 
 let _ =
 	let cf = do_argv in
@@ -273,6 +294,7 @@ let _ =
 		else
 			default_pidfile
 		in
+	calc_memory_limits ();
 
 	(try
 		Unixext.mkdir_rec (Filename.dirname pidfile) 0o755
