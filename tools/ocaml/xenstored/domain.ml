@@ -35,6 +35,7 @@ type t =
 	                                   that later causes conflict with another
 	                                   domain's transaction costs credit. *)
 	mutable caused_conflicts: int64;
+	mutable quota_warned: bool;
 }
 
 let is_dom0 d = d.id = 0
@@ -98,7 +99,13 @@ let make id mfn remote_port interface eventchn = {
 	io_credit = 0;
 	conflict_credit = !Define.conflict_burst_limit;
 	caused_conflicts = 0L;
+	quota_warned = false
 }
+
+let quota_warned dom =
+	let old = dom.quota_warned in
+	dom.quota_warned <- true;
+	old
 
 let log_and_reset_conflict_stats logfn dom =
 	if dom.caused_conflicts > 0L then (

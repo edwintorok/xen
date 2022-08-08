@@ -153,3 +153,9 @@ let pidfile_write filename =
 	(fun () -> Unix.close fd)
 
 end
+
+(* compat with 4.02.3 *)
+module Int = struct
+	type t = int
+	let compare a b = compare (a:int) (b:int)
+end

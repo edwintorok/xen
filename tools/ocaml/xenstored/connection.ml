@@ -38,6 +38,7 @@ and t = {
 	anonid: int;
 	mutable stat_nb_ops: int;
 	mutable perm: Perms.Connection.t;
+	mutable memquota_reached: bool;
 }
 
 let initial_next_tid = 1
@@ -90,6 +91,20 @@ let mark_as_bad con =
 		Domain.mark_as_bad domain;
 		reset con
 
+let mark_as_memquota_reached con ~reason =
+	Logging.info "connection" "%s: %s" (get_domstr con) reason;
+	(* TODO: log intoaccess log *)
+	con.memquota_reached <- true
+
+let reset_memquota con =
+	con.memquota_reached <- false
+
+let memquota_reached con = con.memquota_reached
+
+let quota_warned con = match con.dom with
+	| None -> true (* anon connections have no quota *)
+	| Some dom -> Domain.quota_warned dom
+
 let make_perm dom =
 	let domid =
 		match dom with
@@ -115,6 +130,7 @@ let create xbcon dom =
 	anonid = id;
 	stat_nb_ops = 0;
 	perm = make_perm dom;
+	memquota_reached = false;
 	}
 	in
 	Logging.new_connection ~tid:Transaction.none ~con:(get_domstr con);
@@ -214,21 +230,30 @@ let lookup_watch_perm path = function
 let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
-let fire_single_watch_unchecked watch =
+let fire_single_watch_unchecked ~source watch =
 	let data = Utils.join_by_null [watch.path; watch.token; ""] in
+	(match source with
+	| None -> ()
+	| Some source ->
+		if memquota_reached watch.con then
+			let reason = Printf.sprintf
+				"Target domain of watch event is over quota: %s"
+				(get_domstr watch.con) in
+			mark_as_memquota_reached source ~reason;
+	);
 	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
 
-let fire_single_watch (oldroot, root) watch =
+let fire_single_watch (oldroot, root) ~source watch =
 	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
 	let perms = lookup_watch_perms oldroot root abspath in
 	if Perms.can_fire_watch watch.con.perm perms then
-		fire_single_watch_unchecked watch
+		fire_single_watch_unchecked ~source watch
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
 		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
 
-let fire_watch roots watch path =
+let fire_watch ~source roots watch path =
 	let new_path =
 		if watch.is_relative && path.[0] = '/'
 		then begin
@@ -238,7 +263,7 @@ let fire_watch roots watch path =
 		end else
 			path
 	in
-	fire_single_watch roots { watch with path = new_path }
+	fire_single_watch ~source:(Some source) roots { watch with path = new_path }
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =

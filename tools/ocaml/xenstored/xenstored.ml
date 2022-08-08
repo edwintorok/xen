@@ -345,6 +345,10 @@ let calc_memory_limits () =
 let tweak_gc () =
 	Gc.set { (Gc.get ()) with Gc.max_overhead = !Define.gc_max_overhead }
 
+let tweak_gc_periodic cons =
+	if Process.is_over_quota ~pct:95 cons then
+		let (_:int) = Gc.major_slice 0 in ()
+
 let () =
 	let cf = do_argv in
 	let pidfile =
@@ -510,6 +514,8 @@ let () =
 		(* scan all the xs rings as a safenet for ill-behaved clients *)
 		if !ring_scan_interval >= 0 && now > (!last_scan_time +. float !ring_scan_interval) then
 			(last_scan_time := now; Domains.iter domains ring_scan_checker);
+		let (_:bool) = Process.check_memory_usage_periodic store cons domains in
+		tweak_gc_periodic cons;
 
 		(* make sure we don't print general stats faster than 2 min *)
 		if now > (!last_stat_time +. 120.) then (

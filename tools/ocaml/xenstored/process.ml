@@ -57,7 +57,7 @@ let split_one_path data con =
 	| path :: "" :: [] -> Store.Path.create path (Connection.get_path con)
 	| _                -> raise Invalid_Cmd_Args
 
-let process_watch t cons =
+let process_watch t cons ~source =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.Transaction.store in
 	let ops = Transaction.get_paths t |> List.rev in
@@ -67,7 +67,7 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Rm       -> true, None, oldroot
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
-		Connections.fire_watches ?oldroot root cons (snd op) recurse in
+		Connections.fire_watches ?oldroot ~source root cons (snd op) recurse in
 	List.iter (fun op -> do_op_watch op cons) ops
 
 let create_implicit_path t perm path =
@@ -343,7 +343,7 @@ let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
-			process_watch t cons
+			process_watch t cons ~source:con
 	)
 
 let reply_data fct con t doms cons data =
@@ -502,7 +502,7 @@ let do_watch con _t _domains cons data =
 	Packet.Ack (fun () ->
 		(* xenstore.txt says this watch is fired immediately,
 		   implying even if path doesn't exist or is unreadable *)
-		Connection.fire_single_watch_unchecked watch)
+		Connection.fire_single_watch_unchecked watch ~source:(Some con))
 
 let do_unwatch con _t _domains cons data =
 	let (node, token) =
@@ -533,7 +533,7 @@ let do_transaction_end con t domains cons data =
 	if not success then
 		raise Transaction_again;
 	if commit then begin
-		process_watch t cons;
+		process_watch t cons ~source:con;
 		match t.Transaction.ty with
 		| Transaction.No ->
 			() (* no need to record anything *)
@@ -698,8 +698,6 @@ let process_packet ~store ~cons ~doms ~con ~req =
 		error "process packet: %s. %s" (Printexc.to_string exn) bt;
 		Connection.send_error con tid rid "EIO"
 
-let bytes_of words = words * Sys.word_size / 8
-
 let to_int_size i64 =
 	min i64 (Int64.of_int max_int)
 	|> Int64.to_int
@@ -712,18 +710,105 @@ let get_memory_limit n =
 	min calc_limit (Int64.of_int !Define.maxtotalmemorybytes)
 	|> to_int_size
 
-let check_memory_usage _cons con =
-	match Connection.get_domain con with
-	| None -> () (* dom0 excluded *)
-	| Some dom ->
-			let domid = Domain.get_id dom in
-			let actual = Connection.size con |> Xenbus.Size_tracker.to_byte_count in
-			if actual > !Define.maxdomumemory then begin
-				warn "domain %u: exceeds its memory quota: %u > %u" domid actual !Define.maxdomumemory;
-				Connection.mark_as_bad con
-			end
+let bytes_of words = words * Sys.word_size / 8
+
+let is_over_quota ?(pct=100) cons =
+		let quick = Gc.quick_stat () in
+		let heap_bytes = bytes_of quick.Gc.heap_words in
+		let n = Connections.total cons in
+		let configured = get_memory_limit n * pct / 100 in
+		let is_over = heap_bytes >= configured in
+		if is_over then begin
+			debug "memory_usage: %s quota: %d bytes heap >= %d bytes configured"
+				(if (pct = 100) then "over" else "approaching")
+				heap_bytes configured
+		end;
+		is_over
+
+let connection_size_bytes store con =
+	let domid = match Connection.get_domain con with
+	| None -> 0
+	| Some dom -> Domain.get_id dom
+	in
+	let entry = Quota.get_entry Store.(get_quota store) domid in
+	Xenbus.Size_tracker.add
+	entry.Quota.DomainQuota.size
+	Connection.(size con)
+	|> Xenbus.Size_tracker.to_byte_count
+
+module IntMap = Map.Make(Int)
+
+let check_memory_usage_periodic store cons doms =
+	(* DomU get half of xenstored's available memory as soft quota *)
+	let soft_quota =
+	!Define.maxtotalmemorybytes / (Domains.number doms - 1) / 2
+	in
+	let hard_quota = !Define.maxdomumemory in
+	let soft_quota = min soft_quota (hard_quota * 90 / 100) in
+	let marked = ref false in
+	let () = Connections.iter_domains cons @@ fun con ->
+	if not (Connection.is_dom0 con) then
+		let actual = connection_size_bytes store con in
+		if actual > !Define.maxdomumemory then begin
+			let reason = Printf.sprintf "memory quota exceeded (%u > %u)"
+						actual !Define.maxdomumemory in
+			Connection.mark_as_memquota_reached con ~reason;
+			marked := true
+		end
+		else if actual > soft_quota && not (Connection.quota_warned con) then
+			warn "Domain %s approaching quota (actual: %u, soft: %u, hard: %u)"
+			(Connection.get_domstr con) actual soft_quota hard_quota
+	in
+	!marked
+
+let check_memory_usage_slow store cons =
+	let sizes = ref IntMap.empty in
+	let () = Connections.iter_domains cons @@ fun con ->
+	if not (Connection.is_dom0 con) then begin
+		let size = connection_size_bytes store con in
+		info "Domain %s: %d bytes referenced" (Connection.get_domstr con) size;
+		sizes := IntMap.add size con !sizes
+	end
+	in
+	let size, maxcon = IntMap.max_binding !sizes in
+	let reason = Printf.sprintf "memory usage: %u bytes referenced" size in
+	Connection.mark_as_memquota_reached maxcon ~reason
+
+let check_memory_usage store cons doms _con =
+	if is_over_quota ~pct:90 cons then begin
+		(*
+			as we approach quota free nonessential memory,
+			do not call the GC immediately though to avoid performance issues
+		*)
+		debug "memory_usage: trimming history";
+		History.trim_all ();
+		(* when more memory is allocated the GC will run as usual and
+			free this memory *)
+	end;
+	if is_over_quota cons then begin
+		(*
+			we could do a Gc, and check again whether enough memory got freed,
+			but that could lead to us running a full GC each packet,
+			once we're over quota we need to remove at least one domain!
+		*)
+		if not (check_memory_usage_periodic store cons doms) then
+			(*
+				no domain has exceeded hard quota, throttle largest instead,
+				this must've exceeded its soft quota, or it has exploited a bug
+				in the hard quota calculation
+			 *)
+			check_memory_usage_slow store cons;
+		Gc.compact ()
+	end else if not (is_over_quota ~pct:95 cons) then
+		Connections.reset_memquota cons
 
 let do_input store cons doms con =
+	(*
+		we could also be called directly by the lazy ring scan checker,
+		which ignores IO credit, mark as bad and paused for conflict
+		however we can't ignore memory quotas
+	 *)
+	if not (Connection.memquota_reached con) then
 	let newpacket =
 		try
 			Connection.do_input con
@@ -751,7 +836,7 @@ let do_input store cons doms con =
 		process_packet ~store ~cons ~doms ~con ~req;
 		write_access_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
 		Connection.incr_ops con;
-		check_memory_usage cons con
+		check_memory_usage store cons doms con
 	)
 
 let do_output _store _cons _doms con =

@@ -22,14 +22,18 @@ type t = {
 	domains: (int, Connection.t) Hashtbl.t;
 	ports: (Xeneventchn.t, Connection.t) Hashtbl.t;
 	mutable watches: Connection.watch list Trie.t;
+	mutable memquota_reached: Connection.t list;
 }
 
 let create () = {
 	anonymous = Hashtbl.create 37;
 	domains = Hashtbl.create 37;
 	ports = Hashtbl.create 37;
-	watches = Trie.create ()
+	watches = Trie.create ();
+	memquota_reached = [];
 }
+
+let total t = Hashtbl.length t.anonymous + Hashtbl.length t.domains
 
 let add_anonymous cons fd =
 	let xbcon = Xenbus.Xb.open_fd fd in
@@ -99,6 +103,15 @@ let iter_anonymous cons fct =
 let iter cons fct =
 	iter_domains cons fct; iter_anonymous cons fct
 
+let mark_as_memquota_reached cons con =
+	if not (Connection.memquota_reached con) then
+		cons.memquota_reached <- con :: cons.memquota_reached;
+	Connection.mark_as_memquota_reached con
+
+let reset_memquota cons =
+	List.iter Connection.reset_memquota cons.memquota_reached;
+	cons.memquota_reached <- []
+
 let has_more_work cons =
 	Hashtbl.fold
 		(fun _id con acc ->
@@ -141,18 +154,18 @@ let del_watches cons con =
 	cons.watches <- Trie.map (del_watches_of_con con) cons.watches
 
 (* path is absolute *)
-let fire_watches ?oldroot root cons path recurse =
+let fire_watches ?oldroot ~source root cons path recurse =
 	let key = key_of_path path in
 	let path = Store.Path.to_string path in
 	let roots = oldroot, root in
 	let fire_watch _ = function
 		| None         -> ()
-		| Some watches -> List.iter (fun w -> Connection.fire_watch roots w path) watches
+		| Some watches -> List.iter (fun w -> Connection.fire_watch ~source roots w path) watches
 	in
 	let fire_rec _x = function
 		| None         -> ()
 		| Some watches ->
-			List.iter (Connection.fire_single_watch roots) watches
+			List.iter (Connection.fire_single_watch ~source:(Some source) roots) watches
 	in
 	Trie.iter_path fire_watch cons.watches key;
 	if recurse then
@@ -160,7 +173,7 @@ let fire_watches ?oldroot root cons path recurse =
 
 let fire_spec_watches root cons specpath =
 	iter cons (fun con ->
-		List.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		List.iter (Connection.fire_single_watch ~source:None (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in

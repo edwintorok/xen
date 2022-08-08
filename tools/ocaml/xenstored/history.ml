@@ -34,6 +34,13 @@ let trim ?txn () =
 		List.filter (fun r -> r.finish_count > txn.Transaction.start_count) !history
 	)
 
+(* low on memory: forget all open and historic transactions.
+	 This might result in more conflicts reported for transactions, but doesn't
+	 affect correctness *)
+let trim_all () =
+	Transaction.short_running_txns := [];
+	history := []
+
 let end_transaction txn con tid commit =
 	let success = Connection.end_transaction con tid commit in
 	trim ~txn ();
