@@ -32,6 +32,7 @@ let size = 4096
 let () =
   Define.maxdomumemory := 512 * 1024 ;
   Define.maxtotalmemorybytes := 512 * 1024;
+  Define.test_mode := true;
   Unix.ftruncate shm_fd size ;
   at_exit (fun () ->
       Unix.close shm_fd ;
@@ -136,7 +137,6 @@ let () =
   let argv =
     [|
        "oxenstored"
-     ; "--test"
      ; "--disable-socket"
      ; "--no-fork"
      ; "--config-file=" ^ Sys.argv.(1)

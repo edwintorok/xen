@@ -89,15 +89,17 @@ let mark_as_bad con =
 	| Some domain ->
 		Logging.end_connection ~tid:Transaction.none ~con:(get_domstr con);
 		Domain.mark_as_bad domain;
-		Xenbus.Xb.set_error con.xb 4;
 		reset con
 
 let mark_as_memquota_reached con ~reason =
 	Logging.info "connection" "%s: %s" (get_domstr con) reason;
+	(* TODO: only in test mode *)
+	Xenbus.Xb.set_error con.xb 4;
 	(* TODO: log intoaccess log *)
 	con.memquota_reached <- true
 
 let reset_memquota con =
+	Xenbus.Xb.set_error con.xb 0;
 	con.memquota_reached <- false
 
 let memquota_reached con = con.memquota_reached

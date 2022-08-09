@@ -365,7 +365,7 @@ let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 
 	tweak_gc ();
 
-    if not cf.test_mode then
+    if not !Define.test_mode then
 	(try
 		Unixext.mkdir_rec (Filename.dirname pidfile) 0o755
 	with _ ->
@@ -385,7 +385,7 @@ let main ?argv ?(on_startup = fun _ _ _ _ -> ()) () =
 		printf "Xen Storage Daemon, version %d.%d\n%!"
 			Define.xenstored_major Define.xenstored_minor;
 
-    if not cf.test_mode then
+    if not !Define.test_mode then
 	(try Unixext.pidfile_write pidfile with _ -> ());
 
 	(* for compatilibity with old xenstored *)

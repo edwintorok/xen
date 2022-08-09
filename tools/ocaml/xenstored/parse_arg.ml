@@ -26,7 +26,6 @@ type config =
 	restart: bool;
 	live_reload: bool;
 	disable_socket: bool;
-	test_mode: bool;
 }
 
 let do_argv ?(argv=Sys.argv) () =
@@ -39,7 +38,6 @@ let do_argv ?(argv=Sys.argv) () =
 	and restart = ref false
 	and live_reload = ref false
 	and disable_socket = ref false
-	and test_mode = ref false
 	in
 
 	let speclist =
@@ -58,7 +56,6 @@ let do_argv ?(argv=Sys.argv) () =
 		  ("--restart", Arg.Set restart, "Read database on starting");
 		  ("--live", Arg.Set live_reload, "Read live dump on startup");
 		  ("--disable-socket", Arg.Unit (fun () -> disable_socket := true), "Disable socket");
-		  ("--test", Arg.Set test_mode, "Used in unit tests")
 		] in
 	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket]" in
 	try Arg.parse_argv argv speclist (fun _ -> ()) usage_msg;
@@ -73,7 +70,6 @@ let do_argv ?(argv=Sys.argv) () =
 		restart = !restart;
 		live_reload = !live_reload;
 		disable_socket = !disable_socket;
-		test_mode = !test_mode;
 	}
 	with
 	| Arg.Bad errmsg -> prerr_endline errmsg; exit 2

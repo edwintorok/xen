@@ -25,6 +25,8 @@ let maxwatch = ref (50)
 let maxtransaction = ref (20)
 let maxrequests = ref (-1)   (* maximum requests per transaction *)
 
+let test_mode = ref false
+
 let gc_max_overhead = ref 120
 (*  percentage: when 120*wasted/live > max_overhead a GC compaction is triggered *)
 
