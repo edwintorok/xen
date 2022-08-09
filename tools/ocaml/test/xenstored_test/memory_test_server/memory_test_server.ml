@@ -1,9 +1,9 @@
 open Xenstored_test
 
-let () = Tracedebug_logs.dump_at_exit (fun () -> [])
+(* let () = Tracedebug_logs.dump_at_exit (fun () -> []) *)
 
 let log_write ?(level = Logging.Debug) s =
-  Logs.info @@ fun m -> m "%s %s\n" (Logging.string_of_level level) s
+  Logs.info @@ fun m -> m "%s %s@." (Logging.string_of_level level) s
 
 let logger =
   Logging.{stop= ignore; restart= ignore; rotate= ignore; write= log_write}
@@ -13,7 +13,8 @@ let () =
   Printexc.record_backtrace true ;
   Logging.access_log_special_ops := true ;
   Logging.access_log_transaction_ops := true ;
-  (* Logging.xenstored_log_level := Logging.Debug *)
+  Logs.set_level (Some Logs.Info);
+  (*Logging.xenstored_log_level := Logging.Debug; *)
   Logging.xenstored_log_level := Logging.Info
 
 let shm_name =
@@ -29,7 +30,8 @@ let shm_fd =
 let size = 4096
 
 let () =
-  Define.maxdomumemory := 4 * 1024 * 1024 ;
+  Define.maxdomumemory := 512 * 1024 ;
+  Define.maxtotalmemorybytes := 512 * 1024;
   Unix.ftruncate shm_fd size ;
   at_exit (fun () ->
       Unix.close shm_fd ;
@@ -92,7 +94,7 @@ let on_startup cons doms store eventchn =
   let make_dom domid =
     (* TODO: per domid shm *)
     let evt = eventchn.Event.handle in
-    prerr_endline "Spawning client" ;
+    Logs.info (fun m -> m "Spawning client");
     spawn_client shm_name domid evt.Xeneventchn.client_recv
       evt.Xeneventchn.client_send ;
     (* TODO: duplicate code with add_domain *)
@@ -119,6 +121,8 @@ let on_startup cons doms store eventchn =
   Connections.add_domain cons dom
 
 let () =
+  Logs.set_level (Some Logs.Info);
+  Logs.set_reporter (Logs_fmt.reporter ());
   Logging.set_xenstored_log_destination "/dev/stderr" ;
   Logging.set_access_log_destination "/dev/stderr" ;
   Logging.set_xenstored_logger logger ;
@@ -173,5 +177,5 @@ let () =
          )
       )
   in
-  prerr_endline "launching main" ;
+  log_write "launching main" ;
   Xenstored.main ~argv ~on_startup ()

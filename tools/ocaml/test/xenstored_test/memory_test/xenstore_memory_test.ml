@@ -33,11 +33,14 @@ module RingEvent = struct
 end
 
 let () =
-  Tracedebug_logs.dump_at_exit @@ fun () ->
+(*
+downside: registering a logger that only prints at exit will print nothing
+if things hangs as there are no timeouts, yet...
+Tracedebug_logs.dump_at_exit @@ fun () ->
   [
     Tracedebug.dump RingEvent.pp RingEvent.tracer
   ; Tracedebug.dump StringEvent.pp tracer
-  ]
+  ] *) ()
 
 let size = 4096
 
@@ -440,6 +443,7 @@ let () =
   Sys.catch_break true ;
   Fmt_tty.setup_std_outputs ~style_renderer:`None () ;
   OS.Arg.parse_opts () ;
-  if debug then Logs.set_level (Some Logs.Debug) ;
-  Logs.debug (fun m -> m "PID %d" (Unix.getpid ())) ;
+  if debug then Logs.set_level (Some Logs.Debug)
+  else Logs.set_level (Some Logs.Info);
+  Logs.info (fun m -> m "PID %d" (Unix.getpid ())) ;
   if flag_client then client () else server ()

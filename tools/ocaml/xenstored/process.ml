@@ -814,6 +814,7 @@ let do_input store cons doms con =
 	if not (Connection.memquota_reached con) then
 	let newpacket =
 		try
+		  Logging.info "test" "test";
 			Connection.do_input con
 		with Xenbus.Xb.Reconnect ->
 			info "%s requests a reconnect" (Connection.get_domstr con);
