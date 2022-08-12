@@ -84,7 +84,7 @@ type t = {
 	quota: Quota.t;
 	oldroot: Store.Node.t;
 	mutable paths: (Xenbus.Xb.Op.operation * Store.Path.t) list;
-	mutable operations: (Packet.request * Packet.response) list;
+	mutable operations: (Command_packet.request * Command_packet.response) list;
 	mutable read_lowpath: Store.Path.t option;
 	mutable write_lowpath: Store.Path.t option;
 }

@@ -330,30 +330,30 @@ let do_set_target con _t _domains cons data =
 (*------------- Generic handling of ty ------------------*)
 let send_response ty con t rid response =
 	match response with
-	| Packet.Ack f ->
+	| Command_packet.Ack f ->
 		Connection.send_ack con (Transaction.get_id t) rid ty;
 		(* Now do any necessary follow-up actions *)
 		f ()
-	| Packet.Reply ret ->
+	| Command_packet.Reply ret ->
 		Connection.send_reply con (Transaction.get_id t) rid ty ret
-	| Packet.Error e ->
+	| Command_packet.Error e ->
 		Connection.send_error con (Transaction.get_id t) rid e
 
 let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
-	Packet.Ack (fun () ->
+	Command_packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
 			process_watch t cons
 	)
 
 let reply_data fct con t doms cons data =
 	let ret = fct con t doms cons data in
-	Packet.Reply ret
+	Command_packet.Reply ret
 
 let reply_data_or_ack fct con t doms cons data =
 	match fct con t doms cons data with
-		| Some ret -> Packet.Reply ret
-		| None -> Packet.Ack (fun () -> ())
+		| Some ret -> Command_packet.Reply ret
+		| None -> Command_packet.Ack (fun () -> ())
 
 let reply_none fct con t doms cons data =
 	(* let the function reply *)
@@ -387,9 +387,9 @@ let function_of_type_simple_op ty =
 
 let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	let reply_error e =
-		Packet.Error e in
+		Command_packet.Error e in
 	try
-		fct con t doms cons req.Packet.data
+		fct con t doms cons req.Command_packet.data
 	with
 	| Define.Invalid_path          -> reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
@@ -416,9 +416,9 @@ let write_answer_log ~ty ~tid ~con ~data =
 
 let write_response_log ~ty ~tid ~con ~response =
 	match response with
-	| Packet.Ack _   -> write_answer_log ~ty ~tid ~con ~data:""
-	| Packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
-	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
+	| Command_packet.Ack _   -> write_answer_log ~ty ~tid ~con ~data:""
+	| Command_packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
+	| Command_packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
 
 let record_commit ~con ~tid ~before ~after =
 	let inc r = r := Int64.add 1L !r in
@@ -439,11 +439,11 @@ let transaction_replay c t doms cons =
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
 
 		let perform_exn ~wlog txn (request, response) =
-			if wlog then write_access_log ~ty:request.Packet.ty ~tid ~con ~data:request.Packet.data;
-			let fct = function_of_type_simple_op request.Packet.ty in
+			if wlog then write_access_log ~ty:request.Command_packet.ty ~tid ~con ~data:request.Command_packet.data;
+			let fct = function_of_type_simple_op request.Command_packet.ty in
 			let response' = input_handle_error ~cons ~doms ~fct ~con:c ~t:txn ~req:request in
-			if wlog then write_response_log ~ty:request.Packet.ty ~tid ~con ~response:response';
-			if not(Packet.response_equal response response') then raise Transaction_again
+			if wlog then write_response_log ~ty:request.Command_packet.ty ~tid ~con ~response:response';
+			if not(Command_packet.response_equal response response') then raise Transaction_again
 		in
 		finally
 		(fun () ->
@@ -498,7 +498,7 @@ let do_watch con _t _domains cons data =
 		| _                   -> raise Invalid_Cmd_Args
 		in
 	let watch = Connections.add_watch cons con node token in
-	Packet.Ack (fun () ->
+	Command_packet.Ack (fun () ->
 		(* xenstore.txt says this watch is fired immediately,
 		   implying even if path doesn't exist or is unreadable *)
 		Connection.fire_single_watch_unchecked watch)
@@ -656,9 +656,9 @@ let () = Printexc.record_backtrace true
  * Nothrow guarantee.
  *)
 let process_packet ~store ~cons ~doms ~con ~req =
-	let ty = req.Packet.ty in
-	let tid = maybe_ignore_transaction ty req.Packet.tid in
-	let rid = req.Packet.rid in
+	let ty = req.Command_packet.ty in
+	let tid = maybe_ignore_transaction ty req.Command_packet.tid in
+	let rid = req.Command_packet.rid in
 	try
 		let fct = function_of_type ty in
 		let t =
@@ -687,7 +687,7 @@ let process_packet ~store ~cons ~doms ~con ~req =
 				Transaction.add_operation ~perm:(Connection.get_perm con) t req response;
 			response
 		with Quota.Limit_reached ->
-			Packet.Error "EQUOTA"
+			Command_packet.Error "EQUOTA"
 		in
 
 		(* Put the response on the wire *)
@@ -716,7 +716,7 @@ let do_input store cons doms con =
 	if newpacket then (
 		let packet = Connection.pop_in con in
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
-		let req = {Packet.tid=tid; Packet.rid=rid; Packet.ty=ty; Packet.data=data} in
+		let req = {Command_packet.tid=tid; Command_packet.rid=rid; Command_packet.ty=ty; Command_packet.data=data} in
 
 		(* As we don't log IO, do not call an unnecessary sanitize_data
 		   info "[%s] -> [%d] %s \"%s\""
