@@ -29,8 +29,8 @@ distclean: subdirs-distclean
 
 .PHONY: build-tools-oxenstored
 build-tools-oxenstored:
-	$(MAKE) -s -C libs/eventchn
-	$(MAKE) -s -C libs/mmap
-	$(MAKE) -s -C libs/xb
-	$(MAKE) -s -C libs/xc
+	$(MAKE) -s -C libs/xeneventchn
+	$(MAKE) -s -C libs/xenmmap
+	$(MAKE) -s -C libs/xenbus
+	$(MAKE) -s -C libs/xenctrl
 	$(MAKE) -C xenstored

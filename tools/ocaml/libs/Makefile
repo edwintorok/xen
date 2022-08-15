@@ -2,10 +2,10 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS= \
-	mmap \
+	xenmmap \
 	xentoollog \
-	xc eventchn \
-	xb xs xl
+	xenctrl xeneventchn \
+	xenbus xenstore xenlight
 
 .PHONY: all
 all: subdirs-all

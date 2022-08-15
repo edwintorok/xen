@@ -21,7 +21,7 @@ hotplug/Linux/xen-hotplug-common.sh
 hotplug/Linux/xendomains
 hotplug/NetBSD/rc.d/xencommons
 hotplug/NetBSD/rc.d/xendriverdomain
-ocaml/libs/xs/paths.ml
+ocaml/libs/xenstore/paths.ml
 ocaml/xenstored/paths.ml
 ocaml/xenstored/oxenstored.conf
 ])

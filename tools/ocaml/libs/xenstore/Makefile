@@ -2,7 +2,7 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-OCAMLINCLUDE += -I ../xb/
+OCAMLINCLUDE += -I ../xenbus/
 OCAMLOPTFLAGS += -for-pack Xenstore
 
 .NOTPARALLEL:
