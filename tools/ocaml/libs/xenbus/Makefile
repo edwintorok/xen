@@ -2,14 +2,14 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap
+CFLAGS += -I../xenmmap
 CFLAGS += $(CFLAGS_libxenctrl) # For xen_mb()
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(APPEND_CFLAGS)
 
 # can't -open Xenbus when compiling xenbus.mli itself,
 # so don't add -open flags to OCAMLINCLUDE
-OCAMLINCLUDE += -I ../mmap
+OCAMLINCLUDE += -I ../xenmmap
 OCAMLOPTFLAGS += -no-alias-deps -open Xenbus
 OCAMLCFLAGS += -no-alias-deps -open Xenbus
 OCAMLDEPFLAGS += -map xenbus.mli -open Xenbus
