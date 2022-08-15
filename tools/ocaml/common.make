@@ -1,13 +1,6 @@
 include $(XEN_ROOT)/tools/Rules.mk
 
 CC ?= gcc
-OCAMLOPT ?= ocamlopt
-OCAMLC ?= ocamlc
-OCAMLMKLIB ?= ocamlmklib
-OCAMLDEP ?= ocamldep
-OCAMLLEX ?= ocamllex
-OCAMLYACC ?= ocamlyacc
-OCAMLFIND ?= ocamlfind
 
 CFLAGS += -fPIC -Werror -I$(shell ocamlc -where)
 
