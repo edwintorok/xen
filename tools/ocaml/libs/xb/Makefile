@@ -6,17 +6,22 @@ CFLAGS += -I../mmap
 CFLAGS += $(CFLAGS_libxenctrl) # For xen_mb()
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(APPEND_CFLAGS)
+
+# can't -open Xenbus when compiling xenbus.mli itself,
+# so don't add -open flags to OCAMLINCLUDE
 OCAMLINCLUDE += -I ../mmap
-OCAMLOPTFLAGS += -for-pack Xenbus
+OCAMLOPTFLAGS += -no-alias-deps -open Xenbus
+OCAMLCFLAGS += -no-alias-deps -open Xenbus
+OCAMLDEPFLAGS += -map xenbus.mli -open Xenbus
 
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
-PREINTF = op.cmi partial.cmi packet.cmi
-PREOBJS = op partial packet xs_ring
+PREINTF = xenbus__Op.cmi xenbus__Partial.cmi xenbus__Packet.cmi
+PREOBJS = xenbus__Op xenbus__Partial xenbus__Packet xenbus__Xs_ring
 PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
-OBJS = op partial packet xs_ring xb
-INTF = op.cmi packet.cmi xb.cmi
+OBJS = xenbus__Op xenbus__Partial xenbus__Packet xenbus__Xs_ring xenbus__Xb
+INTF = xenbus__Op.cmi xenbus__Packet.cmi xenbus__Xb.cmi
 LIBS = xenbus.cma xenbus.cmxa
 
 ALL_OCAML_OBJS = $(OBJS) $(PREOJBS)
@@ -27,23 +32,19 @@ bins: $(PROGRAMS)
 
 libs: $(LIBS)
 
-xenbus_OBJS = xenbus
+xenbus_OBJS = $(OBJS)
 xenbus_C_OBJS = xs_ring_stubs xenbus_stubs
 OCAML_LIBRARY = xenbus
 
-xenbus.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(E) " CMX      $@"
-	$(OCAMLOPT) -pack -o $@ $^
-
-xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(E) " CMO      $@"
-	$(OCAMLC) -pack -o $@ $^
+xenbus.cmi: xenbus.mli
+	$(E) " CMI      $@"
+	$(OCAMLC) $(OCAMLINCLUDE) -no-alias-deps -w -49 -c $< -o $@
 
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmo xenbus.cmi xenbus.cmx *.a *.so
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmi *.a *.so
 
 .PHONY: uninstall
 uninstall:
