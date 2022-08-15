@@ -1,5 +1,5 @@
 dnl autoconf macros for OCaml
-dnl from http://forge.ocamlcore.org/
+dnl from https://github.com/ocaml/opam/blob/master/m4/ocaml.m4
 dnl
 dnl Copyright © 2009      Richard W.M. Jones
 dnl Copyright © 2009      Stefano Zacchiroli
@@ -15,11 +15,11 @@ AC_DEFUN([AC_PROG_OCAML],
   AC_CHECK_TOOL([OCAMLC],[ocamlc],[no])
 
   if test "$OCAMLC" != "no"; then
-     OCAMLVERSION=`$OCAMLC -v | sed -n -e 's|.*version* *\(.*\)$|\1|p'`
+     OCAMLVERSION=`$OCAMLC -v | tr -d '\015' | sed -n -e 's|.*version* *\(.*\)$|\1|p'`
      AC_MSG_RESULT([OCaml version is $OCAMLVERSION])
      # If OCAMLLIB is set, use it
      if test "$OCAMLLIB" = ""; then
-        OCAMLLIB=`$OCAMLC -where 2>/dev/null || $OCAMLC -v|tail -1|cut -d ' ' -f 4`
+        OCAMLLIB=`$OCAMLC -where 2>/dev/null | tr -d '\015' || $OCAMLC -v|tail -1|cut -d ' ' -f 4`
      else
         AC_MSG_RESULT([OCAMLLIB previously set; preserving it.])
      fi
@@ -34,9 +34,9 @@ AC_DEFUN([AC_PROG_OCAML],
      if test "$OCAMLOPT" = "no"; then
 	AC_MSG_WARN([Cannot find ocamlopt; bytecode compilation only.])
      else
-	TMPVERSION=`$OCAMLOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
+	TMPVERSION=`$OCAMLOPT -v | tr -d '\015' | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
 	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
-	    AC_MSG_RESULT([versions differs from ocamlc; ocamlopt discarded.])
+	    AC_MSG_RESULT([versions differs from ocamlc $TMPVERSION != $OCAMLVERSION; ocamlopt discarded.])
 	    OCAMLOPT=no
 	else
 	    OCAMLBEST=opt
@@ -48,9 +48,9 @@ AC_DEFUN([AC_PROG_OCAML],
      # checking for ocamlc.opt
      AC_CHECK_TOOL([OCAMLCDOTOPT],[ocamlc.opt],[no])
      if test "$OCAMLCDOTOPT" != "no"; then
-	TMPVERSION=`$OCAMLCDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
+	TMPVERSION=`$OCAMLCDOTOPT -v | tr -d '\015' | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
 	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
-	    AC_MSG_RESULT([versions differs from ocamlc; ocamlc.opt discarded.])
+	    AC_MSG_RESULT([versions differs from ocamlc $TMPVERSION != $OCAMLVERSION; ocamlc.opt discarded.])
 	else
 	    OCAMLC=$OCAMLCDOTOPT
 	fi
@@ -60,9 +60,9 @@ AC_DEFUN([AC_PROG_OCAML],
      if test "$OCAMLOPT" != "no" ; then
 	AC_CHECK_TOOL([OCAMLOPTDOTOPT],[ocamlopt.opt],[no])
 	if test "$OCAMLOPTDOTOPT" != "no"; then
-	   TMPVERSION=`$OCAMLOPTDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
+	   TMPVERSION=`$OCAMLOPTDOTOPT -v | tr -d '\015' | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
 	   if test "$TMPVERSION" != "$OCAMLVERSION" ; then
-	      AC_MSG_RESULT([version differs from ocamlc; ocamlopt.opt discarded.])
+	      AC_MSG_RESULT([versions differs from ocamlc $TMPVERSION != $OCAMLVERSION; ocamlopt.opt discarded.])
 	   else
 	      OCAMLOPT=$OCAMLOPTDOTOPT
 	   fi
@@ -80,6 +80,19 @@ AC_DEFUN([AC_PROG_OCAML],
   # checking for ocamldep
   AC_CHECK_TOOL([OCAMLDEP],[ocamldep],[no])
 
+  # checking for ocamldep.opt
+  if test "$OCAMLDEP" != "no" ; then
+    AC_CHECK_TOOL([OCAMLDEPDOTOPT],[ocamldep.opt],[no])
+    if test "$OCAMLDEPDOTOPT" != "no"; then
+      TMPVERSION=`$OCAMLDEPDOTOPT -version | tr -d '\015' | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
+      if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+        AC_MSG_RESULT([version differs from ocamlc $TMPVERSION != $OCAMLVERSION; ocamldep.opt discarded.])
+      else
+        OCAMLDEP=$OCAMLDEPDOTOPT
+      fi
+    fi
+  fi
+
   # checking for ocamlmktop
   AC_CHECK_TOOL([OCAMLMKTOP],[ocamlmktop],[no])
 
@@ -88,6 +101,19 @@ AC_DEFUN([AC_PROG_OCAML],
 
   # checking for ocamldoc
   AC_CHECK_TOOL([OCAMLDOC],[ocamldoc],[no])
+
+  # checking for ocamldoc.opt
+  if test "$OCAMLDOC" != "no" ; then
+    AC_CHECK_TOOL([OCAMLDOCDOTOPT],[ocamldoc.opt],[no])
+    if test "$OCAMLDOCDOTOPT" != "no"; then
+      TMPVERSION=`$OCAMLDOCDOTOPT -version | tr -d '\015'`
+      if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+        AC_MSG_RESULT([version differs from ocamlc $TMPVERSION != $OCAMLVERSION; ocamldoc.opt discarded.])
+      else
+        OCAMLDOC=$OCAMLDOCDOTOPT
+      fi
+    fi
+  fi
 
   # checking for ocamlbuild
   AC_CHECK_TOOL([OCAMLBUILD],[ocamlbuild],[no])
@@ -121,16 +147,15 @@ AC_DEFUN([AC_PROG_CAMLP4],
   # checking for camlp4
   AC_CHECK_TOOL([CAMLP4],[camlp4],[no])
   if test "$CAMLP4" != "no"; then
-     TMPVERSION=`$CAMLP4 -v 2>&1| sed -n -e 's|.*version *\(.*\)$|\1|p'`
+     TMPVERSION=`$CAMLP4 -v 2>&1| tr -d '\015' | sed -n -e 's|.*version *\(.*\)$|\1|p'`
      if test "$TMPVERSION" != "$OCAMLVERSION" ; then
-	AC_MSG_RESULT([versions differs from ocamlc])
+	AC_MSG_RESULT([versions differs from ocamlc $TMPVERSION != $OCAMLVERSION.])
         CAMLP4=no
      fi
   fi
   AC_SUBST([CAMLP4])
 
   # checking for companion tools
-  AC_CHECK_TOOL([CAMLP4BOOT],[camlp4boot],[no])
   AC_CHECK_TOOL([CAMLP4O],[camlp4o],[no])
   AC_CHECK_TOOL([CAMLP4OF],[camlp4of],[no])
   AC_CHECK_TOOL([CAMLP4OOF],[camlp4oof],[no])
@@ -138,7 +163,6 @@ AC_DEFUN([AC_PROG_CAMLP4],
   AC_CHECK_TOOL([CAMLP4PROF],[camlp4prof],[no])
   AC_CHECK_TOOL([CAMLP4R],[camlp4r],[no])
   AC_CHECK_TOOL([CAMLP4RF],[camlp4rf],[no])
-  AC_SUBST([CAMLP4BOOT])
   AC_SUBST([CAMLP4O])
   AC_SUBST([CAMLP4OF])
   AC_SUBST([CAMLP4OOF])
@@ -148,13 +172,27 @@ AC_DEFUN([AC_PROG_CAMLP4],
   AC_SUBST([CAMLP4RF])
 ])
 
+AC_DEFUN([AC_PROG_OCAMLOBJINFO],
+[dnl
+  AC_CHECK_TOOL([OCAMLOBJINFO],[ocamlobjinfo],[no])
+  AC_SUBST([OCAMLOBJINFO])
+])
 
 AC_DEFUN([AC_PROG_FINDLIB],
 [dnl
   AC_REQUIRE([AC_PROG_OCAML])dnl
+  AC_REQUIRE([AC_PROG_OCAMLOBJINFO])dnl
 
   # checking for ocamlfind
   AC_CHECK_TOOL([OCAMLFIND],[ocamlfind],[no])
+  AS_IF([test "$OCAMLFIND" != "no"],[
+    AS_IF([test "$OCAMLOBJINFO" = "no"],[AC_MSG_WARN([ocamlobjinfo not found; cannot verify ocamlfind])],[
+      AS_IF([! $OCAMLOBJINFO `$OCAMLFIND query -predicates byte -a-format findlib | tr -d '\015'` > /dev/null 2>&1],[
+        AC_MSG_RESULT([site-lib is for a different version of OCaml; ocamlfind discarded.])
+        OCAMLFIND=no
+      ])
+    ])
+  ])
   AC_SUBST([OCAMLFIND])
 ])
 
@@ -183,6 +221,28 @@ AC_DEFUN([AC_CHECK_OCAML_PKG],
     AC_MSG_RESULT([not found])
     AS_TR_SH([OCAML_PKG_$1])=no
   fi
+
+  AC_SUBST(AS_TR_SH([OCAML_PKG_$1]))
+])
+
+AC_DEFUN([AC_CHECK_OCAML_PKG_AT_LEAST],
+[dnl
+  AC_REQUIRE([AC_PROG_FINDLIB])dnl
+
+  AC_MSG_CHECKING([for OCaml findlib package $1 $2 or later])
+
+  AS_IF([version=`$OCAMLFIND query $1 -format '%v' 2>/dev/null`],[
+    AX_COMPARE_VERSION([$version],[lt],[$2],[
+      AC_MSG_RESULT([no ($version installed)])
+      AS_TR_SH([OCAML_PKG_$1])=no
+    ],[
+      AS_TR_SH([OCAML_PKG_$1])=$1
+      AC_MSG_RESULT([found $version])
+    ])
+  ],[
+    AC_MSG_RESULT([no])
+    AS_TR_SH([OCAML_PKG_$1])=no
+  ])
 
   AC_SUBST(AS_TR_SH([OCAML_PKG_$1]))
 ])
