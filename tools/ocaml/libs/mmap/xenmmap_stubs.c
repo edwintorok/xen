@@ -79,47 +79,6 @@ CAMLprim value stub_mmap_final(value intf)
     CAMLreturn(Val_unit);
 }
 
-CAMLprim value stub_mmap_read(value intf, value start, value len)
-{
-    CAMLparam3(intf, start, len);
-    CAMLlocal1(data);
-    int c_start;
-    int c_len;
-
-    c_start = Int_val(start);
-    c_len = Int_val(len);
-
-    if (c_start > Intf_val(intf)->len)
-        caml_invalid_argument("start invalid");
-    if (c_start + c_len > Intf_val(intf)->len)
-        caml_invalid_argument("len invalid");
-
-    data = caml_alloc_string(c_len);
-    memcpy((char *) data, Intf_val(intf)->addr + c_start, c_len);
-
-    CAMLreturn(data);
-}
-
-CAMLprim value stub_mmap_write(value intf, value data,
-                               value start, value len)
-{
-    CAMLparam4(intf, data, start, len);
-    int c_start;
-    int c_len;
-
-    c_start = Int_val(start);
-    c_len = Int_val(len);
-
-    if (c_start > Intf_val(intf)->len)
-        caml_invalid_argument("start invalid");
-    if (c_start + c_len > Intf_val(intf)->len)
-        caml_invalid_argument("len invalid");
-
-    memcpy(Intf_val(intf)->addr + c_start, (char *) data, c_len);
-
-    CAMLreturn(Val_unit);
-}
-
 CAMLprim value stub_mmap_getpagesize(value unit)
 {
     CAMLparam1(unit);
