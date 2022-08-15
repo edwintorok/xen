@@ -2,9 +2,9 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
+CFLAGS += -I../xenmmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS += $(APPEND_CFLAGS)
-OCAMLINCLUDE += -I ../mmap
+OCAMLINCLUDE += -I ../xenmmap
 
 LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 

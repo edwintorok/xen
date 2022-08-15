@@ -2,8 +2,8 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-OCAMLINCLUDE += -I ../xb/
-OCAMLFLAGS += -for-pack Xenstore
+OCAMLINCLUDE += -I ../xenbus/
+OCAMLOPTFLAGS += -for-pack Xenstore
 
 .NOTPARALLEL:
 # Ocaml is such a PITA!

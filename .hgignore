@@ -273,11 +273,11 @@
 ^tools/ocaml/.*/.*\.cmx?a$
 ^tools/ocaml/.*/META$
 ^tools/ocaml/.*/\.ocamldep\.make$
-^tools/ocaml/libs/xl/_libxl_types\.ml\.in$
-^tools/ocaml/libs/xl/_libxl_types\.mli\.in$
-^tools/ocaml/libs/xl/_libxl_types\.inc$
-^tools/ocaml/libs/xl/xenlight\.ml$
-^tools/ocaml/libs/xl/xenlight\.mli$
+^tools/ocaml/libs/xenlight/_libxl_types\.ml\.in$
+^tools/ocaml/libs/xenlight/_libxl_types\.mli\.in$
+^tools/ocaml/libs/xenlight/_libxl_types\.inc$
+^tools/ocaml/libs/xenlight/xenlight\.ml$
+^tools/ocaml/libs/xenlight/xenlight\.mli$
 ^tools/ocaml/xenstored/oxenstored$
 ^tools/ocaml/test/xtl$
 ^tools/ocaml/test/send_debug_keys$
