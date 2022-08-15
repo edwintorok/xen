@@ -45,6 +45,13 @@ GIT_HTTP            ?= @githttp@
 # Optional components
 XENSTAT_XENTOP      := @monitors@
 OCAML_TOOLS         := @ocamltools@
+OCAMLOPT            := @OCAMLOPT@
+OCAMLC              := @OCAMLC@
+OCAMLMKLIB          := @OCAMLMKLIB@
+OCAMLDEP            := @OCAMLDEP@
+OCAMLLEX            := @OCAMLLEX@
+OCAMLYACC           := @OCAMLYACC@
+OCAMLFIND           := @OCAMLFIND@
 FLASK_POLICY        := @xsmpolicy@
 CONFIG_OVMF         := @ovmf@
 CONFIG_ROMBIOS      := @rombios@
