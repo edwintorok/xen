@@ -5,7 +5,7 @@ SUBDIRS= \
 	mmap \
 	xentoollog \
 	xc eventchn \
-	xb xs xl
+	xb
 
 .PHONY: all
 all: subdirs-all
