@@ -588,6 +588,9 @@ ac_unique_file="./xen/common/kernel.c"
 enable_option_checking=no
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+LD_VER_BUILD_ID
+XEN_OS
+XEN_COMPILE_ARCH
 SUBSYSTEMS
 docs
 stubdom
@@ -644,7 +647,6 @@ infodir
 docdir
 oldincludedir
 includedir
-runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -724,7 +726,6 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
-runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -977,15 +978,6 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
-  -runstatedir | --runstatedir | --runstatedi | --runstated \
-  | --runstate | --runstat | --runsta | --runst | --runs \
-  | --run | --ru | --r)
-    ac_prev=runstatedir ;;
-  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
-  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
-  | --run=* | --ru=* | --r=*)
-    runstatedir=$ac_optarg ;;
-
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1123,7 +1115,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir runstatedir
+		libdir localedir mandir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1276,7 +1268,6 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
-  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1769,7 +1760,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_files="$ac_config_files config/Toplevel.mk config/Paths.mk"
+ac_config_files="$ac_config_files config/Toplevel.mk config/Paths.mk config/ConfigOnce.mk"
 
 
 ac_aux_dir=
@@ -2369,6 +2360,17 @@ echo "Will build the following subsystems:"
 for x in $SUBSYSTEMS; do
 	echo "  $x"
 done
+
+
+XEN_COMPILE_ARCH=$(uname -m | sed -e s/i.86/x86_32/ \
+                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
+                         -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
+                         -e s/aarch64/arm64/)
+
+XEN_OS=$(uname -s)
+LD_VER_BUILD_ID=$($(LD) --build-id 2>&1 | grep -q build-id && echo n || echo y)
+
+
 
 
 cat >confcache <<\_ACEOF
@@ -3079,6 +3081,7 @@ do
   case $ac_config_target in
     "config/Toplevel.mk") CONFIG_FILES="$CONFIG_FILES config/Toplevel.mk" ;;
     "config/Paths.mk") CONFIG_FILES="$CONFIG_FILES config/Paths.mk" ;;
+    "config/ConfigOnce.mk") CONFIG_FILES="$CONFIG_FILES config/ConfigOnce.mk" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

@@ -1,7 +1,7 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
-#if !defined(__GNUC__) || (__GNUC__ < 4)
+#if !defined(__GNUC__) || (__GNUC__ < 4) || CONFIG_GCC_VERSION < 40100
 #error Sorry, your compiler is too old/not recognized.
 #elif CONFIG_CC_IS_GCC
 # if defined(CONFIG_ARM_32) && CONFIG_GCC_VERSION < 40900

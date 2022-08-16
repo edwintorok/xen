@@ -8,6 +8,7 @@ AC_CONFIG_SRCDIR([./xen/common/kernel.c])
 AC_CONFIG_FILES([
 	config/Toplevel.mk
 	config/Paths.mk
+	config/ConfigOnce.mk
 ])
 
 AC_CANONICAL_HOST
@@ -42,5 +43,16 @@ AX_SUBSYSTEM_CONDITIONAL([stubdom], $arch_enable_stubdom)
 AX_SUBSYSTEM_DEFAULT_ENABLE([docs])
 
 AX_SUBSYSTEM_FINISH
+
+XEN_COMPILE_ARCH=$(uname -m | sed -e s/i.86/x86_32/ \
+                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
+                         -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
+                         -e s/aarch64/arm64/)
+
+XEN_OS=$(uname -s)
+LD_VER_BUILD_ID=$($(LD) --build-id 2>&1 | grep -q build-id && echo n || echo y)
+AC_SUBST(XEN_COMPILE_ARCH)
+AC_SUBST(XEN_OS)
+AC_SUBST(LD_VER_BUILD_ID)
 
 AC_OUTPUT()

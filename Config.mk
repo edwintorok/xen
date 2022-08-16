@@ -17,15 +17,10 @@ space   := $(empty) $(empty)
 realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "$$PWD/$(notdir $(file))")))
 or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(3),$(if $(strip $(4)),$(4)))))
 
+include $(XEN_ROOT)/config/ConfigOnce.mk
 -include $(XEN_ROOT)/.config
 
-XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
-                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
-                         -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
-                         -e s/aarch64/arm64/)
-
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
-XEN_OS              ?= $(shell uname -s)
 
 CONFIG_$(XEN_OS) := y
 
@@ -105,31 +100,8 @@ endef
 
 cc-options-add = $(foreach o,$(3),$(call cc-option-add,$(1),$(2),$(o)))
 
-# cc-ver: Check compiler against the version requirement. Return boolean 'y'/'n'.
-# Usage: ifeq ($(call cc-ver,$(CC),ge,0x030400),y)
-cc-ver = $(shell if [ $$((`$(1) -dumpversion | awk -F. \
-           '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -$(2) $$(($(3))) ]; \
-           then echo y; else echo n; fi ;)
-
-# cc-ver-check: Check compiler is at least specified version, else fail.
-# Usage: $(call cc-ver-check,CC,0x030400,"Require at least gcc-3.4")
-cc-ver-check = $(eval $(call cc-ver-check-closure,$(1),$(2),$(3)))
-define cc-ver-check-closure
-    ifeq ($$(call cc-ver,$$($(1)),ge,$(2)),n)
-        override $(1) = echo "*** FATAL BUILD ERROR: "$(3) >&2; exit 1;
-        cc-option := n
-    endif
-endef
-
-# Require GCC v4.1+
-check-$(gcc) = $(call cc-ver-check,CC,0x040100,"Xen requires at least gcc-4.1")
-$(eval $(check-y))
-
-ld-ver-build-id = $(shell $(1) --build-id 2>&1 | \
-					grep -q build-id && echo n || echo y)
-
 export XEN_HAS_BUILD_ID ?= n
-ifeq ($(call ld-ver-build-id,$(LD)),n)
+ifeq ($(LD_VER_BUILD_ID,$(LD)),n)
 build_id_linker :=
 else
 CFLAGS += -DBUILD_ID

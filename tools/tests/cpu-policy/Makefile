@@ -3,6 +3,12 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 TARGETS :=
 
+# cc-ver: Check compiler against the version requirement. Return boolean 'y'/'n'.
+# Usage: ifeq ($(call cc-ver,$(CC),ge,0x030400),y)
+cc-ver = $(shell if [ $$((`$(1) -dumpversion | awk -F. \
+           '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -$(2) $$(($(3))) ]; \
+           then echo y; else echo n; fi ;)
+
 # For brevity, these tests make extensive use of designated initialisers in
 # anonymous unions, but GCCs older than 4.6 can't cope.  Ignore the test in
 # this case.

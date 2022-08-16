@@ -29,6 +29,15 @@
 
 #include "xen-compat.h"
 
+#if defined(__GNUC__)
+#define GCC_VERSION (__GNUC__ * 10000 \
+                     + __GNUC_MINOR__ * 100 \
+                     + __GNUC_PATCHLEVEL__)
+#if GCC_VERSION < 40100
+#error "Xen requires at least gcc-4.1"
+#endif
+#endif
+
 #if defined(__i386__) || defined(__x86_64__)
 #include "arch-x86/xen.h"
 #elif defined(__arm__) || defined (__aarch64__)
