@@ -11,7 +11,7 @@ CFLAGS += $(APPEND_CFLAGS)
 
 OCAMLINCLUDE += -I ../xentoollog
 
-LIBS_xenlight = $(LDLIBS_libxenlight)
+CDEPS_xenlight = xenlight
 
 OCAML_LIBRARY = xenlight
 

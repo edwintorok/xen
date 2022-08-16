@@ -6,7 +6,7 @@ CFLAGS += -I../xenmmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE += -I ../xenmmap
 
-LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
+CDEPS_xenctrl = xenctrl xenguest
 
 OCAML_LIBRARY = xenctrl
 

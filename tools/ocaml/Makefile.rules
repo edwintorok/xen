@@ -1,42 +1,3 @@
-ifdef V
-	ifeq ("$(origin V)", "command line")
-		BUILD_VERBOSE = $(V)
-	endif
-else
-	V := 1
-	BUILD_VERBOSE := 1
-endif
-ifndef BUILD_VERBOSE
-	BUILD_VERBOSE := 0
-endif
-ifeq ($(BUILD_VERBOSE),1)
-	E := @true
-	Q :=
-else
-	E := @echo
-	Q := @
-endif
-
-.NOTPARALLEL:
-
-%.cmo: %.ml
-	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -c -o $@ $<,MLC,$@)
-
-%.cmi: %.mli
-	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -c -o $@ $<,MLI,$@)
-
-%.cmx %.o: %.ml
-	$(call quiet-command, $(OCAMLOPT) $(OCAMLFLAGS) -c -o $@ $<,MLOPT,$@)
-
-%.ml: %.mll
-	$(call quiet-command, $(OCAMLLEX) -q -o $@ $<,MLLEX,$@)
-
-%.ml: %.mly
-	$(call quiet-command, $(OCAMLYACC) -q $<,MLYACC,$@)
-
-%.o: %.c
-	$(call quiet-command, $(CC) $(CFLAGS) -c -o $@ $<,CC,$@)
-
 META: META.in
 	sed 's/@VERSION@/$(VERSION)/g' < $< $o
 
@@ -48,41 +9,21 @@ OCAML_SOURCES ?= $(wildcard *.ml *.mli)
 .ocamldep.make: $(OCAML_SOURCES) $(GENERATED_FILES)
 	$(Q)echo -n "DEPSORTED_OCAML_SOURCES=" >$@.new
 	$(Q)$(OCAMLDEP) -sort $^ >>$@.new
-	$(Q)$(OCAMLDEP) $^ >>$@.new
 	$(Q)mv $@.new $@
 
 ifndef IS_CLEAN_ONLY_GOAL
 include .ocamldep.make
 endif
 
-MLI=$(filter %.mli,$(DEPSORTED_OCAML_SOURCES))
-ML=$(filter %.ml,$(DEPSORTED_OCAML_SOURCES))
-PREINTF=$(MLI:.mli=.cmi)
-PREOBJS=$(ML:.ml=)
-PRELIBS=$(ML:.ml=.cmo) $(ML:.ml=.cmx)
-OBJS=$(PREOBJS)
-INTF=$(PREINTF)
-ALL_OCAML_OBJS = $(OBJS)
-ALL_OCAML_OBJ_SOURCES=$(ML)
+MLI=$(filter %.mli,$(ALL_OCAML_SOURCES))
+ML=$(filter %.ml,$(ALL_OCAML_SOURCES))
 
+bin: all
 
-bins: $(PROGRAMS)
+libs: all
 
-libs: $(LIBS)
-
-clean: $(CLEAN_HOOKS)
+distclean clean: $(CLEAN_HOOKS)
 	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
-
-ifneq (,$(PACK_LIBRARY))
-
-$(PACK_LIBRARY).cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(E) " CMX      $@"
-	$(OCAMLOPT) -pack -o $@ $^
-
-$(PACK_LIBRARY).cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(E) " CMO      $@"
-	$(OCAMLC) -pack -o $@ $^
-endif
 
 CSOURCES=$(wildcard *.c)
 ifneq (,$(OCAML_PROGRAM))
@@ -90,11 +31,51 @@ $(OCAML_PROGRAM)_OBJS = $(OBJS)
 $(OCAML_PROGRAM): $(CSOURCES:.c=.o)
 endif
 
+# do not embed -Wl,-rpath-link or -L into the .cmxa: this will be used out-of-tree too
 ifneq (,$(OCAML_LIBRARY))
-LIBS=$(OCAML_LIBRARY).cma $(OCAML_LIBRARY).cmxa
-$(OCAML_LIBRARY)_OBJS= $(OCAML_LIBRARY)
-$(OCAML_LIBRARY)_C_OBJS = $(CSOURCES:.c=)
+LIBS_$(OCAML_LIBRARY) ?= \
+  $(foreach DEP,$(CDEPS_$(OCAML_LIBRARY)),\
+    -l$(DEP)\
+  )
+endif
 
+ifneq (,$(OCAML_PROGRAM))
+OCAML_C_DEPS=$($(OCAML_PROGRAM)_C_DEPS)
+# sort to eliminate duplicates and make the line shorter and more debuggable
+LDFLAGS += $(sort $(foreach DEP,$(OCAML_C_DEPS),\
+              $(SHDEPS_libxen$(DEP)) \
+           ))
+# -Wl,-rpath-link from SHDEPS is not enough we also need -L, otherwise linking
+# xenevtchn will fail with 'DSO missing from command-line'
+LDFLAGS += $(foreach DEP,$(OCAML_C_DEPS),\
+            -L $(XEN_libxen$(DEP)) \
+           )
+OCAML_LIBS += $($(OCAML_PROGRAM)_LIBS)
+OCAML_LIBS += $(foreach DEP,$($(OCAML_PROGRAM)_OCAML_DEPS),\
+                -ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/$(DEP) \
+                $(OCAML_TOPLEVEL)/libs/$(DEP)/$(DEP).cmxa)
+endif
+
+# avoid name clash between the C stub library and the Xen C library we link
+# by default they would be libxenctrl.a and libxenctrl.so
+# use -oc to change .a to be libxenctrl_stubs.a
+all: $(ALL_OCAML_SOURCES) $(OCAML_TOPLEVEL)/Makefile.rules $(CSOURCES:.c=.o)
+	$(OCAMLC) $(OCAMLFLAGS) -c $(MLI) $(ML)
+	$(OCAMLOPT) $(OCAMLFLAGS) -c $(ML)
+ifneq (,$(PACK_LIBRARY))
+	$(OCAMLC) -pack -o $(PACK_LIBRARY).cmo $(ML:.ml=.cmo)
+	$(OCAMLOPT) -pack -o $(PACK_LIBRARY).cmx $(ML:.ml=.cmx)
+	$(OCAMLMKLIB) -verbose -o $(OCAML_LIBRARY) -oc $(OCAML_LIBRARY)_stubs $(PACK_LIBRARY).cmo $(PACK_LIBRARY).cmx $(filter %.o,$^) $(addprefix -cclib ,$(LIBS_$(OCAML_LIBRARY)))
+else
+ifneq (,$(OCAML_LIBRARY))
+	$(OCAMLMKLIB) -verbose -o $(OCAML_LIBRARY) -oc $(OCAML_LIBRARY)_stubs $(ML:.ml=.cmo) $(ML:.ml=.cmx) $(filter %.o,$^) $(addprefix -cclib ,$(LIBS_$(OCAML_LIBRARY)))
+endif
+endif
+ifneq (,$(OCAML_PROGRAM))
+	$(OCAMLOPT) -verbose -o $(OCAML_PROGRAM) $(addprefix -ccopt ,$(LDFLAGS)) $(OCAML_LIBS) $(ML:.ml=.cmx) $(filter %.o,$^)
+endif
+
+ifneq (,$(OCAML_LIBRARY))
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
@@ -105,52 +86,3 @@ install: $(LIBS) META
 uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) $(OCAML_LIBRARY)
 endif
-
-all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
-
-distclean: clean
-
-quiet-command = $(if $(V),$1,@printf " %-8s %s\n" "$2" "$3" && $1)
-
-mk-caml-lib-native = $(call quiet-command, $(OCAMLOPT) -a -o $1 $2 $3,MLA,$1)
-mk-caml-lib-bytecode = $(call quiet-command, $(OCAMLC) -a -o $1 $2 $3,MLA,$1)
-
-mk-caml-stubs = $(call quiet-command, $(OCAMLMKLIB) -o `basename $1 .a` $2,MKLIB,$1)
-mk-caml-lib-stubs = \
-	$(call quiet-command, $(AR) rcs $1 $2 && $(OCAMLMKLIB) -o `basename $1 .a | sed -e 's/^lib//'` $2,MKLIB,$1)
-
-# define a library target <name>.cmxa and <name>.cma
-define OCAML_LIBRARY_template
- $(1).cmxa: lib$(1)_stubs.a $(foreach obj,$($(1)_OBJS),$(obj).cmx)
-	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs $(foreach lib,$(LIBS_$(1)),-cclib $(lib)), $(foreach obj,$($(1)_OBJS),$(obj).cmx))
- $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call mk-caml-lib-bytecode,$$@, -dllib dll$(1)_stubs.so -cclib -l$(1)_stubs, $$+)
- $(1)_stubs.a: $(foreach obj,$$($(1)_C_OBJS),$(obj).o)
-	$(call mk-caml-stubs,$$@, $$+)
- lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
-	$(call mk-caml-lib-stubs,$$@, $$+)
-endef
-
-define OCAML_NOC_LIBRARY_template
- $(1).cmxa: $(foreach obj,$($(1)_OBJS),$(obj).cmx)
-	$(call mk-caml-lib-native,$$@, , $(foreach obj,$($(1)_OBJS),$(obj).cmx))
- $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call mk-caml-lib-bytecode,$$@, , $$+)
-endef
-
-define OCAML_PROGRAM_template
- $(1): $(foreach obj,$($(1)_OBJS),$(obj).cmx) $($(1)_EXTRA_DEPS)
-	$(call quiet-command, $(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+ $(addprefix -ccopt ,$(LDFLAGS)),MLBIN,$$@)
- $(1).byte: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -o $$@ $($(1)_BYTE_LIBS) $$+ $(addprefix -ccopt ,$(LDFLAGS)),MLBIN,$$@)
-endef
-
-define C_PROGRAM_template
- $(1): $(foreach obj,$($(1)_OBJS),$(obj).o)
-	$(call quiet-command, $(CC) $(LDFLAGS) -o $$@ $$+,BIN,$$@)
-endef
-
-$(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
-$(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
-$(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
-$(foreach p,$(C_PROGRAM),$(eval $(call C_PROGRAM_template,$(p))))

@@ -14,17 +14,12 @@ OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xenctrl \
 	-I $(OCAML_TOPLEVEL)/libs/xeneventchn
 
-XENSTOREDLIBS = \
-	unix.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xenmmap $(OCAML_TOPLEVEL)/libs/xenmmap/xenmmap.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xeneventchn $(OCAML_TOPLEVEL)/libs/xeneventchn/xeneventchn.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xenctrl $(OCAML_TOPLEVEL)/libs/xenctrl/xenctrl.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xenbus $(OCAML_TOPLEVEL)/libs/xenbus/xenbus.cmxa \
-	-ccopt -L -ccopt $(XEN_ROOT)/tools/libs/ctrl
+oxenstored_LIBS = unix.cmxa
+# for rpath
+oxenstored_C_DEPS = evtchn ctrl guest
+oxenstored_OCAML_DEPS = xenmmap xeneventchn xenctrl xenbus
 
 PROGRAMS = oxenstored
-
-oxenstored_LIBS = $(XENSTOREDLIBS)
 
 OCAML_PROGRAM = oxenstored
 
