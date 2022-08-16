@@ -2,18 +2,6 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-OBJS = xenmmap
-INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-LIBS = xenmmap.cma xenmmap.cmxa
-
-all: $(INTF) $(LIBS) $(PROGRAMS)
-
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
-
-xenmmap_OBJS = $(OBJS)
-xenmmap_C_OBJS = xenmmap_stubs
 OCAML_LIBRARY = xenmmap
 
 .PHONY: install
@@ -27,4 +15,3 @@ uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenmmap
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
-
