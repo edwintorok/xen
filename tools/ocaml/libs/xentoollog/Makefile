@@ -41,14 +41,4 @@ xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
 _xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_INCLUDE)/xentoollog.h
 	$(PYTHON) genlevels.py _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc
 
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xentoollog
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xentoollog META $(INTF) $(LIBS) *.a *.so *.cmx
-
-.PHONY: uninstall
-uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xentoollog
-
 include $(OCAML_TOPLEVEL)/Makefile.rules

@@ -10,16 +10,6 @@ LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 
 OCAML_LIBRARY = xenctrl
 
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenctrl
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenctrl META $(INTF) $(LIBS) *.a *.so *.cmx
-
-.PHONY: uninstall
-uninstall:
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenctrl
-
 xenctrl_stubs.o: xenctrl_abi_check.h
 
 xenctrl_abi_check.h: abi-check xenctrl_stubs.c xenctrl.ml

@@ -8,15 +8,4 @@ LIBS_xeneventchn = $(LDLIBS_libxenevtchn)
 
 OCAML_LIBRARY = xeneventchn
 
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xeneventchn
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xeneventchn META $(INTF) $(LIBS) *.a *.so *.cmx
-
-.PHONY: uninstall
-uninstall:
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xeneventchn
-
 include $(OCAML_TOPLEVEL)/Makefile.rules
-

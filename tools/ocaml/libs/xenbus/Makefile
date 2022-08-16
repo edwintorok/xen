@@ -9,6 +9,7 @@ CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE += -I ../xenmmap
 OCAMLOPTFLAGS += -for-pack Xenbus
 
+
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
@@ -30,23 +31,6 @@ libs: $(LIBS)
 xenbus_OBJS = xenbus
 xenbus_C_OBJS = xs_ring_stubs xenbus_stubs
 OCAML_LIBRARY = xenbus
-
-xenbus.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(E) " CMX      $@"
-	$(OCAMLOPT) -pack -o $@ $^
-
-xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(E) " CMO      $@"
-	$(OCAMLC) -pack -o $@ $^
-
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmo xenbus.cmi xenbus.cmx *.a *.so
-
-.PHONY: uninstall
-uninstall:
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
+PACK_LIBRARY = $(OCAML_LIBRARY)
 
 include $(OCAML_TOPLEVEL)/Makefile.rules

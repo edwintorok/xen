@@ -8,6 +8,20 @@ OCAMLOPTFLAGS += -for-pack Xenstore
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
+PREINTF = xsraw.cmi xst.cmi
+PREOBJS = queueop xsraw xst
+PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
+OBJS = paths queueop xsraw xst xs
+INTF = xsraw.cmi xst.cmi xs.cmi
+LIBS = xenstore.cma xenstore.cmxa
+
+all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
+
+bins: $(PROGRAMS)
+
+libs: $(LIBS)
+
+xenstore_OBJS = xenstore
 OCAML_NOC_LIBRARY = xenstore
 
 include $(OCAML_TOPLEVEL)/Makefile.rules
