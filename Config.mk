@@ -17,6 +17,7 @@ space   := $(empty) $(empty)
 realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "$$PWD/$(notdir $(file))")))
 or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(3),$(if $(strip $(4)),$(4)))))
 
+include $(XEN_ROOT)/config/ConfigOnce.mk
 -include $(XEN_ROOT)/.config
 
 # When we have have some goals, and they're all clean goals
@@ -28,13 +29,7 @@ IS_CLEAN_ONLY_GOAL := y
 endif
 endif
 
-XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
-                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
-                         -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
-                         -e s/aarch64/arm64/)
-
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
-XEN_OS              ?= $(shell uname -s)
 
 CONFIG_$(XEN_OS) := y
 
