@@ -7,7 +7,7 @@ CFLAGS += $(CFLAGS_libxenctrl) # For xen_mb()
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE += -I ../mmap
-OCAMLOPTFLAGS += -for-pack Xenbus
+OCAMLFLAGS += -for-pack Xenbus
 
 .NOTPARALLEL:
 # Ocaml is such a PITA!

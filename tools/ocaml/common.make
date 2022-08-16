@@ -4,8 +4,7 @@ CC ?= gcc
 
 CFLAGS += -fPIC -Werror -I$(shell ocamlc -where)
 
-OCAMLOPTFLAGS = -g -ccopt "$(LDFLAGS)" $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F
-OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
+OCAMLFLAGS = -g -ccopt "$(LDFLAGS)" $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F
 
 VERSION := 4.1
 
