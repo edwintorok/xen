@@ -4,12 +4,8 @@ include $(OCAML_TOPLEVEL)/common.make
 
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
-CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
-LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
 
-CFLAGS  += $(CFLAGS-y)
 CFLAGS  += $(APPEND_CFLAGS)
-LDFLAGS += $(LDFLAGS-y)
 LDFLAGS += $(APPEND_LDFLAGS)
 
 OCAMLINCLUDE += \
@@ -24,13 +20,6 @@ syslog_C_OBJS = syslog_stubs
 poll_OBJS = poll
 poll_C_OBJS = select_stubs
 OCAML_LIBRARY = syslog poll
-
-LIBS += systemd.cma systemd.cmxa
-systemd_OBJS = systemd
-systemd_C_OBJS = systemd_stubs
-OCAML_LIBRARY += systemd
-
-LIBS_systemd += $(LDFLAGS-y)
 
 OBJS = paths \
 	define \
@@ -56,12 +45,11 @@ OBJS = paths \
 	process \
 	xenstored
 
-INTF = symbol.cmi trie.cmi syslog.cmi systemd.cmi poll.cmi
+INTF = symbol.cmi trie.cmi syslog.cmi poll.cmi
 
 XENSTOREDLIBS = \
 	unix.cmxa \
 	-ccopt -L -ccopt . syslog.cmxa \
-	-ccopt -L -ccopt . systemd.cmxa \
 	-ccopt -L -ccopt . poll.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \
