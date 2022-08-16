@@ -9,21 +9,12 @@ CFLAGS += $(CFLAGS_libxentoollog)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE +=
 
-OBJS = xentoollog
-INTF = xentoollog.cmi
-LIBS = xentoollog.cma xentoollog.cmxa
-
 LIBS_xentoollog = $(LDLIBS_libxentoollog)
-
-xentoollog_OBJS = $(OBJS)
-xentoollog_C_OBJS = xentoollog_stubs
 
 OCAML_LIBRARY = xentoollog
 
-GENERATED_FILES += xentoollog.ml xentoollog.ml.tmp xentoollog.mli xentoollog.mli.tmp
+GENERATED_FILES += xentoollog.ml xentoollog.mli
 GENERATED_FILES += _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc META
-
-all: $(INTF) $(LIBS)
 
 xentoollog.ml: xentoollog.ml.in _xtl_levels.ml.in
 	$(Q)sed -e '1i\
@@ -46,8 +37,6 @@ xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
 	    -e '/^(\* @@XTL_LEVELS@@ \*)$$/r_xtl_levels.mli.in' \
 	  < xentoollog.mli.in > xentoollog.mli.tmp
 	$(Q)mv xentoollog.mli.tmp xentoollog.mli
-
-libs: $(LIBS)
 
 _xtl_levels.ml.in _xtl_levels.mli.in _xtl_levels.inc: genlevels.py $(XEN_INCLUDE)/xentoollog.h
 	$(PYTHON) genlevels.py _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc

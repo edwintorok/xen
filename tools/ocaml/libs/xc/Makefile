@@ -6,20 +6,9 @@ CFLAGS += -I../mmap $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE += -I ../mmap
 
-OBJS = xenctrl
-INTF = xenctrl.cmi
-LIBS = xenctrl.cma xenctrl.cmxa
-
 LIBS_xenctrl = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest)
 
-xenctrl_OBJS = $(OBJS)
-xenctrl_C_OBJS = xenctrl_stubs
-
 OCAML_LIBRARY = xenctrl
-
-all: $(INTF) $(LIBS)
-
-libs: $(LIBS)
 
 .PHONY: install
 install: $(LIBS) META

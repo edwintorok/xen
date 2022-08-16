@@ -9,20 +9,13 @@ CFLAGS += $(CFLAGS_libxenlight)
 CFLAGS += -I ../xentoollog
 CFLAGS += $(APPEND_CFLAGS)
 
-OBJS = xenlight
-INTF = xenlight.cmi
-LIBS = xenlight.cma xenlight.cmxa
-
 OCAMLINCLUDE += -I ../xentoollog
 
 LIBS_xenlight = $(LDLIBS_libxenlight)
 
-xenlight_OBJS = $(OBJS)
-xenlight_C_OBJS = xenlight_stubs
-
 OCAML_LIBRARY = xenlight
 
-GENERATED_FILES += xenlight.ml xenlight.ml.tmp xenlight.mli xenlight.mli.tmp
+GENERATED_FILES += xenlight.ml xenlight.mli
 GENERATED_FILES += _libxl_types.ml.in _libxl_types.mli.in
 GENERATED_FILES += _libxl_types.inc META
 
@@ -55,8 +48,6 @@ _libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/
 	PYTHONPATH=$(XEN_ROOT)/tools/libs/light $(PYTHON) genwrap.py \
 		$(XEN_ROOT)/tools/libs/light/libxl_types.idl \
 		_libxl_types.mli.in _libxl_types.ml.in _libxl_types.inc
-
-libs: $(LIBS)
 
 .PHONY: install
 install: $(LIBS) META

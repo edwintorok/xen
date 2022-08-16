@@ -19,8 +19,6 @@ endif
 
 .NOTPARALLEL:
 
-ALL_OCAML_OBJS ?= $(OBJS)
-
 %.cmo: %.ml
 	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -c -o $@ $<,MLC,$@)
 
@@ -42,10 +40,47 @@ ALL_OCAML_OBJS ?= $(OBJS)
 META: META.in
 	sed 's/@VERSION@/$(VERSION)/g' < $< $o
 
-ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
+OCAML_SOURCES ?= $(wildcard *.ml *.mli)
 
-.ocamldep.make: $(ALL_OCAML_OBJ_SOURCES) Makefile $(OCAML_TOPLEVEL)/Makefile.rules
-	$(call quiet-command, $(OCAMLDEP) $(ALL_OCAML_OBJ_SOURCES) *.mli $o,MLDEP,)
+# The sorted list of source files will be needed when linking
+# dependencies need to be potentially regenerated whenever source changes:
+# new dependencies might've been introduced
+.ocamldep.make: $(OCAML_SOURCES) $(GENERATED_FILES)
+	$(Q)echo -n "DEPSORTED_OCAML_SOURCES=" >$@.new
+	$(Q)$(OCAMLDEP) -sort $^ >>$@.new
+	$(Q)$(OCAMLDEP) $^ >>$@.new
+	$(Q)mv $@.new $@
+
+ifndef IS_CLEAN_ONLY_GOAL
+include .ocamldep.make
+endif
+
+MLI=$(filter %.mli,$(DEPSORTED_OCAML_SOURCES))
+ML=$(filter %.ml,$(DEPSORTED_OCAML_SOURCES))
+PREINTF=$(MLI:.mli=.cmi)
+PREOBJS=$(ML:.ml=)
+PRELIBS=$(ML:.ml=.cmo) $(ML:.ml=.cmx)
+OBJS=$(PREOBJS)
+INTF=$(PREINTF)
+ALL_OCAML_OBJS = $(OBJS)
+ALL_OCAML_OBJ_SOURCES=$(ML)
+
+ifneq (,$(OCAML_LIBRARY))
+$(OCAML_LIBRARY)_OBJS= $(OCAML_LIBRARY)
+$(OCAML_LIBRARY)_C_OBJS ?= $(wildcard *.c:.c=)
+LIBS=$(OCAML_LIBRARY).cma $(OCAML_LIBRARY).cmxa
+endif
+ifneq (,$(OCAML_NOC_LIBRARY))
+$(OCAML_NOC_LIBRARY)_OBJS= $(OCAML_LIBRARY)
+$(OCAML_NOC_LIBRARY)_C_OBJS ?= $(wildcard *.c:.c=)
+LIBS=$(OCAML_NOC_LIBRARY).cma $(OCAML_NOC_LIBRARY).cmxa
+endif
+
+all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
+
+bins: $(PROGRAMS)
+
+libs: $(LIBS)
 
 clean: $(CLEAN_HOOKS)
 	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
@@ -91,10 +126,6 @@ define C_PROGRAM_template
  $(1): $(foreach obj,$($(1)_OBJS),$(obj).o)
 	$(call quiet-command, $(CC) $(LDFLAGS) -o $$@ $$+,BIN,$$@)
 endef
-
-ifndef IS_CLEAN_ONLY_GOAL
-include .ocamldep.make
-endif
 
 $(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
 $(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
