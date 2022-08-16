@@ -14,43 +14,8 @@ OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xenctrl \
 	-I $(OCAML_TOPLEVEL)/libs/xeneventchn
 
-LIBS = syslog.cma syslog.cmxa poll.cma poll.cmxa
-syslog_OBJS = syslog
-syslog_C_OBJS = syslog_stubs
-poll_OBJS = poll
-poll_C_OBJS = select_stubs
-OCAML_LIBRARY = syslog poll
-
-OBJS = paths \
-	define \
-	stdext \
-	trie \
-	config \
-	packet \
-	logging \
-	quota \
-	perms \
-	symbol \
-	utils \
-	store \
-	disk \
-	transaction \
-	event \
-	domain \
-	domains \
-	connection \
-	connections \
-	history \
-	parse_arg \
-	process \
-	xenstored
-
-INTF = symbol.cmi trie.cmi syslog.cmi poll.cmi
-
 XENSTOREDLIBS = \
 	unix.cmxa \
-	-ccopt -L -ccopt . syslog.cmxa \
-	-ccopt -L -ccopt . poll.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xenmmap $(OCAML_TOPLEVEL)/libs/xenmmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xeneventchn $(OCAML_TOPLEVEL)/libs/xeneventchn/xeneventchn.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xenctrl $(OCAML_TOPLEVEL)/libs/xenctrl/xenctrl.cmxa \
@@ -60,15 +25,8 @@ XENSTOREDLIBS = \
 PROGRAMS = oxenstored
 
 oxenstored_LIBS = $(XENSTOREDLIBS)
-oxenstored_OBJS = $(OBJS)
 
 OCAML_PROGRAM = oxenstored
-
-all: $(INTF) $(LIBS) $(PROGRAMS)
-
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)

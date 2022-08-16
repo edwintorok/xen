@@ -58,14 +58,9 @@ PREOBJS=$(ML:.ml=)
 PRELIBS=$(ML:.ml=.cmo) $(ML:.ml=.cmx)
 OBJS=$(PREOBJS)
 INTF=$(PREINTF)
-LIBS=$(OCAML_LIBRARY).cma $(OCAML_LIBRARY).cmxa
 ALL_OCAML_OBJS = $(OBJS)
 ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
 
-$(OCAML_LIBRARY)_OBJS= $(OCAML_LIBRARY)
-$(OCAML_LIBRARY)_C_OBJS = $(wildcard *.c:.c=)
-
-all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
 
 bins: $(PROGRAMS)
 
@@ -73,6 +68,41 @@ libs: $(LIBS)
 
 clean: $(CLEAN_HOOKS)
 	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
+
+ifneq (,$(PACK_LIBRARY))
+
+$(PACK_LIBRARY).cmx : $(foreach obj, $(OBJS), $(obj).cmx)
+	$(E) " CMX      $@"
+	$(OCAMLOPT) -pack -o $@ $^
+
+$(PACK_LIBRARY).cmo : $(foreach obj, $(OBJS), $(obj).cmo)
+	$(E) " CMO      $@"
+	$(OCAMLC) -pack -o $@ $^
+endif
+
+CSOURCES=$(wildcard *.c)
+ifneq (,$(OCAML_PROGRAM))
+$(OCAML_PROGRAM)_OBJS = $(OBJS)
+$(OCAML_PROGRAM): $(CSOURCES:.c=.o)
+endif
+
+ifneq (,$(OCAML_LIBRARY))
+LIBS=$(OCAML_LIBRARY).cma $(OCAML_LIBRARY).cmxa
+$(OCAML_LIBRARY)_OBJS= $(OCAML_LIBRARY)
+$(OCAML_LIBRARY)_C_OBJS = $(CSOURCES:.c=)
+
+.PHONY: install
+install: $(LIBS) META
+	mkdir -p $(OCAMLDESTDIR)
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) $(OCAML_LIBRARY)
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore $(OCAML_LIBRARY) META $(LIBS) $(OCAML_LIBRARY).cmo $(OCAML_LIBRARY).cmi $(OCAML_LIBRARY).cmx *.a *.so
+
+.PHONY: uninstall
+uninstall:
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) $(OCAML_LIBRARY)
+endif
+
+all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
 
 distclean: clean
 
@@ -106,9 +136,9 @@ endef
 
 define OCAML_PROGRAM_template
  $(1): $(foreach obj,$($(1)_OBJS),$(obj).cmx) $($(1)_EXTRA_DEPS)
-	$(call quiet-command, $(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+,MLBIN,$$@)
+	$(call quiet-command, $(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+ $(addprefix -ccopt ,$(LDFLAGS)),MLBIN,$$@)
  $(1).byte: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -o $$@ $($(1)_BYTE_LIBS) $$+,MLBIN,$$@)
+	$(call quiet-command, $(OCAMLC) $(OCAMLFLAGS) -o $$@ $($(1)_BYTE_LIBS) $$+ $(addprefix -ccopt ,$(LDFLAGS)),MLBIN,$$@)
 endef
 
 define C_PROGRAM_template

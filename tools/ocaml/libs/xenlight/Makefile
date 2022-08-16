@@ -49,14 +49,4 @@ _libxl_types.ml.in _libxl_types.mli.in _libxl_types.inc: genwrap.py $(XEN_ROOT)/
 		$(XEN_ROOT)/tools/libs/light/libxl_types.idl \
 		_libxl_types.mli.in _libxl_types.ml.in _libxl_types.inc
 
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenlight
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenlight META $(INTF) $(LIBS) *.a *.so *.cmx
-
-.PHONY: uninstall
-uninstall:
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenlight
-
 include $(OCAML_TOPLEVEL)/Makefile.rules
