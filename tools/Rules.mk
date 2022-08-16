@@ -125,6 +125,9 @@ endif
 
 CFLAGS_libxenlight += $(CFLAGS_libxenctrl)
 
+ifneq (clean,$(MAKECMDGOALS))
+ifneq (distclean,$(MAKECMDGOALS))
+
 ifeq ($(debug),y)
 # Use -Og if available, -O0 otherwise
 dbg_opt_level := $(call cc-option,$(CC),-Og,-O0)
@@ -133,6 +136,9 @@ CFLAGS += $(dbg_opt_level) -fno-omit-frame-pointer
 PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 else
 CFLAGS += -O2 -fomit-frame-pointer
+endif
+
+endif
 endif
 
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
