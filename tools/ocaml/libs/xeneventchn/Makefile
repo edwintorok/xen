@@ -4,7 +4,7 @@ include $(OCAML_TOPLEVEL)/common.make
 
 CFLAGS += $(CFLAGS_libxenevtchn) $(CFLAGS_xeninclude)
 
-LIBS_xeneventchn = $(LDLIBS_libxenevtchn)
+CDEPS_xeneventchn = xenevtchn
 
 OCAML_LIBRARY = xeneventchn
 

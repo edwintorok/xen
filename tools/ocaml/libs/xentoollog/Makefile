@@ -9,7 +9,7 @@ CFLAGS += $(CFLAGS_libxentoollog)
 CFLAGS += $(APPEND_CFLAGS)
 OCAMLINCLUDE +=
 
-LIBS_xentoollog = $(LDLIBS_libxentoollog)
+CDEPS_xentoollog = xentoollog
 
 OCAML_LIBRARY = xentoollog
 
