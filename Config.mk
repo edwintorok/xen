@@ -19,6 +19,15 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 
 -include $(XEN_ROOT)/.config
 
+# When we have have some goals, and they're all clean goals
+# 'make' is a valid invocation that will run the first rule (typically 'all')
+# and needs special casing here
+ifneq (,$(MAKECMDGOALS))
+ifeq (,$(filter-out %clean subdir-clean%, $(MAKECMDGOALS)))
+IS_CLEAN_ONLY_GOAL := y
+endif
+endif
+
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
                          -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
                          -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
@@ -129,12 +138,14 @@ ld-ver-build-id = $(shell $(1) --build-id 2>&1 | \
 					grep -q build-id && echo n || echo y)
 
 export XEN_HAS_BUILD_ID ?= n
+ifndef IS_CLEAN_ONLY_GOAL
 ifeq ($(call ld-ver-build-id,$(LD)),n)
 build_id_linker :=
 else
 CFLAGS += -DBUILD_ID
 export XEN_HAS_BUILD_ID=y
 build_id_linker := --build-id=sha1
+endif
 endif
 
 define buildmakevars2shellvars
@@ -173,10 +184,12 @@ CFLAGS += -std=gnu99
 
 CFLAGS += -Wall -Wstrict-prototypes
 
+ifndef IS_CLEAN_ONLY_GOAL
 $(call cc-option-add,HOSTCFLAGS,HOSTCC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)
 $(call cc-option-add,CFLAGS,CC,-Wno-unused-but-set-variable)
 $(call cc-option-add,CFLAGS,CC,-Wno-unused-local-typedefs)
+endif
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
