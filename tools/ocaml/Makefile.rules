@@ -66,9 +66,7 @@ endef
 
 define OCAML_PROGRAM_template
  $(1): $(foreach obj,$($(1)_OBJS),$(obj).cmx) $($(1)_EXTRA_DEPS)
-	$(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+
- $(1).byte: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(OCAMLC) $(OCAMLFLAGS) -o $$@ $($(1)_BYTE_LIBS) $$+
+	$(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+ $(addprefix -cclib ,$(LDFLAGS))
 endef
 
 define C_PROGRAM_template
