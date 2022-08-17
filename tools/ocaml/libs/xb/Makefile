@@ -32,11 +32,9 @@ xenbus_C_OBJS = xs_ring_stubs xenbus_stubs
 OCAML_LIBRARY = xenbus
 
 xenbus.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(E) " CMX      $@"
 	$(OCAMLOPT) -pack -o $@ $^
 
 xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(E) " CMO      $@"
 	$(OCAMLC) -pack -o $@ $^
 
 .PHONY: install

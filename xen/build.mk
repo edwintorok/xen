@@ -35,7 +35,7 @@ define cmd_compile.h
 endef
 
 include/xen/compile.h: include/xen/compile.h.in .banner FORCE
-	$(if $(filter-out FORCE,$?),$(Q)rm -fv $@)
+	$(if $(filter-out FORCE,$?),rm -fv $@)
 	$(call if_changed,compile.h)
 
 targets += include/xen/compile.h
@@ -69,7 +69,7 @@ $(sort $(ALL_OBJS) $(ALL_LIBS)): $(build-dirs) ;
 
 PHONY += $(build-dirs)
 $(build-dirs): FORCE
-	$(Q)$(MAKE) $(build)=$@ need-builtin=1
+	$(MAKE) $(build)=$@ need-builtin=1
 
 ifeq ($(CONFIG_LTO),y)
 # Gather all LTO objects together
@@ -87,4 +87,4 @@ endif
 targets += prelink.o
 
 $(TARGET): prelink.o FORCE
-	$(Q)$(MAKE) $(build)=arch/$(TARGET_ARCH) $@
+	$(MAKE) $(build)=arch/$(TARGET_ARCH) $@

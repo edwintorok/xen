@@ -89,10 +89,10 @@ endif
 # If it is set to "silent_", nothing will be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
 #
-# A simple variant is to prefix commands with $(Q) - that's useful
+# A simple variant is to prefix commands with  - that's useful
 # for commands that shall be hidden in non-verbose mode.
 #
-#	$(Q)ln $@ :<
+#	ln $@ :<
 #
 # If KBUILD_VERBOSE equals 0 then the above command will be hidden.
 # If KBUILD_VERBOSE equals 1 then the above command is displayed.
@@ -178,7 +178,7 @@ $(filter-out $(this-makefile), $(MAKECMDGOALS)) __all: __sub-make
 
 # Invoke a second make in the output directory, passing relevant variables
 __sub-make:
-	$(Q)$(MAKE) -C $(abs_objtree) -f $(abs_srctree)/Makefile $(MAKECMDGOALS)
+	$(MAKE) -C $(abs_objtree) -f $(abs_srctree)/Makefile $(MAKECMDGOALS)
 
 endif # need-sub-make
 endif # root-make-done
@@ -288,7 +288,7 @@ export XEN_HAS_CHECKPOLICY := $(call success,$(CHECKPOLICY) -h 2>&1 | grep -q xe
 
 PHONY += tools_fixdep
 tools_fixdep:
-	$(Q)$(MAKE) $(build)=tools tools/fixdep
+	$(MAKE) $(build)=tools tools/fixdep
 
 PHONY += outputmakefile
 # Before starting out-of-tree build, make sure the source tree is clean.
@@ -305,9 +305,9 @@ cmd_makefile = { \
     } > Makefile
 
 outputmakefile:
-	$(Q)ln -fsn $(srctree) source
+	ln -fsn $(srctree) source
 ifdef building_out_of_srctree
-	$(Q)if [ -f $(srctree)/.config -o \
+	if [ -f $(srctree)/.config -o \
 		 -d $(srctree)/include/config -o \
 		 -d $(srctree)/include/generated ]; then \
 		echo >&2 "***"; \
@@ -317,7 +317,7 @@ ifdef building_out_of_srctree
 		false; \
 	fi
 	$(call cmd,makefile)
-	$(Q)test -e .gitignore || \
+	test -e .gitignore || \
 	{ echo "# this is build directory, ignore it"; echo "*"; } > .gitignore
 endif
 
@@ -337,13 +337,13 @@ filechk_kconfig_allconfig = \
 	set -e; { $(call filechk_kconfig_allconfig); } > $@
 
 config: tools_fixdep outputmakefile FORCE
-	$(Q)$(MAKE) $(build)=tools/kconfig $@
+	$(MAKE) $(build)=tools/kconfig $@
 
 # Config.mk tries to include .config file, don't try to remake it
 %/.config: ;
 
 %config: .allconfig.tmp tools_fixdep outputmakefile FORCE
-	$(Q)$(MAKE) $(build)=tools/kconfig KCONFIG_ALLCONFIG=$< $@
+	$(MAKE) $(build)=tools/kconfig KCONFIG_ALLCONFIG=$< $@
 
 else # !config-build
 
@@ -356,7 +356,7 @@ ifeq ($(need-config),y)
 # Allow people to just run `make` as before and not force them to configure
 # Only run defconfig if $(KCONFIG_CONFIG) is missing
 $(KCONFIG_CONFIG): tools_fixdep
-	$(if $(wildcard $@), , $(Q)$(MAKE) $(build)=tools/kconfig defconfig)
+	$(if $(wildcard $@), , $(MAKE) $(build)=tools/kconfig defconfig)
 
 # The actual configuration files used during the build are stored in
 # include/generated/ and include/config/. Update them if .config is newer than
@@ -365,7 +365,7 @@ $(KCONFIG_CONFIG): tools_fixdep
 # This exploits the 'multi-target pattern rule' trick.
 # The syncconfig should be executed only once to make all the targets.
 include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
-	$(Q)$(MAKE) $(build)=tools/kconfig syncconfig
+	$(MAKE) $(build)=tools/kconfig syncconfig
 
 ifeq ($(CONFIG_DEBUG),y)
 CFLAGS += -O1
@@ -515,10 +515,10 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 
 .PHONY: tests
 tests:
-	$(Q)$(MAKE) $(build)=test
+	$(MAKE) $(build)=test
 .PHONY: install-tests
 install-tests:
-	$(Q)$(MAKE) $(build)=test install
+	$(MAKE) $(build)=test install
 
 .PHONY: _uninstall
 _uninstall: D=$(DESTDIR)
@@ -547,18 +547,18 @@ _debug:
 
 .PHONY: _clean
 _clean:
-	$(Q)$(MAKE) $(clean)=tools
-	$(Q)$(MAKE) $(clean)=include
-	$(Q)$(MAKE) $(clean)=common
-	$(Q)$(MAKE) $(clean)=drivers
-	$(Q)$(MAKE) $(clean)=lib
-	$(Q)$(MAKE) $(clean)=xsm
-	$(Q)$(MAKE) $(clean)=crypto
-	$(Q)$(MAKE) $(clean)=arch/arm
-	$(Q)$(MAKE) $(clean)=arch/riscv
-	$(Q)$(MAKE) $(clean)=arch/x86
-	$(Q)$(MAKE) $(clean)=test
-	$(Q)$(MAKE) $(clean)=tools/kconfig
+	$(MAKE) $(clean)=tools
+	$(MAKE) $(clean)=include
+	$(MAKE) $(clean)=common
+	$(MAKE) $(clean)=drivers
+	$(MAKE) $(clean)=lib
+	$(MAKE) $(clean)=xsm
+	$(MAKE) $(clean)=crypto
+	$(MAKE) $(clean)=arch/arm
+	$(MAKE) $(clean)=arch/riscv
+	$(MAKE) $(clean)=arch/x86
+	$(MAKE) $(clean)=test
+	$(MAKE) $(clean)=tools/kconfig
 	find . \( -name "*.o" -o -name ".*.d" -o -name ".*.d2" \
 		-o -name ".*.o.tmp" -o -name "*~" -o -name "core" \
 		-o -name '*.lex.c' -o -name '*.tab.[ch]' -o -name '*.c.cppcheck' \
@@ -579,12 +579,12 @@ $(TARGET).gz: $(TARGET)
 	mv $@.new $@
 
 $(TARGET): outputmakefile FORCE
-	$(Q)$(MAKE) $(build)=tools
-	$(Q)$(MAKE) $(build)=. include/xen/compile.h
-	$(Q)$(MAKE) $(build)=include all
-	$(Q)$(MAKE) $(build)=arch/$(TARGET_ARCH) include
-	$(Q)$(MAKE) $(build)=. arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
-	$(Q)$(MAKE) $(build)=. MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
+	$(MAKE) $(build)=tools
+	$(MAKE) $(build)=. include/xen/compile.h
+	$(MAKE) $(build)=include all
+	$(MAKE) $(build)=arch/$(TARGET_ARCH) include
+	$(MAKE) $(build)=. arch/$(TARGET_ARCH)/include/asm/asm-offsets.h
+	$(MAKE) $(build)=. MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' 'ALL_LIBS=$(ALL_LIBS-y)' $@
 
 SUBDIRS = xsm arch/$(TARGET_ARCH) common drivers lib test
 define all_sources
@@ -630,13 +630,13 @@ _MAP: $(TARGET)
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
 %.o %.i %.s: %.c tools_fixdep FORCE
-	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
+	$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
 %.o %.s: %.S tools_fixdep FORCE
-	$(Q)$(MAKE) $(build)=$(*D) $(*D)/$(@F)
+	$(MAKE) $(build)=$(*D) $(*D)/$(@F)
 
 %/: tools_fixdep FORCE
-	$(Q)$(MAKE) $(build)=$* need-builtin=1
+	$(MAKE) $(build)=$* need-builtin=1
 
 .PHONY: cloc
 cloc:
@@ -726,11 +726,11 @@ $(objtree)/%.c.cppcheck: $(srctree)/%.c $(CPPCHECKDEPS) | cppcheck-version
 	$(call if_changed,cppcheck_xml)
 
 cppcheck-version:
-	$(Q)if ! which $(CPPCHECK) > /dev/null 2>&1; then \
+	if ! which $(CPPCHECK) > /dev/null 2>&1; then \
 		echo "Cannot find cppcheck executable: $(CPPCHECK)"; \
 		exit 1; \
 	fi
-	$(Q)if [ "$$($(CPPCHECK) --version | awk '{print ($$2 < 2.7)}')" -eq 1 ]; then \
+	if [ "$$($(CPPCHECK) --version | awk '{print ($$2 < 2.7)}')" -eq 1 ]; then \
 		echo "Please upgrade your cppcheck to version 2.7 or greater"; \
 		exit 1; \
 	fi
@@ -742,14 +742,14 @@ cppcheck-version:
 # cppcheck in json format including the list of rules to ignore.
 #
 cppcheck-misra.txt: $(XEN_ROOT)/docs/misra/rules.rst $(srctree)/tools/convert_misra_doc.py
-	$(Q)$(PYTHON) $(srctree)/tools/convert_misra_doc.py -i $< -o $@ -j $(@:.txt=.json)
+	$(PYTHON) $(srctree)/tools/convert_misra_doc.py -i $< -o $@ -j $(@:.txt=.json)
 
 # convert_misra_doc is generating both files.
 cppcheck-misra.json: cppcheck-misra.txt
 
 # Put this in generated headers this way it is cleaned by include/Makefile
 $(objtree)/include/generated/compiler-def.h:
-	$(Q)$(CC) -dM -E -o $@ - < /dev/null
+	$(CC) -dM -E -o $@ - < /dev/null
 
 endif #config-build
 endif # need-sub-make

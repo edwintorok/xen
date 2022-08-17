@@ -47,8 +47,8 @@ build_gconfig: $(obj)/gconf
 build_xconfig: $(obj)/qconf
 
 localyesconfig localmodconfig: $(obj)/conf
-	$(Q)perl $(srctree)/$(src)/streamline_config.pl --$@ $(srctree) $(Kconfig) > .tmp.config
-	$(Q)if [ -f .config ]; then 					\
+	perl $(srctree)/$(src)/streamline_config.pl --$@ $(srctree) $(Kconfig) > .tmp.config
+	if [ -f .config ]; then 					\
 			cmp -s .tmp.config .config ||			\
 			(mv -f .config .config.old.1;			\
 			 mv -f .tmp.config .config;			\
@@ -58,7 +58,7 @@ localyesconfig localmodconfig: $(obj)/conf
 			mv -f .tmp.config .config;			\
 			$< $(silent) --oldconfig $(Kconfig);		\
 	fi
-	$(Q)rm -f .tmp.config
+	rm -f .tmp.config
 
 # These targets map 1:1 to the commandline options of 'conf'
 #
@@ -80,14 +80,14 @@ savedefconfig: $(obj)/conf
 defconfig: $(obj)/conf
 ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG)),)
 	@$(kecho) "*** Default configuration is based on '$(KBUILD_DEFCONFIG)'"
-	$(Q)$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
+	$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
 else
 	@$(kecho) "*** Default configuration is based on target '$(KBUILD_DEFCONFIG)'"
-	$(Q)$(MAKE) -f $(srctree)/Makefile $(KBUILD_DEFCONFIG)
+	$(MAKE) -f $(srctree)/Makefile $(KBUILD_DEFCONFIG)
 endif
 
 %_defconfig: $(obj)/conf
-	$(Q)$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
+	$< $(silent) --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
 
 configfiles=$(wildcard $(srctree)/kernel/configs/$@ $(srctree)/arch/$(SRCARCH)/configs/$@)
 
@@ -96,8 +96,8 @@ $(XEN_ROOT)/.config: ;
 
 %.config: $(obj)/conf
 	$(if $(call configfiles),, $(error No configuration exists for this target on this architecture))
-	$(Q)$(CONFIG_SHELL) $(srctree)/tools/kconfig/merge_config.sh -m .config $(configfiles)
-	$(Q)$(MAKE) -f $(srctree)/tools/kconfig/Makefile.kconfig olddefconfig
+	$(CONFIG_SHELL) $(srctree)/tools/kconfig/merge_config.sh -m .config $(configfiles)
+	$(MAKE) -f $(srctree)/tools/kconfig/Makefile.kconfig olddefconfig
 
 PHONY += kvmconfig
 kvmconfig: kvm_guest.config
@@ -109,7 +109,7 @@ xenconfig: xen.config
 
 PHONY += tinyconfig
 tinyconfig:
-	$(Q)$(MAKE) -f $(srctree)/Makefile allnoconfig tiny.config
+	$(MAKE) -f $(srctree)/Makefile allnoconfig tiny.config
 
 # CHECK: -o cache_dir=<path> working?
 PHONY += testconfig

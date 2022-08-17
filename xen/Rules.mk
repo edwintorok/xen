@@ -317,7 +317,7 @@ __build: $(targets-for-builtin) $(subdir-y) $(always-y)
 
 PHONY += $(subdir-y)
 $(subdir-y):
-	$(Q)$(MAKE) $(build)=$@ need-builtin=$(if $(filter $@/built_in.o, $(subdir-builtin)),1)
+	$(MAKE) $(build)=$@ need-builtin=$(if $(filter $@/built_in.o, $(subdir-builtin)),1)
 
 # Read all saved command lines and dependencies for the $(targets) we
 # may be building above, using $(if_changed{,_dep}). As an

@@ -26,7 +26,7 @@ GENERATED_FILES += _xtl_levels.mli.in _xtl_levels.ml.in _xtl_levels.inc META
 all: $(INTF) $(LIBS)
 
 xentoollog.ml: xentoollog.ml.in _xtl_levels.ml.in
-	$(Q)sed -e '1i\
+	sed -e '1i\
 (*\
  * AUTO-GENERATED FILE DO NOT EDIT\
  * Generated from xentoollog.ml.in and _xtl_levels.ml.in\
@@ -34,10 +34,10 @@ xentoollog.ml: xentoollog.ml.in _xtl_levels.ml.in
 ' \
 	    -e '/^(\* @@XTL_LEVELS@@ \*)$$/r_xtl_levels.ml.in' \
 	  < xentoollog.ml.in > xentoollog.ml.tmp
-	$(Q)mv xentoollog.ml.tmp xentoollog.ml
+	mv xentoollog.ml.tmp xentoollog.ml
 
 xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
-	$(Q)sed -e '1i\
+	sed -e '1i\
 (*\
  * AUTO-GENERATED FILE DO NOT EDIT\
  * Generated from xentoollog.mli.in and _xtl_levels.mli.in\
@@ -45,7 +45,7 @@ xentoollog.mli: xentoollog.mli.in _xtl_levels.mli.in
 ' \
 	    -e '/^(\* @@XTL_LEVELS@@ \*)$$/r_xtl_levels.mli.in' \
 	  < xentoollog.mli.in > xentoollog.mli.tmp
-	$(Q)mv xentoollog.mli.tmp xentoollog.mli
+	mv xentoollog.mli.tmp xentoollog.mli
 
 libs: $(LIBS)
 

@@ -46,7 +46,7 @@ kecho := $($(quiet)kecho)
 # - If the content differ the new file is used
 # - If they are equal no change, and no timestamp update
 define filechk
-	$(Q)set -e;						\
+	set -e;						\
 	mkdir -p $(dir $@);					\
 	trap "rm -f $(dot-target).tmp" EXIT;			\
 	{ $(filechk_$(1)); } > $(dot-target).tmp;		\
@@ -92,14 +92,14 @@ cc-ifversion = $(shell [ $(CONFIG_GCC_VERSION)0 $(1) $(2)000 ] && echo $(3) || e
 clang-ifversion = $(shell [ $(CONFIG_CLANG_VERSION)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
 
 ###
-# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
+# Shorthand for $(MAKE) -f scripts/Makefile.build obj=
 # Usage:
-# $(Q)$(MAKE) $(build)=dir
+# $(MAKE) $(build)=dir
 build := -f $(srctree)/Rules.mk obj
 
 # Shorthand for $(MAKE) clean
 # Usage:
-# $(Q)$(MAKE) $(clean)=dir
+# $(MAKE) $(clean)=dir
 clean := -f $(srctree)/scripts/Makefile.clean obj
 
 # echo command.

@@ -46,6 +46,6 @@ endif
 
 PHONY += $(subdir-all)
 $(subdir-all):
-	$(Q)$(MAKE) $(clean)=$@
+	$(MAKE) $(clean)=$@
 
 .PHONY: $(PHONY)

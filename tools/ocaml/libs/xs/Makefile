@@ -25,12 +25,10 @@ xenstore_OBJS = xenstore
 OCAML_NOC_LIBRARY = xenstore
 
 xenstore.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(E) " CMX      $@"
-	$(Q)$(OCAMLOPT) -pack -o $@ $^
+	$(OCAMLOPT) -pack -o $@ $^
 
 xenstore.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(E) " CMO      $@"
-	$(Q)$(OCAMLC) -pack -o $@ $^
+	$(OCAMLC) -pack -o $@ $^
 
 
 .PHONY: install
