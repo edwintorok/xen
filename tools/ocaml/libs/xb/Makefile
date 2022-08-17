@@ -2,49 +2,19 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-CFLAGS += -I../mmap
-CFLAGS += $(CFLAGS_libxenctrl) # For xen_mb()
-CFLAGS += $(CFLAGS_xeninclude)
-CFLAGS += $(APPEND_CFLAGS)
-OCAMLINCLUDE += -I ../mmap
-OCAMLFLAGS += -for-pack Xenbus
-
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
-PREINTF = op.cmi partial.cmi packet.cmi
-PREOBJS = op partial packet xs_ring
-PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
-OBJS = op partial packet xs_ring xb
-INTF = op.cmi packet.cmi xb.cmi
-LIBS = xenbus.cma xenbus.cmxa
-
-ALL_OCAML_OBJS = $(OBJS) $(PREOJBS)
-
-all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
-
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
-
-xenbus_OBJS = xenbus
-xenbus_C_OBJS = xs_ring_stubs xenbus_stubs
 OCAML_LIBRARY = xenbus
 
-xenbus.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
-	$(OCAMLOPT) -pack -o $@ $^
+xenbus_OCAMLINCLUDE += -I $(OCAML_xenmmap)
+xenbus_CFLAGS += -I$(OCAML_xenmmap)
 
-xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
-	$(OCAMLC) -pack -o $@ $^
+xenbus_OCAMLFLAGS += -for-pack Xenbus
 
-.PHONY: install
-install: $(LIBS) META
-	mkdir -p $(OCAMLDESTDIR)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmo xenbus.cmi xenbus.cmx *.a *.so
+# objects that go into the pack
+xenbus_OBJS = op partial packet xs_ring xb
 
-.PHONY: uninstall
-uninstall:
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
+xenbus_C_OBJS = xs_ring_stubs xenbus_stubs
 
 include $(OCAML_TOPLEVEL)/Makefile.rules

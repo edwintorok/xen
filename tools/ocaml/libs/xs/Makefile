@@ -2,7 +2,7 @@ OCAML_TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(OCAML_TOPLEVEL)/../..
 include $(OCAML_TOPLEVEL)/common.make
 
-OCAMLINCLUDE += -I ../xb/
+OCAMLINCLUDE += -I $(OCAML_xenbus)
 OCAMLFLAGS += -for-pack Xenstore
 
 .NOTPARALLEL:
@@ -17,10 +17,6 @@ LIBS = xenstore.cma xenstore.cmxa
 
 all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
 
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
-
 xenstore_OBJS = xenstore
 OCAML_NOC_LIBRARY = xenstore
 
@@ -29,7 +25,6 @@ xenstore.cmx : $(foreach obj, $(OBJS), $(obj).cmx)
 
 xenstore.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
 	$(OCAMLC) -pack -o $@ $^
-
 
 .PHONY: install
 install: $(LIBS) META

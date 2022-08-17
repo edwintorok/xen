@@ -2,24 +2,18 @@ XEN_ROOT = $(CURDIR)/../../..
 OCAML_TOPLEVEL = $(CURDIR)/..
 include $(OCAML_TOPLEVEL)/common.make
 
+OCAML_PROGRAM = oxenstored
+
 # Include configure output (config.h)
-CFLAGS += -include $(XEN_ROOT)/tools/config.h
-CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
-LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
+oxenstored_CFLAGS += -include $(XEN_ROOT)/tools/config.h
+oxenstored_CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
+oxenstored_LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
 
-CFLAGS  += $(CFLAGS-y)
-CFLAGS  += $(APPEND_CFLAGS)
-LDFLAGS += $(LDFLAGS-y)
-LDFLAGS += $(APPEND_LDFLAGS)
+oxenstored_CFLAGS  += $(oxenstored_CFLAGS-y)
+oxenstored_LDFLAGS += $(oxenstored_LDFLAGS-y)
 
-OCAMLINCLUDE += \
-	-I $(OCAML_TOPLEVEL)/libs/xb \
-	-I $(OCAML_TOPLEVEL)/libs/mmap \
-	-I $(OCAML_TOPLEVEL)/libs/xc \
-	-I $(OCAML_TOPLEVEL)/libs/eventchn
-
-OBJS = systemd poll syslog
-OBJS += paths \
+oxenstored_OBJS = systemd poll syslog
+oxenstored_OBJS += paths \
 	define \
 	stdext \
 	trie \
@@ -43,30 +37,9 @@ OBJS += paths \
 	process \
 	xenstored
 
-INTF = symbol.cmi trie.cmi syslog.cmi systemd.cmi poll.cmi
-
-XENSTOREDLIBS = \
-	unix.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xc $(OCAML_TOPLEVEL)/libs/xc/xenctrl.cmxa \
-	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xb $(OCAML_TOPLEVEL)/libs/xb/xenbus.cmxa \
-	-ccopt -L -ccopt $(XEN_ROOT)/tools/libs/ctrl
-
-PROGRAMS = oxenstored
-
-oxenstored_LIBS = $(XENSTOREDLIBS)
-oxenstored_OBJS = $(OBJS)
+oxenstored_LIBS=unix xenmmap xeneventchn xenctrl xenbus
 
 oxenstored_EXTRA_DEPS = systemd_stubs.o select_stubs.o syslog_stubs.o
-
-OCAML_PROGRAM = oxenstored
-
-all: $(INTF) $(LIBS) $(PROGRAMS)
-
-bins: $(PROGRAMS)
-
-libs: $(LIBS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
