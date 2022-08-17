@@ -1,6 +1,44 @@
 .NOTPARALLEL:
 
-ALL_OCAML_OBJS ?= $(OBJS)
+# Paths to OCaml libraries
+OCAML_xenbus=$(OCAML_TOPLEVEL)/libs/xb
+OCAML_xenctrl=$(OCAML_TOPLEVEL)/libs/xc
+OCAML_xeneventchn=$(OCAML_TOPLEVEL)/libs/eventchn
+OCAML_xenlight=$(OCAML_TOPLEVEL)/libs/xl
+OCAML_xenmmap=$(OCAML_TOPLEVEL)/libs/mmap
+OCAML_xenstore=$(OCAML_TOPLEVEL)/libs/xs
+OCAML_xentoollog=$(OCAML_TOPLEVEL)/libs/xentoollog
+
+# C library dependencies for OCaml libraries
+OCAML_USELIBS_xenctrl=xenctrl xenguest
+OCAML_USELIBS_xeneventchn=xenevtchn
+OCAML_USELIBS_xenlight=xenlight
+OCAML_USELIBS_xentoollog=xentoollog
+
+OCAML_LIBS=xenmmap xentoollog xenctrl xeneventchn xenbus xenstore xenlight
+
+# in-tree linker flags for a C library
+$(foreach LIB,$(LIBS_LIBS),$(eval\
+  LINKPATH_xen$(LIB)=$(SHDEPS_libxen$(LIB)) -L$(XEN_libxen$(LIB))\
+))
+
+# in-tree linker path flags for an OCaml library
+# sort is used to remove duplicates to make this more debuggable
+$(foreach LIB,$(OCAML_LIBS),$(eval\
+  CLINKPATH_OCAML_$(LIB)=$(sort \
+    $(foreach DEP,$(OCAML_USELIBS_$(LIB)),\
+      $(LINKPATH_$(DEP))\
+     ))))
+
+$(foreach LIB,$(OCAML_LIBS),$(eval\
+  LINK_OCAML_$(LIB)=\
+    $(addprefix -ccopt ,$(CLINKPATH_OCAML_$(LIB)))\
+    $(LIB).cmxa\
+ ))
+
+LINK_OCAML_unix=unix.cmxa
+
+ALL_OCAML_OBJS ?=
 
 %.cmo: %.ml
 	$(OCAMLC) $(OCAMLFLAGS) -c -o $@ $<
@@ -25,6 +63,118 @@ META: META.in
 
 ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS)) $(wildcard *.mli)
 
+clean: $(CLEAN_HOOKS)
+	rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
+
+distclean: clean
+
+# Define a library target <name>.cmxa and <name>.cma
+
+# See https://v2.ocaml.org/manual/intfc.html#s%3Aocamlmklib
+# https://www.gnu.org/software/make/manual/html_node/Multiple-Targets.html
+# and https://www.gnu.org/software/make/manual/html_node/Pattern-Intro.html#Pattern-Intro
+# Pattern rules are always grouped targets
+
+OCAMLMKLIB_FLAGS ?=
+# more dependencies will be added below
+# all invocations of ocamlmklib need to see same -l and -L flags
+%.cmxa %.cma dll%_stubs.so lib%_stubs.a: %.cmx %.cmo %_stubs.o
+	$(OCAMLMKLIB) -verbose -o $* $(OCAMLMKLIB_FLAGS) $(filter %.cmx %.cmo %.o,$^)
+
+# use:
+#  $$ to refer to make variables defined in the template itself
+#  $1 to refer to the template argument
+#  $VAR or $(function ...) as usual to refer to global variables/functions
+define OCAML_LIBRARY_template
+# For in-tree linking we need to add -L and -Wl,-rpath-link
+# -Wl,-rpath-link is added by $(SHDEPS_...)
+# But only pass these to the C linker not to OCaml, achieved with -ldopt
+OCAMLMKLIB_FLAGS_$(1) += -oc $(1)_stubs
+OCAMLMKLIB_FLAGS_$(1) += $(addprefix -ldopt ,$(CLINKPATH_OCAML_$(1)))
+
+# The regular -l flags that we want in .cma/.cmxa
+OCAMLMKLIB_FLAGS_$(1) += $(addprefix -l,$(OCAML_USELIBS_$(1)))
+
+TARGETS_$(1)=$(1).cmxa $(1).cma dll$(1)_stubs.so lib$(1)_stubs.a
+$$(TARGETS_$(1)): OCAMLMKLIB_FLAGS+=$$(OCAMLMKLIB_FLAGS_$(1))
+$$(TARGETS_$(1)): $$(OBJS:=.cmx) $$(OBJS:=.cmo) $$($(1)_C_OBJS:=.o)
+
+$($(1)_C_OBJS:=.o): CFLAGS += $($(1)_CFLAGS)
+$($(1)_C_OBJS:=.o): CFLAGS += $(CFLAGS_xeninclude)
+$($(1)_C_OBJS:=.o): CFLAGS += $(foreach LIB,$(OCAML_USELIBS_$(1)),$(CFLAGS_$(LIB)))
+$($(1)_C_OBJS:=.o): CFLAGS += $(APPEND_CFLAGS)
+
+$(1).cmx $(1).cmo $($(1)_OBJS:=.cmx) $($(1)_OBJS:=.cmo): OCAMLINCLUDE += $($(1)_OCAMLINCLUDE)
+$(1).cmx $(1).cmo $($(1)_OBJS:=.cmx) $($(1)_OBJS:=.cmo): OCAMLFLAGS += $($(1)_OCAMLFLAGS)
+
+GENERATED_FILES += $$(GENERATED_FILES_$(1))
+LIBS += $(1).cmxa $(1).cma
+
+# Is it a pack
+ifneq (,$($(1)_OBJS))
+$(1).cmx: $($(1)_OBJS:=.cmx)
+	$(OCAMLOPT) -pack -o $$@ $$^
+
+$(1).cmo: $($(1)_OBJS:=.cmo)
+	$(OCAMLC) -pack -o $$@ $$^
+
+ALL_OCAML_OBJS += $($(1)_OBJS)
+else
+ALL_OCAML_OBJS += $(1)
+endif
+
+.PHONY: install
+install: $$(TARGETS_$(1)) META
+	mkdir -p $(OCAMLDESTDIR)
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) $(1)
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore $(1) $^ $(1).cmi $$(OBJS:=.cmx)
+
+.PHONY: uninstall
+uninstall:
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) $(1)
+endef
+
+define OCAML_NOC_LIBRARY_template
+ $(1).cmxa: $(OBJS:=.cmx)
+	$(OCAMLOPT) -a -o $$@ $$^
+
+ $(1).cma: $(OBJS:=.cmo)
+	$(OCAMLC) -a -o $$@ $$^
+endef
+
+# Define a program
+
+define OCAML_PROGRAM_template
+ LINK_$(1)=$$(foreach DEP,$$($(1)_LIBS),$$(LINK_OCAML_$$(DEP)))
+
+ OCAMLINCLUDE_$(1) = $(addprefix -I ,$(foreach DEP,$($(1)_LIBS),$(OCAML_$(DEP))))
+ $(1) $($(1)_OBJS:=.cmx): OCAMLINCLUDE += $$(OCAMLINCLUDE_$(1))
+
+ $(1): LDFLAGS += $(LDFLAGS_$(1))
+ $(1): LDFLAGS += $(APPEND_LDFLAGS)
+
+ $($(1)_EXTRA_DEPS): CFLAGS += $(CFLAGS_$(1))
+ $($(1)_EXTRA_DEPS): CFLAGS += $(APPEND_CFLAGS)
+
+ # evaluation of OCAMLFLAGS is delayed with $$ because it is modified above
+ $(1): $($(1)_OBJS:=.cmx) $($(1)_EXTRA_DEPS)
+	$(OCAMLOPT) -o $(1) $() $$(OCAMLFLAGS) $$(LINK_$(1)) $$^ $$(addprefix -cclib ,$$(LDFLAGS))
+
+ PROGRAMS+=$(1)
+
+ ALL_OCAML_OBJS += $($(1)_OBJS)
+endef
+
+$(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
+$(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
+$(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
+
+all: $(LIBS) $(PROGRAMS)
+
+bins: $(PROGRAMS)
+
+libs: $(LIBS)
+
 # $o is defined in common.make and uses a tmpfile
 .ocamldep.make: $(filter-out $(GENERATED_FILES), $(ALL_OCAML_OBJ_SOURCES)) Makefile $(OCAML_TOPLEVEL)/Makefile.rules
 	rm -f $@.tmp
@@ -33,52 +183,6 @@ ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS)) $(wildcard *.mli)
 	)
 	$(OCAMLDEP) $(filter %.ml %.mli,$^) >>$@.tmp && mv $@.tmp $@
 
-clean: $(CLEAN_HOOKS)
-	rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
-
-distclean: clean
-
-mk-caml-lib-native = $(OCAMLOPT) -a -o $1 $2 $3
-mk-caml-lib-bytecode = $(OCAMLC) -a -o $1 $2 $3
-
-mk-caml-stubs = $(OCAMLMKLIB) -o `basename $1 .a` $2
-mk-caml-lib-stubs = \
-	$(AR) rcs $1 $2 && $(OCAMLMKLIB) -o `basename $1 .a | sed -e 's/^lib//'` $2
-
-# define a library target <name>.cmxa and <name>.cma
-define OCAML_LIBRARY_template
- $(1).cmxa: lib$(1)_stubs.a $(foreach obj,$($(1)_OBJS),$(obj).cmx)
-	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs $(foreach lib,$(LIBS_$(1)),-cclib $(lib)), $(foreach obj,$($(1)_OBJS),$(obj).cmx))
- $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call mk-caml-lib-bytecode,$$@, -dllib dll$(1)_stubs.so -cclib -l$(1)_stubs, $$+)
- $(1)_stubs.a: $(foreach obj,$$($(1)_C_OBJS),$(obj).o)
-	$(call mk-caml-stubs,$$@, $$+)
- lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
-	$(call mk-caml-lib-stubs,$$@, $$+)
-endef
-
-define OCAML_NOC_LIBRARY_template
- $(1).cmxa: $(foreach obj,$($(1)_OBJS),$(obj).cmx)
-	$(call mk-caml-lib-native,$$@, , $(foreach obj,$($(1)_OBJS),$(obj).cmx))
- $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
-	$(call mk-caml-lib-bytecode,$$@, , $$+)
-endef
-
-define OCAML_PROGRAM_template
- $(1): $(foreach obj,$($(1)_OBJS),$(obj).cmx) $($(1)_EXTRA_DEPS)
-	$(OCAMLOPT) $(OCAMLFLAGS) -o $$@ $($(1)_LIBS) $$+ $(addprefix -cclib ,$(LDFLAGS))
-endef
-
-define C_PROGRAM_template
- $(1): $(foreach obj,$($(1)_OBJS),$(obj).o)
-	$(CC) $(LDFLAGS) -o $$@ $$+
-endef
-
 ifndef IS_CLEAN_ONLY_GOAL
 include .ocamldep.make
 endif
-
-$(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
-$(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
-$(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
-$(foreach p,$(C_PROGRAM),$(eval $(call C_PROGRAM_template,$(p))))
