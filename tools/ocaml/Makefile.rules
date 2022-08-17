@@ -23,11 +23,15 @@ ALL_OCAML_OBJS ?= $(OBJS)
 META: META.in
 	sed 's/@VERSION@/$(VERSION)/g' < $< $o
 
-ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
+ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS)) $(wildcard *.mli)
 
 # $o is defined in common.make and uses a tmpfile
-.ocamldep.make: $(ALL_OCAML_OBJ_SOURCES) Makefile $(OCAML_TOPLEVEL)/Makefile.rules
-	$(OCAMLDEP) $(ALL_OCAML_OBJ_SOURCES) *.mli $o
+.ocamldep.make: $(filter-out $(GENERATED_FILES), $(ALL_OCAML_OBJ_SOURCES)) Makefile $(OCAML_TOPLEVEL)/Makefile.rules
+	rm -f $@.tmp
+	$(foreach ML,$(patsubst %.ml,%,$(filter %.ml,$(GENERATED_FILES))),\
+		echo $(ML).cmx $(ML).cmo: $(ML).cmi >>$@.tmp\
+	)
+	$(OCAMLDEP) $(filter %.ml %.mli,$^) >>$@.tmp && mv $@.tmp $@
 
 clean: $(CLEAN_HOOKS)
 	rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
