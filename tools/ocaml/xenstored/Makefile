@@ -6,13 +6,8 @@ OCAML_PROGRAM = oxenstored
 
 # Include configure output (config.h)
 oxenstored_CFLAGS += -include $(XEN_ROOT)/tools/config.h
-oxenstored_CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
-oxenstored_LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
 
-oxenstored_CFLAGS  += $(oxenstored_CFLAGS-y)
-oxenstored_LDFLAGS += $(oxenstored_LDFLAGS-y)
-
-oxenstored_OBJS = systemd poll syslog
+oxenstored_OBJS = poll syslog
 oxenstored_OBJS += paths \
 	define \
 	stdext \
@@ -39,7 +34,7 @@ oxenstored_OBJS += paths \
 
 oxenstored_LIBS=unix xenmmap xeneventchn xenctrl xenbus
 
-oxenstored_EXTRA_DEPS = systemd_stubs.o select_stubs.o syslog_stubs.o
+oxenstored_EXTRA_DEPS = select_stubs.o syslog_stubs.o
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
