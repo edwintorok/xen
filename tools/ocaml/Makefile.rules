@@ -1,14 +1,5 @@
 .NOTPARALLEL:
 
-# Paths to OCaml libraries
-OCAML_xenbus=$(OCAML_TOPLEVEL)/libs/xb
-OCAML_xenctrl=$(OCAML_TOPLEVEL)/libs/xc
-OCAML_xeneventchn=$(OCAML_TOPLEVEL)/libs/eventchn
-OCAML_xenlight=$(OCAML_TOPLEVEL)/libs/xl
-OCAML_xenmmap=$(OCAML_TOPLEVEL)/libs/mmap
-OCAML_xenstore=$(OCAML_TOPLEVEL)/libs/xs
-OCAML_xentoollog=$(OCAML_TOPLEVEL)/libs/xentoollog
-
 # C library dependencies for OCaml libraries
 OCAML_USELIBS_xenctrl=xenctrl xenguest
 OCAML_USELIBS_xeneventchn=xenevtchn
@@ -16,6 +7,11 @@ OCAML_USELIBS_xenlight=xenlight
 OCAML_USELIBS_xentoollog=xentoollog
 
 OCAML_LIBS=xenmmap xentoollog xenctrl xeneventchn xenbus xenstore xenlight
+
+# Paths to OCaml libraries
+$(foreach LIB,$(OCAML_LIBS),$(eval\
+  OCAML_$(LIB)=$(OCAML_TOPLEVEL)/libs/$(LIB)\
+))
 
 # in-tree linker flags for a C library
 $(foreach LIB,$(LIBS_LIBS),$(eval\

@@ -1,11 +1,9 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS= \
-	mmap \
-	xentoollog \
-	xc eventchn \
-	xb xs xl
+IS_CLEAN_ONLY_GOAL=1
+include $(XEN_ROOT)/tools/ocaml/Makefile.rules
+SUBDIRS=$(OCAML_LIBS)
 
 .PHONY: all
 all: subdirs-all
