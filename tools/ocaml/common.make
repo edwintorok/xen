@@ -2,7 +2,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CC ?= gcc
 
-CFLAGS += -fPIC -Werror -I$(shell ocamlc -where)
+OCAMLC_WHERE=$(shell $(OCAMLC) -where)
+CFLAGS += -fPIC -Werror -I$(OCAMLC_WHERE)
 
 OCAMLFLAGS = -g $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F
 
