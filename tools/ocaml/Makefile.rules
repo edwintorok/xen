@@ -6,7 +6,7 @@ OCAML_USELIBS_xeneventchn=xenevtchn
 OCAML_USELIBS_xenlight=xenlight
 OCAML_USELIBS_xentoollog=xentoollog
 
-OCAML_LIBS=xenmmap xentoollog xenctrl xeneventchn xenbus xenstore xenlight
+OCAML_LIBS=xenmmap xentoollog xenctrl xeneventchn xenbus
 
 # Paths to OCaml libraries
 $(foreach LIB,$(OCAML_LIBS),$(eval\
