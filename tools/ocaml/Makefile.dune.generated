@@ -6,17 +6,9 @@ _build/default/Makefile: Makefile
 	mkdir -p _build/default; \
 	cp -l Makefile _build/default/Makefile
 
-_build/default/Makefile.duneo: Makefile.duneo
+_build/default/Makefile.dunex: Makefile.dunex
 	mkdir -p _build/default; \
-	cp -l Makefile.duneo _build/default/Makefile.duneo
-
-_build/default/Makefile.duneo.tmp: Makefile.duneo.tmp
-	mkdir -p _build/default; \
-	cp -l Makefile.duneo.tmp _build/default/Makefile.duneo.tmp
-
-_build/default/Makefile.rules: Makefile.rules
-	mkdir -p _build/default; \
-	cp -l Makefile.rules _build/default/Makefile.rules
+	cp -l Makefile.dunex _build/default/Makefile.dunex
 
 _build/default/Rules.mk: Rules.mk
 	mkdir -p _build/default; \
@@ -65,36 +57,6 @@ _build/default/dune-workspace: dune-workspace
 _build/default/dune-workspace.dev: dune-workspace.dev
 	mkdir -p _build/default; \
 	cp -l dune-workspace.dev _build/default/dune-workspace.dev
-
-_build/default/install.sh: install.sh
-	mkdir -p _build/default; \
-	cp -l install.sh _build/default/install.sh
-
-_build/default/install.sh.tmp: install.sh.tmp
-	mkdir -p _build/default; \
-	cp -l install.sh.tmp _build/default/install.sh.tmp
-
-_build/default/.libs@xenbus@xenbus_stubs.o.d: \
-  .libs@xenbus@xenbus_stubs.o.d
-	mkdir -p _build/default/ocaml; \
-	cp -l .libs@xenbus@xenbus_stubs.o.d \
-	  _build/default/.libs@xenbus@xenbus_stubs.o.d
-
-_build/default/.libs@xenctrl@xenctrl_stubs.o.d: \
-  .libs@xenctrl@xenctrl_stubs.o.d
-	mkdir -p _build/default/ocaml; \
-	cp -l .libs@xenctrl@xenctrl_stubs.o.d \
-	  _build/default/.libs@xenctrl@xenctrl_stubs.o.d
-
-_build/default/.libs@xeneventchn@xeneventchn_stubs.o.d: \
-  .libs@xeneventchn@xeneventchn_stubs.o.d
-	mkdir -p _build/default/ocaml; \
-	cp -l .libs@xeneventchn@xeneventchn_stubs.o.d \
-	  _build/default/.libs@xeneventchn@xeneventchn_stubs.o.d
-
-_build/default/.ocamldep.make: .ocamldep.make
-	mkdir -p _build/default/ocaml; \
-	cp -l .ocamldep.make _build/default/.ocamldep.make
 
 _build/default/LICENSE: LICENSE
 	mkdir -p _build/default/ocaml; \
@@ -157,6 +119,10 @@ _build/default/Makefile.dune: Makefile.dune
 	mkdir -p _build/default/ocaml; \
 	cp -l Makefile.dune _build/default/Makefile.dune
 
+_build/default/Makefile.dune.generated: Makefile.dune.generated
+	mkdir -p _build/default/ocaml; \
+	cp -l Makefile.dune.generated _build/default/Makefile.dune.generated
+
 _build/default/Makefile.dune.generated.abspath: \
   Makefile.dune.generated.abspath
 	mkdir -p _build/default/ocaml; \
@@ -167,9 +133,9 @@ _build/default/Makefile.dunegen: Makefile.dunegen
 	mkdir -p _build/default/ocaml; \
 	cp -l Makefile.dunegen _build/default/Makefile.dunegen
 
-_build/default/Makefile.duneo: Makefile.duneo
+_build/default/Makefile.dunex: Makefile.dunex
 	mkdir -p _build/default/ocaml; \
-	cp -l Makefile.duneo _build/default/Makefile.duneo
+	cp -l Makefile.dunex _build/default/Makefile.dunex
 
 _build/default/Makefile.rules: Makefile.rules
 	mkdir -p _build/default/ocaml; \
@@ -179,29 +145,9 @@ _build/default/common.make: common.make
 	mkdir -p _build/default/ocaml; \
 	cp -l common.make _build/default/common.make
 
-_build/default/dllxenbus_stubs.so: dllxenbus_stubs.so
-	mkdir -p _build/default/ocaml; \
-	cp -l dllxenbus_stubs.so _build/default/dllxenbus_stubs.so
-
-_build/default/dllxenctrl_stubs.so: dllxenctrl_stubs.so
-	mkdir -p _build/default/ocaml; \
-	cp -l dllxenctrl_stubs.so _build/default/dllxenctrl_stubs.so
-
-_build/default/dllxeneventchn_stubs.so: dllxeneventchn_stubs.so
-	mkdir -p _build/default/ocaml; \
-	cp -l dllxeneventchn_stubs.so _build/default/dllxeneventchn_stubs.so
-
-_build/default/dllxenmmap_stubs.so: dllxenmmap_stubs.so
-	mkdir -p _build/default/ocaml; \
-	cp -l dllxenmmap_stubs.so _build/default/dllxenmmap_stubs.so
-
 _build/default/dune-project: dune-project
 	mkdir -p _build/default/ocaml; \
 	cp -l dune-project _build/default/dune-project
-
-_build/default/dune-workspace: dune-workspace
-	mkdir -p _build/default/ocaml; \
-	cp -l dune-workspace _build/default/dune-workspace
 
 _build/default/dune-workspace.dev.in: dune-workspace.dev.in
 	mkdir -p _build/default/ocaml; \
@@ -211,13 +157,278 @@ _build/default/dune-workspace.in: dune-workspace.in
 	mkdir -p _build/default/ocaml; \
 	cp -l dune-workspace.in _build/default/dune-workspace.in
 
-_build/default/install.sh: install.sh
-	mkdir -p _build/default/ocaml; \
-	cp -l install.sh _build/default/install.sh
+_build/default/dune2makefile/.ocamlformat: \
+  dune2makefile/.ocamlformat
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/.ocamlformat \
+	  _build/default/dune2makefile/.ocamlformat
+
+_build/default/dune2makefile/dune: dune2makefile/dune
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/dune _build/default/dune2makefile/dune
+
+_build/default/dune2makefile/dune-project: \
+  dune2makefile/dune-project
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/dune-project \
+	  _build/default/dune2makefile/dune-project
+
+_build/default/dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen:
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	{ \
+	  echo '(** @canonical Dune__exe.Dune2makefile *)'; \
+	  echo 'module Dune2makefile = Dune__exe__Dune2makefile'; \
+	  echo ''; \
+	  echo ''; \
+	  echo '(** @canonical Dune__exe.Makefile *)'; \
+	  echo 'module Makefile = Dune__exe__Makefile'; \
+	  echo ''; \
+	  echo ''; \
+	  echo '(** @canonical Dune__exe.MakefileLexer *)'; \
+	  echo 'module MakefileLexer = Dune__exe__MakefileLexer'; \
+	  echo ''; \
+	  echo ''; \
+	  echo '(** @canonical Dune__exe.MakefileParser *)'; \
+	  echo 'module MakefileParser = Dune__exe__MakefileParser'; \
+	} > dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen
+
+_build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmo \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmt: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/byte; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLC) -w -40 -w -49 -nopervasives -nostdlib \
+	  -g -bin-annot -I dune2makefile/.dune2makefile.eobjs/byte \
+	  -no-alias-deps -o \
+	  dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmo -c -impl \
+	  dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen
+
+_build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.o: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/native; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLOPT) -w -40 -w -49 -nopervasives \
+	  -nostdlib -g -I dune2makefile/.dune2makefile.eobjs/byte -I \
+	  dune2makefile/.dune2makefile.eobjs/native -intf-suffix .ml-gen \
+	  -no-alias-deps -o \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx -c -impl \
+	  dune2makefile/.dune2makefile.eobjs/dune__exe.ml-gen
+
+_build/default/dune2makefile/makefile.mli: \
+  dune2makefile/makefile.mli
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/makefile.mli \
+	  _build/default/dune2makefile/makefile.mli
+
+_build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmti: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/makefile.mli
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/byte; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLC) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -g -bin-annot -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -no-alias-deps -opaque -open \
+	  Dune__exe -o \
+	  dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmi -c \
+	  -intf dune2makefile/makefile.mli
+
+_build/default/dune2makefile/makefileLexer.mll: \
+  dune2makefile/makefileLexer.mll
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/makefileLexer.mll \
+	  _build/default/dune2makefile/makefileLexer.mll
+
+_build/default/dune2makefile/makefileLexer.ml: \
+  /home/edwin/.opam/4.14.0/bin/ocamllex \
+  _build/default/dune2makefile/makefileLexer.mll
+	mkdir -p _build/default/dune2makefile; \
+	mkdir -p _build/default/dune2makefile; \
+	cd _build/default/dune2makefile; \
+	mkdir -p ../..; \
+	cd ../..; \
+	/home/edwin/.opam/4.14.0/bin/ocamllex -q -o \
+	  dune2makefile/makefileLexer.ml dune2makefile/makefileLexer.mll
+
+_build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmo \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmt: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/makefileLexer.ml
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/byte; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLC) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -g -bin-annot -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -no-alias-deps -open \
+	  Dune__exe -o \
+	  dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmo \
+	  -c -impl dune2makefile/makefileLexer.ml
+
+_build/default/dune2makefile/dune2makefile.ml: \
+  dune2makefile/dune2makefile.ml
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/dune2makefile.ml \
+	  _build/default/dune2makefile/dune2makefile.ml
+
+_build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Dune2makefile.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Dune2makefile.cmo \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Dune2makefile.cmt: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmi \
+  _build/default/dune2makefile/dune2makefile.ml
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/byte; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLC) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -g -bin-annot -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -no-alias-deps -open \
+	  Dune__exe -o \
+	  dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Dune2makefile.cmo \
+	  -c -impl dune2makefile/dune2makefile.ml
+
+_build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.o: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx \
+  _build/default/dune2makefile/makefileLexer.ml
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/native; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLOPT) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -nodynlink -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -I \
+	  dune2makefile/.dune2makefile.eobjs/native -intf-suffix .ml \
+	  -no-alias-deps -open Dune__exe -o \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.cmx \
+	  -c -impl dune2makefile/makefileLexer.ml
+
+_build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.o: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Dune2makefile.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__MakefileLexer.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.cmx \
+  _build/default/dune2makefile/dune2makefile.ml
+	mkdir -p _build/default/dune2makefile/.dune2makefile.eobjs/native; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLOPT) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -nodynlink -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -I \
+	  dune2makefile/.dune2makefile.eobjs/native -intf-suffix .ml \
+	  -no-alias-deps -open Dune__exe -o \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.cmx \
+	  -c -impl dune2makefile/dune2makefile.ml
+
+_build/default/dune2makefile/dune2makefile.exe: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe.o \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.o \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.cmx \
+  _build/default/dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.o
+	mkdir -p _build/default/dune2makefile; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLOPT) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -nodynlink -o \
+	  dune2makefile/dune2makefile.exe \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe.cmx \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe__MakefileLexer.cmx \
+	  dune2makefile/.dune2makefile.eobjs/native/dune__exe__Dune2makefile.cmx
+
+_build/default/dune2makefile/makefileParser.mly: \
+  dune2makefile/makefileParser.mly
+	mkdir -p _build/default/dune2makefile; \
+	cp -l dune2makefile/makefileParser.mly \
+	  _build/default/dune2makefile/makefileParser.mly
+
+_build/default/dune2makefile/makefileParser__mock.ml.mock: \
+  /home/edwin/.opam/4.14.0/bin/menhir \
+  _build/default/dune2makefile/makefileParser.mly
+	mkdir -p _build/default/dune2makefile; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	/home/edwin/.opam/4.14.0/bin/menhir --explain \
+	  dune2makefile/makefileParser.mly --base \
+	  dune2makefile/makefileParser --infer-write-query \
+	  dune2makefile/makefileParser__mock.ml.mock
+
+_build/default/dune2makefile/makefileParser__mock.mli.inferred: \
+  \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe.cmi \
+  _build/default/dune2makefile/.dune2makefile.eobjs/byte/dune__exe__Makefile.cmi \
+  _build/default/dune2makefile/makefileParser__mock.ml.mock
+	mkdir -p _build/default/dune2makefile; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	$(OCAMLC) -w -40 -strict-sequence \
+	  -strict-formats -principal -w @18 -g -I \
+	  dune2makefile/.dune2makefile.eobjs/byte -open Dune__exe -short-paths \
+	  -i -impl dune2makefile/makefileParser__mock.ml.mock > \
+	  dune2makefile/makefileParser__mock.mli.inferred
+
+_build/default/dune2makefile/makefileParser.ml \
+  _build/default/dune2makefile/makefileParser.mli: \
+  /home/edwin/.opam/4.14.0/bin/menhir \
+  _build/default/dune2makefile/makefileParser.mly \
+  _build/default/dune2makefile/makefileParser__mock.mli.inferred
+	mkdir -p _build/default/dune2makefile; \
+	mkdir -p _build/default; \
+	cd _build/default; \
+	/home/edwin/.opam/4.14.0/bin/menhir --explain \
+	  dune2makefile/makefileParser.mly --base \
+	  dune2makefile/makefileParser --infer-read-reply \
+	  dune2makefile/makefileParser__mock.mli.inferred
+
+_build/default/libs/.cma: libs/.cma
+	mkdir -p _build/default/libs; \
+	cp -l libs/.cma _build/default/libs/.cma
+
+_build/default/libs/.cmi.cmi: libs/.cmi.cmi
+	mkdir -p _build/default/libs; \
+	cp -l libs/.cmi.cmi _build/default/libs/.cmi.cmi
+
+_build/default/libs/.cmo: libs/.cmo
+	mkdir -p _build/default/libs; \
+	cp -l libs/.cmo _build/default/libs/.cmo
+
+_build/default/libs/.cmx: libs/.cmx
+	mkdir -p _build/default/libs; \
+	cp -l libs/.cmx _build/default/libs/.cmx
+
+_build/default/libs/.cmx.o: libs/.cmx.o
+	mkdir -p _build/default/libs; \
+	cp -l libs/.cmx.o _build/default/libs/.cmx.o
 
 _build/default/libs/Makefile: libs/Makefile
 	mkdir -p _build/default/libs; \
 	cp -l libs/Makefile _build/default/libs/Makefile
+
+_build/default/libs/xenbus/.all.d: libs/xenbus/.all.d
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/.all.d _build/default/libs/xenbus/.all.d
 
 _build/default/libs/xenbus/META.in: libs/xenbus/META.in
 	mkdir -p _build/default/libs/xenbus; \
@@ -1122,7 +1333,7 @@ _build/default/libs/xenbus/xenbus_stubs.o: \
 	cd _build/default/libs/xenbus; \
 	$(CC) -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC \
 	  -D_FILE_OFFSET_BITS=64 -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -g \
-	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen-builds3/tools/ocaml/../../tools/include -o \
+	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen/tools/ocaml/../../tools/include -o \
 	  xenbus_stubs.o -c xenbus_stubs.c
 
 _build/default/libs/xenbus/xs_ring_stubs.c: \
@@ -1139,7 +1350,7 @@ _build/default/libs/xenbus/xs_ring_stubs.o: \
 	cd _build/default/libs/xenbus; \
 	$(CC) -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC \
 	  -D_FILE_OFFSET_BITS=64 -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -g \
-	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen-builds3/tools/ocaml/../../tools/include -o \
+	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen/tools/ocaml/../../tools/include -o \
 	  xs_ring_stubs.o -c xs_ring_stubs.c
 
 _build/default/libs/xenbus/dllxenbus_stubs.so: \
@@ -1168,6 +1379,14 @@ _build/default/libs/xenbus/libxenbus_stubs.a: \
 	  libs/xenbus/xenbus_stubs libs/xenbus/xenbus_stubs.o \
 	  libs/xenbus/xs_ring_stubs.o
 
+_build/default/libs/xenbus/op.cmi: libs/xenbus/op.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/op.cmi _build/default/libs/xenbus/op.cmi
+
+_build/default/libs/xenbus/op.cmx: libs/xenbus/op.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/op.cmx _build/default/libs/xenbus/op.cmx
+
 _build/default/libs/xenbus/op.ml: libs/xenbus/op.ml
 	mkdir -p _build/default/libs/xenbus; \
 	cp -l libs/xenbus/op.ml _build/default/libs/xenbus/op.ml
@@ -1175,6 +1394,14 @@ _build/default/libs/xenbus/op.ml: libs/xenbus/op.ml
 _build/default/libs/xenbus/op.mli: libs/xenbus/op.mli
 	mkdir -p _build/default/libs/xenbus; \
 	cp -l libs/xenbus/op.mli _build/default/libs/xenbus/op.mli
+
+_build/default/libs/xenbus/packet.cmi: libs/xenbus/packet.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/packet.cmi _build/default/libs/xenbus/packet.cmi
+
+_build/default/libs/xenbus/packet.cmx: libs/xenbus/packet.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/packet.cmx _build/default/libs/xenbus/packet.cmx
 
 _build/default/libs/xenbus/packet.ml: libs/xenbus/packet.ml
 	mkdir -p _build/default/libs/xenbus; \
@@ -1184,6 +1411,14 @@ _build/default/libs/xenbus/packet.mli: libs/xenbus/packet.mli
 	mkdir -p _build/default/libs/xenbus; \
 	cp -l libs/xenbus/packet.mli _build/default/libs/xenbus/packet.mli
 
+_build/default/libs/xenbus/partial.cmi: libs/xenbus/partial.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/partial.cmi _build/default/libs/xenbus/partial.cmi
+
+_build/default/libs/xenbus/partial.cmx: libs/xenbus/partial.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/partial.cmx _build/default/libs/xenbus/partial.cmx
+
 _build/default/libs/xenbus/partial.ml: libs/xenbus/partial.ml
 	mkdir -p _build/default/libs/xenbus; \
 	cp -l libs/xenbus/partial.ml _build/default/libs/xenbus/partial.ml
@@ -1192,9 +1427,13 @@ _build/default/libs/xenbus/partial.mli: libs/xenbus/partial.mli
 	mkdir -p _build/default/libs/xenbus; \
 	cp -l libs/xenbus/partial.mli _build/default/libs/xenbus/partial.mli
 
-_build/default/libs/xenbus/sth0mmBc: libs/xenbus/sth0mmBc
+_build/default/libs/xenbus/xb.cmi: libs/xenbus/xb.cmi
 	mkdir -p _build/default/libs/xenbus; \
-	cp -l libs/xenbus/sth0mmBc _build/default/libs/xenbus/sth0mmBc
+	cp -l libs/xenbus/xb.cmi _build/default/libs/xenbus/xb.cmi
+
+_build/default/libs/xenbus/xb.cmx: libs/xenbus/xb.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xb.cmx _build/default/libs/xenbus/xb.cmx
 
 _build/default/libs/xenbus/xb.ml: libs/xenbus/xb.ml
 	mkdir -p _build/default/libs/xenbus; \
@@ -1627,6 +1866,14 @@ _build/default/libs/xenbus/xenbus.cma: \
 	  libs/xenbus/.xenbus.objs/byte/xenbus__Packet.cmo \
 	  libs/xenbus/.xenbus.objs/byte/xenbus__Xb.cmo
 
+_build/default/libs/xenbus/xenbus.cmi: libs/xenbus/xenbus.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus.cmi _build/default/libs/xenbus/xenbus.cmi
+
+_build/default/libs/xenbus/xenbus.cmx: libs/xenbus/xenbus.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus.cmx _build/default/libs/xenbus/xenbus.cmx
+
 _build/default/libs/xenbus/xenbus.cmxs: \
   \
   _build/default/libs/xenbus/libxenbus_stubs.a \
@@ -1639,6 +1886,74 @@ _build/default/libs/xenbus/xenbus.cmxs: \
 	  -strict-formats -principal -w @18 -nodynlink -shared -linkall -I \
 	  libs/xenbus -o libs/xenbus/xenbus.cmxs \
 	  libs/xenbus/xenbus.cmxa
+
+_build/default/libs/xenbus/xenbus__Op.cmi: \
+  libs/xenbus/xenbus__Op.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Op.cmi \
+	  _build/default/libs/xenbus/xenbus__Op.cmi
+
+_build/default/libs/xenbus/xenbus__Op.cmx: \
+  libs/xenbus/xenbus__Op.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Op.cmx \
+	  _build/default/libs/xenbus/xenbus__Op.cmx
+
+_build/default/libs/xenbus/xenbus__Packet.cmi: \
+  libs/xenbus/xenbus__Packet.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Packet.cmi \
+	  _build/default/libs/xenbus/xenbus__Packet.cmi
+
+_build/default/libs/xenbus/xenbus__Packet.cmx: \
+  libs/xenbus/xenbus__Packet.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Packet.cmx \
+	  _build/default/libs/xenbus/xenbus__Packet.cmx
+
+_build/default/libs/xenbus/xenbus__Partial.cmi: \
+  libs/xenbus/xenbus__Partial.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Partial.cmi \
+	  _build/default/libs/xenbus/xenbus__Partial.cmi
+
+_build/default/libs/xenbus/xenbus__Partial.cmx: \
+  libs/xenbus/xenbus__Partial.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Partial.cmx \
+	  _build/default/libs/xenbus/xenbus__Partial.cmx
+
+_build/default/libs/xenbus/xenbus__Xb.cmi: \
+  libs/xenbus/xenbus__Xb.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Xb.cmi \
+	  _build/default/libs/xenbus/xenbus__Xb.cmi
+
+_build/default/libs/xenbus/xenbus__Xb.cmx: \
+  libs/xenbus/xenbus__Xb.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Xb.cmx \
+	  _build/default/libs/xenbus/xenbus__Xb.cmx
+
+_build/default/libs/xenbus/xenbus__Xs_ring.cmi: \
+  libs/xenbus/xenbus__Xs_ring.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Xs_ring.cmi \
+	  _build/default/libs/xenbus/xenbus__Xs_ring.cmi
+
+_build/default/libs/xenbus/xenbus__Xs_ring.cmx: \
+  libs/xenbus/xenbus__Xs_ring.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xenbus__Xs_ring.cmx \
+	  _build/default/libs/xenbus/xenbus__Xs_ring.cmx
+
+_build/default/libs/xenbus/xs_ring.cmi: libs/xenbus/xs_ring.cmi
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xs_ring.cmi _build/default/libs/xenbus/xs_ring.cmi
+
+_build/default/libs/xenbus/xs_ring.cmx: libs/xenbus/xs_ring.cmx
+	mkdir -p _build/default/libs/xenbus; \
+	cp -l libs/xenbus/xs_ring.cmx _build/default/libs/xenbus/xs_ring.cmx
 
 _build/default/libs/xenctrl/META.in: libs/xenctrl/META.in
 	mkdir -p _build/default/libs/xenctrl; \
@@ -1684,7 +1999,7 @@ _build/default/libs/xenctrl/xenctrl_stubs.o: \
 	cd _build/default/libs/xenctrl; \
 	$(CC) -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC \
 	  -D_FILE_OFFSET_BITS=64 -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -g \
-	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen-builds3/tools/ocaml/../../tools/include -o \
+	  -I $(OCAMLC_WHERE) -I ../xenmmap -I /home/edwin/xen/tools/ocaml/../../tools/include -o \
 	  xenctrl_stubs.o -c xenctrl_stubs.c
 
 _build/default/libs/xenctrl/dllxenctrl_stubs.so: \
@@ -1831,7 +2146,7 @@ _build/default/libs/xeneventchn/xeneventchn_stubs.o: \
 	cd _build/default/libs/xeneventchn; \
 	$(CC) -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC \
 	  -D_FILE_OFFSET_BITS=64 -O2 -fno-strict-aliasing -fwrapv -pthread -fPIC -g \
-	  -I $(OCAMLC_WHERE) -I /home/edwin/xen-builds3/tools/ocaml/../../tools/include -o \
+	  -I $(OCAMLC_WHERE) -I /home/edwin/xen/tools/ocaml/../../tools/include -o \
 	  xeneventchn_stubs.o -c xeneventchn_stubs.c
 
 _build/default/libs/xeneventchn/dllxeneventchn_stubs.so: \
@@ -1952,6 +2267,18 @@ _build/default/libs/xeneventchn/xeneventchn.cmxs: \
 	  libs/xeneventchn -o libs/xeneventchn/xeneventchn.cmxs \
 	  libs/xeneventchn/xeneventchn.cmxa
 
+_build/default/libs/xenmmap/.ocamldep.make: \
+  libs/xenmmap/.ocamldep.make
+	mkdir -p _build/default/libs/xenmmap; \
+	cp -l libs/xenmmap/.ocamldep.make \
+	  _build/default/libs/xenmmap/.ocamldep.make
+
+_build/default/libs/xenmmap/.xenmmap_stubs.o.d: \
+  libs/xenmmap/.xenmmap_stubs.o.d
+	mkdir -p _build/default/libs/xenmmap; \
+	cp -l libs/xenmmap/.xenmmap_stubs.o.d \
+	  _build/default/libs/xenmmap/.xenmmap_stubs.o.d
+
 _build/default/libs/xenmmap/META.in: libs/xenmmap/META.in
 	mkdir -p _build/default/libs/xenmmap; \
 	cp -l libs/xenmmap/META.in _build/default/libs/xenmmap/META.in
@@ -2011,6 +2338,12 @@ _build/default/libs/xenmmap/xenmmap.a \
 	  libs/xenmmap/xenmmap.cmxa -cclib -lxenmmap_stubs \
 	  libs/xenmmap/.xenmmap.objs/native/xenmmap.cmx
 
+_build/default/libs/xenmmap/xenmmap.annot: \
+  libs/xenmmap/xenmmap.annot
+	mkdir -p _build/default/libs/xenmmap; \
+	cp -l libs/xenmmap/xenmmap.annot \
+	  _build/default/libs/xenmmap/xenmmap.annot
+
 _build/default/libs/xenmmap/.xenmmap.objs/byte/xenmmap.cmo \
   _build/default/libs/xenmmap/.xenmmap.objs/byte/xenmmap.cmt: \
   \
@@ -2036,6 +2369,16 @@ _build/default/libs/xenmmap/xenmmap.cma: \
 	  -dllib -lxenmmap_stubs -cclib -lxenmmap_stubs \
 	  libs/xenmmap/.xenmmap.objs/byte/xenmmap.cmo
 
+_build/default/libs/xenmmap/xenmmap.cmi: libs/xenmmap/xenmmap.cmi
+	mkdir -p _build/default/libs/xenmmap; \
+	cp -l libs/xenmmap/xenmmap.cmi \
+	  _build/default/libs/xenmmap/xenmmap.cmi
+
+_build/default/libs/xenmmap/xenmmap.cmx: libs/xenmmap/xenmmap.cmx
+	mkdir -p _build/default/libs/xenmmap; \
+	cp -l libs/xenmmap/xenmmap.cmx \
+	  _build/default/libs/xenmmap/xenmmap.cmx
+
 _build/default/libs/xenmmap/xenmmap.cmxs: \
   \
   _build/default/libs/xenmmap/libxenmmap_stubs.a \
@@ -2048,6 +2391,10 @@ _build/default/libs/xenmmap/xenmmap.cmxs: \
 	  -strict-formats -principal -w @18 -nodynlink -shared -linkall -I \
 	  libs/xenmmap -o libs/xenmmap/xenmmap.cmxs \
 	  libs/xenmmap/xenmmap.cmxa
+
+_build/default/libs/xenstore/paths.ml: libs/xenstore/paths.ml
+	mkdir -p _build/default/libs/xenstore; \
+	cp -l libs/xenstore/paths.ml _build/default/libs/xenstore/paths.ml
 
 _build/default/libs/xentoollog/META.in: libs/xentoollog/META.in
 	mkdir -p _build/default/libs/xentoollog; \
@@ -2088,21 +2435,9 @@ _build/default/libs/xentoollog/xentoollog_stubs.c: \
 	cp -l libs/xentoollog/xentoollog_stubs.c \
 	  _build/default/libs/xentoollog/xentoollog_stubs.c
 
-_build/default/libxenbus_stubs.a: libxenbus_stubs.a
-	mkdir -p _build/default/ocaml; \
-	cp -l libxenbus_stubs.a _build/default/libxenbus_stubs.a
-
-_build/default/libxenctrl_stubs.a: libxenctrl_stubs.a
-	mkdir -p _build/default/ocaml; \
-	cp -l libxenctrl_stubs.a _build/default/libxenctrl_stubs.a
-
-_build/default/libxeneventchn_stubs.a: libxeneventchn_stubs.a
-	mkdir -p _build/default/ocaml; \
-	cp -l libxeneventchn_stubs.a _build/default/libxeneventchn_stubs.a
-
-_build/default/libxenmmap_stubs.a: libxenmmap_stubs.a
-	mkdir -p _build/default/ocaml; \
-	cp -l libxenmmap_stubs.a _build/default/libxenmmap_stubs.a
+_build/default/libs/xs/paths.ml: libs/xs/paths.ml
+	mkdir -p _build/default/libs/xs; \
+	cp -l libs/xs/paths.ml _build/default/libs/xs/paths.ml
 
 _build/default/test/Makefile: test/Makefile
 	mkdir -p _build/default/test; \
@@ -2111,10 +2446,6 @@ _build/default/test/Makefile: test/Makefile
 _build/default/test/xtl.ml: test/xtl.ml
 	mkdir -p _build/default/test; \
 	cp -l test/xtl.ml _build/default/test/xtl.ml
-
-_build/default/uninstall.sh: uninstall.sh
-	mkdir -p _build/default/ocaml; \
-	cp -l uninstall.sh _build/default/uninstall.sh
 
 _build/default/xen.dune-package:
 	mkdir -p _build/default/ocaml; \
@@ -3065,14 +3396,6 @@ _build/default/xen.install: _build/install/default/doc/xen/LICENSE \
 	  echo '  "_build/install/default/doc/xen/LICENSE"'; \
 	  echo ]; \
 	} > xen.install
-
-_build/default/xen.install-sh: xen.install-sh
-	mkdir -p _build/default/ocaml; \
-	cp -l xen.install-sh _build/default/xen.install-sh
-
-_build/default/xen.uninstall-sh: xen.uninstall-sh
-	mkdir -p _build/default/ocaml; \
-	cp -l xen.uninstall-sh _build/default/xen.uninstall-sh
 
 _build/default/xenstored.dune-package:
 	mkdir -p _build/default/ocaml; \
@@ -5889,14 +6212,6 @@ _build/default/xenstored.install: \
 	  echo '  "_build/install/default/doc/xenstored/LICENSE"'; \
 	  echo ]; \
 	} > xenstored.install
-
-_build/default/xenstored.install-sh: xenstored.install-sh
-	mkdir -p _build/default/ocaml; \
-	cp -l xenstored.install-sh _build/default/xenstored.install-sh
-
-_build/default/xenstored.uninstall-sh: xenstored.uninstall-sh
-	mkdir -p _build/default/ocaml; \
-	cp -l xenstored.uninstall-sh _build/default/xenstored.uninstall-sh
 
 _build/default/xenstored/Makefile: xenstored/Makefile
 	mkdir -p _build/default/xenstored; \

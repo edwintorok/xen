@@ -1,0 +1,5 @@
+(ocamllex makefileLexer shellLexer)
+
+(executable
+ (modules_without_implementation makefile)
+ (name dune2makefile))
