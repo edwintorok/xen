@@ -16,17 +16,12 @@
 {
   open Lexing
   
-  type target =
-  [ `TARGET of string
-  | `COLON
-  | `EOL
-  | `EOF ]
-
-  type command =
-  [ `COMMAND of char option * string
-  | `EOL
-  | `EOF
-  ]
+  type t =
+  | TARGET of string
+  | COMMAND of char option * string
+  | COLON
+  | EOL
+  | EOF
 
   let raise_invalid_char msg c =
     failwith (Printf.sprintf "Invalid character while parsing %s: %C" msg c)
@@ -67,7 +62,7 @@ let space_followed_by_blanks = ' ' blank*
 *)
 
 (* bol = beginning of line *)
-rule target_line = parse
+rule line = parse
 | blank* newline
   (*
      Call Lexing.new_line to update position information,
@@ -76,7 +71,7 @@ rule target_line = parse
      or not (e.g. if we're not at the beginning of the line)
   *)
   { new_line lexbuf;
-    `EOL
+    EOL
   }
 
 | space_nonl* escape newline
@@ -85,7 +80,7 @@ rule target_line = parse
     so continue parsing the line
     For positions to be accurate the regex above needs to end with newline
   *)
-  { new_line lexbuf; condense_whitespace lexbuf; target_line lexbuf }
+  { new_line lexbuf; condense_whitespace lexbuf; line lexbuf }
 
 | space_followed_by_blanks* (target_chars+ as target) blank*
   (* blank separated targets/prerequisites:
@@ -93,11 +88,13 @@ rule target_line = parse
      targets and commands more difficult, so we don't support it
      (it'd also make the lexer here context-dependent)
   *)
-  { `TARGET target }
+  { TARGET target }
 
-| ':' { `COLON }
+| ':' { COLON }
 
-| '\t' { raise_notsup "leading tab for targets/prerequisites"}
+| '\t' (command_prefix as p)?
+  { COMMAND (p, command (Buffer.create 128) lexbuf) }
+
 | '#' { raise_notsup "# comment" }
 | ';' { raise_notsup "starting a command with ; on target lines" }
 | "include" blank+ { raise_notsup "include line" }
@@ -105,18 +102,7 @@ rule target_line = parse
 | '$' { raise_notsup "macro expansion" }
 | _ as c { raise_invalid_char "line" c }
 
-| eof { `EOF }
-
-and command_line = parse
-| '\t' (command_prefix as p)?
-  { `COMMAND (p, command (Buffer.create 128) lexbuf) }
-
-| blank* '\n'
-  { `EOL }
-
-| _ as c { raise_invalid_char "command_line" c }
-
-| eof { `EOF }
+| eof { EOF }
 
 and command buf = parse
 | newline

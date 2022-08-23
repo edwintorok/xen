@@ -9,15 +9,13 @@ let print_position ppf lexbuf =
 
 let process_rules rules = Printer.printf stdout rules
 
-type tokens = [ MakefileLexer.target | MakefileLexer.command ]
-
-let parse_list_exn (terminated_by : [< tokens ]) (lexer : Lexing.lexbuf -> 'a)
-    (f : 'a -> 'b) (lexbuf : Lexing.lexbuf) : 'b list =
+let parse_list_exn (terminated_by : MakefileLexer.t) (f : MakefileLexer.t -> 'b)
+    (lexbuf : Lexing.lexbuf) : 'b list =
   let rec loop aux =
-    match (aux, lexer lexbuf) with
-    | _, `EOF -> List.rev aux
+    match (aux, MakefileLexer.line lexbuf) with
+    | _, MakefileLexer.EOF -> List.rev aux
     | _, r when r = terminated_by -> List.rev aux
-    | [], `EOL ->
+    | [], EOL ->
         (* blank/empty lines are comments, ignore them
            this rule needs to come after terminated_by,
            which could itself be EOL
@@ -30,25 +28,25 @@ let parse_list_exn (terminated_by : [< tokens ]) (lexer : Lexing.lexbuf -> 'a)
 let raise_unexpected_token expected actual =
   let actual_str =
     match actual with
-    | `EOL -> "EOL"
-    | `COLON -> ":"
-    | `TARGET t -> Printf.sprintf "target(%s)" t
-    | `COMMAND (p, cmd) ->
+    | MakefileLexer.EOL -> "EOL"
+    | COLON -> ":"
+    | TARGET t -> Printf.sprintf "target(%s)" t
+    | COMMAND (p, cmd) ->
         Printf.sprintf "command(%c%s)" (Option.value ~default:' ' p) cmd
-    | `EOF -> "EOF"
+    | EOF -> "EOF"
   in
   failwith
     (Printf.sprintf "unexpected token: <%s>, expected: <%s>" actual_str expected)
 
 let parse_target_exn = function
-  | `TARGET t -> Target t
+  | MakefileLexer.TARGET t -> Target t
   | t -> raise_unexpected_token "target" t
 
 let rec getall aux f x =
   match f x with None -> List.rev aux | Some arg -> getall (arg :: aux) f x
 
 let parse_command_exn = function
-  | `COMMAND (_prefix, cmd) ->
+  | MakefileLexer.COMMAND (_prefix, cmd) ->
       let lexbuf = Lexing.from_string cmd in
       let tokens =
         try getall [] ShellLexer.token lexbuf
@@ -61,18 +59,14 @@ let parse_command_exn = function
   | t -> raise_unexpected_token "command" t
 
 let parse_prereq_exn = function
-  | `TARGET t -> Prerequisite t
+  | MakefileLexer.TARGET t -> Prerequisite t
   | t -> raise_unexpected_token "prerequisite" t
 
-let parse_targets_exn =
-  parse_list_exn `COLON MakefileLexer.target_line parse_target_exn
-
-let parse_prerequisites_exn =
-  parse_list_exn `EOL MakefileLexer.target_line parse_prereq_exn
+let parse_targets_exn = parse_list_exn MakefileLexer.COLON parse_target_exn
+let parse_prerequisites_exn = parse_list_exn MakefileLexer.EOL parse_prereq_exn
 
 (* Another rule could follow immediately, but we don't support that *)
-let parse_commands_exn =
-  parse_list_exn `EOL MakefileLexer.command_line parse_command_exn
+let parse_commands_exn = parse_list_exn MakefileLexer.EOL parse_command_exn
 
 let parse_exn lexbuf =
   let targets = parse_targets_exn lexbuf in
