@@ -809,7 +809,7 @@ let check_memory_usage store cons doms _con =
 			check_memory_usage_slow store cons;
 		Gc.compact ()
 	end else if not (is_over_quota ~pct:95 cons) then
-		Connections.reset_memquota cons
+		Connections.reset_memquota store cons
 
 let do_input store cons doms con =
 	(*

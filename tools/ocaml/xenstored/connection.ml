@@ -26,6 +26,7 @@ type watch = {
 	path: Store.Path.t;
 	base: string;
 	is_relative: bool;
+	mutable events_overflow: bool;
 }
 
 and t = {
@@ -67,7 +68,8 @@ let watch_create ~con ~path ~is_relative ~token =
 	token = token;
 	path = path;
 	base = get_path con;
-	is_relative
+	is_relative;
+	events_overflow = false
 }
 
 let get_con w = w.con
@@ -231,16 +233,15 @@ let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
 let fire_single_watch_unchecked ~source watch =
+	(* TODO: replace with xb limit check! *)
+	if memquota_reached watch.con then
+		watch.events_overflow <- true; 
+	(* TODO: use is_dom0 here to support stub domains for xenstored in the future *)
+	if source <> None && watch.events_overflow then
+		let con = get_domstr watch.con in
+	  Logging.watchevents_overflow ~con (Store.Path.to_string watch.path)
+	else
 	let data = Packet.NullJoined [Packet.Path watch.path; Packet.String watch.token; Packet.Empty] in
-	(match source with
-	| None -> ()
-	| Some source ->
-		if memquota_reached watch.con then
-			let reason = Printf.sprintf
-				"Target domain of watch event is over quota: %s"
-				(get_domstr watch.con) in
-			mark_as_memquota_reached source ~reason;
-	);
 	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
 
 let fire_single_watch (oldroot, root) ~source watch =

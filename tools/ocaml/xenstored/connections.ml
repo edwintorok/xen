@@ -108,8 +108,23 @@ let mark_as_memquota_reached cons con =
 		cons.memquota_reached <- con :: cons.memquota_reached;
 	Connection.mark_as_memquota_reached con
 
-let reset_memquota cons =
-	List.iter Connection.reset_memquota cons.memquota_reached;
+let reset_memquota store cons =
+  let reset con =
+    Connection.reset_memquota con;
+	  con.watches |> Hashtbl.iter @@ fun _ ->
+	  List.iter @@ fun watch ->
+	  if watch.Connection.events_overflow then begin
+		  watch.Connection.events_overflow <- false;
+		  let root = Store.get_root store in
+		  (* fire spurious watches once, avoid triggering quota again *)
+		  Connection.fire_watch ~source:None (None, root) watch watch.path;
+		  Store.traversal root @@ fun parent node ->
+		    let nodename = Symbol.to_string node.Store.Node.name in
+        let path = Store.Path.of_path_and_name parent nodename in 
+		    Connection.fire_watch ~source:None (None, root) watch path
+	  end
+  in
+	List.iter reset cons.memquota_reached;
 	cons.memquota_reached <- []
 
 let has_more_work cons =

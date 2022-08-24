@@ -348,3 +348,7 @@ let xb_answer ~tid ~con ~ty data =
 let watch_not_fired ~con perms path =
 	let data = lazy (Printf.sprintf "EPERM perms=[%s] path=%s" perms path) in
 	access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info
+
+let watchevents_overflow ~con path =
+  let data = lazy (Printf.sprintf "EAGAIN watch event overflow on %s" path) in
+  access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info
