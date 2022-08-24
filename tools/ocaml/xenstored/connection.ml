@@ -23,7 +23,7 @@ let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
 type watch = {
 	con: t;
 	token: string;
-	path: string;
+	path: Store.Path.t;
 	base: string;
 	is_relative: bool;
 }
@@ -33,7 +33,7 @@ and t = {
 	dom: Domain.t option;
 	transactions: (int, Transaction.t) Hashtbl.t;
 	mutable next_tid: int;
-	watches: (string, watch list) Hashtbl.t;
+	watches: (Store.Path.t, watch list) Hashtbl.t;
 	mutable nb_watches: int;
 	anonid: int;
 	mutable stat_nb_ops: int;
@@ -61,12 +61,13 @@ let do_reconnect con =
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
 
-let watch_create ~con ~path ~token = {
+let watch_create ~con ~path ~is_relative ~token =
+{
 	con = con;
 	token = token;
 	path = path;
 	base = get_path con;
-	is_relative = path.[0] <> '/' && path.[0] <> '@'
+	is_relative
 }
 
 let get_con w = w.con
@@ -152,43 +153,39 @@ let set_target con target_domid =
 
 let is_backend_mmap con = Xenbus.Xb.is_mmap con.xb
 
-let send_reply con tid rid ty data =
-	if (String.length data) > xenstore_payload_max && (is_backend_mmap con) then
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000")
-	else
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid ty data)
 
-let send_error con tid rid err = send_reply con tid rid Xenbus.Xb.Op.Error (err ^ "\000")
-let send_ack con tid rid ty = send_reply con tid rid ty "OK\000"
+let send_reply con tid rid ty data =
+	if (Packet.length data) > xenstore_payload_max && (is_backend_mmap con) then
+		Xenbus.Xb.queue con.xb @@ lazy
+		(Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000")
+	else
+		Xenbus.Xb.queue con.xb @@ lazy
+		(data |> Packet.to_string |> Xenbus.Xb.Packet.create tid rid ty)
+
+let send_error con tid rid err =
+	send_reply con tid rid Xenbus.Xb.Op.Error @@ Packet.String (err ^ "\000")
+let send_ack con tid rid ty =
+	send_reply con tid rid ty @@ Packet.String "OK\000"
 
 let get_watch_path con path =
-	if path.[0] = '@' || path.[0] = '/' then
-		path
-	else
-		let rpath = get_path con in
-		rpath ^ path
+	Store.Path.create path (get_path con)
 
 let get_watches (con: t) path =
 	if Hashtbl.mem con.watches path
 	then Hashtbl.find con.watches path
 	else []
 
-let get_children_watches con path =
-	let path = path ^ "/" in
-	List.concat (Hashtbl.fold (fun p w l ->
-		if String.startswith path p then w :: l else l) con.watches [])
-
 let is_dom0 con =
 	Perms.Connection.is_dom0 (get_perm con)
 
-let add_watch con (path, apath) token =
+let add_watch con ~is_relative apath token =
 	if !Quota.activate && !Define.maxwatch > 0 &&
 	   not (is_dom0 con) && con.nb_watches > !Define.maxwatch then
 		raise Quota.Limit_reached;
 	let l = get_watches con apath in
 	if List.exists (fun w -> w.token = token) l then
 		raise Define.Already_exist;
-	let watch = watch_create ~con ~token ~path in
+	let watch = watch_create ~con ~token ~path:apath ~is_relative in
 	Hashtbl.replace con.watches apath (watch :: l);
 	con.nb_watches <- con.nb_watches + 1;
 	watch
@@ -234,7 +231,7 @@ let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
 let fire_single_watch_unchecked ~source watch =
-	let data = Utils.join_by_null [watch.path; watch.token; ""] in
+	let data = Packet.NullJoined [Packet.Path watch.path; Packet.String watch.token; Packet.Empty] in
 	(match source with
 	| None -> ()
 	| Some source ->
@@ -247,7 +244,7 @@ let fire_single_watch_unchecked ~source watch =
 	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
 
 let fire_single_watch (oldroot, root) ~source watch =
-	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
+	let abspath = watch.path in
 	let perms = lookup_watch_perms oldroot root abspath in
 	if Perms.can_fire_watch watch.con.perm perms then
 		fire_single_watch_unchecked ~source watch
@@ -258,13 +255,12 @@ let fire_single_watch (oldroot, root) ~source watch =
 
 let fire_watch ~source roots watch path =
 	let new_path =
-		if watch.is_relative && path.[0] = '/'
-		then begin
-			let n = String.length watch.base
-		 	and m = String.length path in
-			String.sub path n (m - n)
-		end else
-			path
+		if watch.is_relative then match path with
+		| [special] when special.[0] = '@' -> [special]
+		| _local :: _domain :: _domid :: relative -> relative
+		| bad ->
+			failwith ("Failed to fire watch on bad path: " ^ Store.Path.to_string bad)
+		else path
 	in
 	fire_single_watch ~source:(Some source) roots { watch with path = new_path }
 
@@ -380,12 +376,12 @@ let dump con chan =
 	in
 	(* dump watches *)
 	List.iter (fun (path, token) ->
-		Printf.fprintf chan "watch,%d,%s,%s\n" id (Utils.hexify path) (Utils.hexify token)
+		Printf.fprintf chan "watch,%d,%s,%s\n" id (Utils.hexify @@ Store.Path.to_string path) (Utils.hexify token)
 		) (list_watches con)
 
 let debug con =
 	let domid = get_domstr con in
-	let watches = List.map (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid path token) (list_watches con) in
+	let watches = List.map (fun (path, token) -> Printf.sprintf "watch %s: %s %s\n" domid (Store.Path.to_string path) token) (list_watches con) in
 	String.concat "" watches
 
 let decr_conflict_credit doms con =
@@ -398,7 +394,7 @@ open Xenbus.Size_tracker
 let size_of_watch w =
 	add (mul record_field 5) @@
 	add (string w.token) @@
-	add (string w.path) @@
+	add (list string w.path) @@
 	string w.base
 
 let size_of_watchlist l =
@@ -410,4 +406,4 @@ let size t =
 	(* we assume Domain.t is at most constant in size, and do not track it *)
 	add (Xenbus.Xb.size t.xb) @@
 	add (hashtbl unboxed Transaction.size t.transactions) @@
-	hashtbl string size_of_watchlist t.watches
+	hashtbl (list string) size_of_watchlist t.watches

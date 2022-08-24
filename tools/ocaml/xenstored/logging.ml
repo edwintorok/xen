@@ -286,14 +286,15 @@ let init_access_log post_rotate = match !access_log_destination with
 	| Syslog facility ->
 		access_logger := Some (make_syslog_logger facility)
 
-let access_logging ~con ~tid ?(data="") ~level access_type =
-        try
+let empty_data = Lazy.from_val ""
+let access_logging ~con ~tid ?(data=empty_data) ~level access_type =
+	try
 		maybe
 			(fun logger ->
 				let date = string_of_date() in
 				let tid = string_of_tid ~con tid in
 				let access_type = string_of_access_type access_type in
-				let data = sanitize_data data in
+				let data = sanitize_data (Lazy.force data) in
 				let prefix = prefix !access_log_destination date in
 				let msg = Printf.sprintf "%s %s %s %s" prefix tid access_type data in
 				logger.write ~level msg)
@@ -302,10 +303,15 @@ let access_logging ~con ~tid ?(data="") ~level access_type =
 
 let new_connection = access_logging ~level:Debug Newconn
 let end_connection = access_logging ~level:Debug Endconn
+
+let path_to_string path = String.concat "/" ("" :: path)
 let read_coalesce ~tid ~con data =
-	if !access_log_read_ops
-        then access_logging Coalesce ~tid ~con ~data:("read "^data) ~level:Debug
-let write_coalesce data = access_logging Coalesce ~data:("write "^data) ~level:Debug
+	if !access_log_read_ops then
+		let data = lazy ("read " ^ path_to_string data) in
+		access_logging Coalesce ~tid ~con ~data ~level:Debug
+let write_coalesce data =
+		let data = lazy ("write " ^ path_to_string data) in
+		access_logging Coalesce ~data ~level:Debug
 let conflict = access_logging Conflict ~level:Debug
 let commit = access_logging Commit ~level:Debug
 
@@ -328,11 +334,11 @@ let end_transaction ~tid ~con =
 	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end) ~level:Debug
 
 let live_update () =
-	xb_op ~tid:0 ~con:"" ~ty:Xenbus.Xb.Op.Debug "Live update begin"
+	xb_op ~tid:0 ~con:"" ~ty:Xenbus.Xb.Op.Debug (lazy "Live update begin")
 
 let xb_answer ~tid ~con ~ty data =
 	let print, level = match ty with
-		| Xenbus.Xb.Op.Error when String.startswith "ENOENT" data -> !access_log_read_ops , Warn
+		| Xenbus.Xb.Op.Error when String.startswith "ENOENT" (Lazy.force data) -> !access_log_read_ops , Warn
 		| Xenbus.Xb.Op.Error -> true , Warn
 		| Xenbus.Xb.Op.Watchevent -> true , Info
 		| _ -> false, Debug
@@ -340,5 +346,5 @@ let xb_answer ~tid ~con ~ty data =
 	if print then access_logging ~tid ~con ~data (XbOp ty) ~level
 
 let watch_not_fired ~con perms path =
-	let data = Printf.sprintf "EPERM perms=[%s] path=%s" perms path in
+	let data = lazy (Printf.sprintf "EPERM perms=[%s] path=%s" perms path) in
 	access_logging ~tid:0 ~con ~data Watch_not_fired ~level:Info

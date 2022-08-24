@@ -69,8 +69,6 @@ let trim_path path =
 	with
 		Not_found -> ""
 
-let join_by_null ls = String.concat "\000" ls
-
 (* unix utils *)
 let create_unix_socket name =
         Unixext.unlink_safe name;

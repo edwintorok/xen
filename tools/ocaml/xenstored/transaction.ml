@@ -122,7 +122,9 @@ let trim_short_running_transactions txn =
 
 let size_of_resp = function
 	| Packet.Ack _ -> record_field (* a closure, lets assume "constant" usage *)
-	| Packet.Reply str | Packet.Error str -> string str
+	| Packet.Reply r -> Packet.length r |> of_string_length
+		(* it may point to deleted nodes, so have to count size *)
+	| Packet.Error str -> string str
 
 let size_of_packet_req_resp (req, resp) =
 	add (string req.Packet.data) @@ size_of_resp resp
@@ -233,10 +235,10 @@ let commit ~con t =
 					(* it has to be in the store, otherwise it means bugs
 					   in the lowpath registration. we don't need to handle none. *)
 					maybe (fun n -> Store.set_node cstore p n t.quota store.Store.quota) n;
-					Logging.write_coalesce ~tid:(get_id t) ~con (Store.Path.to_string p);
+					Logging.write_coalesce ~tid:(get_id t) ~con p
 				) t.write_lowpath;
 				maybe (fun p ->
-					Logging.read_coalesce ~tid:(get_id t) ~con (Store.Path.to_string p)
+					Logging.read_coalesce ~tid:(get_id t) ~con p
 					) t.read_lowpath;
 				has_coalesced := true;
 				Store.incr_transaction_coalesce cstore;

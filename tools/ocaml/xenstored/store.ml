@@ -220,9 +220,9 @@ let rec lookup node path fct =
 let apply rnode path fct =
 	lookup rnode path fct
 
-let introduce_domain = "@introduceDomain"
-let release_domain = "@releaseDomain"
-let specials = List.map of_string [ introduce_domain; release_domain ]
+let introduce_domain = of_string "@introduceDomain"
+let release_domain = of_string "@releaseDomain"
+let specials = [ introduce_domain; release_domain ]
 
 end
 

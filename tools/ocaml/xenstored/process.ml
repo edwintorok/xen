@@ -226,7 +226,7 @@ let do_debug con t _domains cons data =
 		let dropped_trailing_nul = params |> List.rev |> List.tl |> List.rev in
 		LiveUpdate.parse_live_update dropped_trailing_nul
 	| "print" :: msg :: _ ->
-		Logging.xb_op ~tid:0 ~ty:Xenbus.Xb.Op.Debug ~con:"=======>" msg;
+		Logging.xb_op ~tid:0 ~ty:Xenbus.Xb.Op.Debug ~con:"=======>" (Lazy.from_val msg);
 		None
 	| "quota" :: domid :: _ ->
 		let domid = int_of_string domid in
@@ -242,22 +242,23 @@ let do_debug con t _domains cons data =
 	| _ -> None
 	with _ -> None
 
+let string s = Packet.String s
 let do_directory con t _domains _cons data =
 	let path = split_one_path data con in
-	let entries = Transaction.ls t (Connection.get_perm con) path in
+	let entries = Transaction.ls t (Connection.get_perm con) path |> List.map string in
 	if List.length entries > 0 then
-		(Utils.join_by_null entries) ^ "\000"
+		Packet.NullJoined [Packet.NullJoined entries; Packet.Empty]
 	else
-		""
+	  Packet.NullJoined []
 
 let do_read con t _domains _cons data =
 	let path = split_one_path data con in
-	Transaction.read t (Connection.get_perm con) path
+	Packet.String (Transaction.read t (Connection.get_perm con) path)
 
 let do_getperms con t _domains _cons data =
 	let path = split_one_path data con in
 	let perms = Transaction.getperms t (Connection.get_perm con) path in
-	Perms.Node.to_string perms ^ "\000"
+	Packet.NullJoined [Packet.Perms perms; Packet.Empty]
 
 let do_getdomainpath _con _t _domains _cons data =
 	let domid =
@@ -265,7 +266,9 @@ let do_getdomainpath _con _t _domains _cons data =
 		| domid :: "" :: [] -> c_int_of_string domid
 		| _                 -> raise Invalid_Cmd_Args
 		in
-	sprintf "/local/domain/%u\000" domid
+	Packet.NullJoined
+		[ Packet.Path ["local"; "domain"; string_of_int domid]
+		; Packet.Empty ]
 
 let do_write con t _domains _cons data =
 	let path, value =
@@ -312,7 +315,10 @@ let do_isintroduced con _t domains _cons data =
 		| domid :: _ -> int_of_string domid
 		| _          -> raise Invalid_Cmd_Args
 		in
-	if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
+	if domid = Define.domid_self || Domains.exist domains domid then
+		Packet.null_terminated "T"
+	else
+		Packet.null_terminated "F"
 
 (* only in xen >= 4.2 *)
 let do_reset_watches con _t _domains cons _data =
@@ -352,7 +358,7 @@ let reply_data fct con t doms cons data =
 
 let reply_data_or_ack fct con t doms cons data =
 	match fct con t doms cons data with
-		| Some ret -> Packet.Reply ret
+		| Some ret -> Packet.Reply (Packet.String ret)
 		| None -> Packet.Ack (fun () -> ())
 
 let reply_none fct con t doms cons data =
@@ -410,16 +416,16 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	| Define.Unknown_operation     -> reply_error "ENOSYS"
 
 let write_access_log ~ty ~tid ~con ~data =
-	Logging.xb_op ~ty ~tid ~con data
+	Logging.xb_op ~ty ~tid ~con (Lazy.from_val data)
 
 let write_answer_log ~ty ~tid ~con ~data =
-	Logging.xb_answer ~ty ~tid ~con data
+	Logging.xb_answer ~ty ~tid ~con @@ lazy (Packet.to_string data)
 
 let write_response_log ~ty ~tid ~con ~response =
 	match response with
-	| Packet.Ack _   -> write_answer_log ~ty ~tid ~con ~data:""
+	| Packet.Ack _   -> write_answer_log ~ty ~tid ~con ~data:Packet.Empty
 	| Packet.Reply x -> write_answer_log ~ty ~tid ~con ~data:x
-	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:e
+	| Packet.Error e -> write_answer_log ~ty:(Xenbus.Xb.Op.Error) ~tid ~con ~data:(Packet.String e)
 
 let record_commit ~con ~tid ~before ~after =
 	let inc r = r := Int64.add 1L !r in
@@ -516,7 +522,7 @@ let do_transaction_start con t _domains _cons _data =
 	if Transaction.get_id t <> Transaction.none then
 		raise Transaction_nested;
 	let store = Transaction.get_store t in
-	string_of_int (Connection.start_transaction con store) ^ "\000"
+	Packet.null_terminated @@ string_of_int (Connection.start_transaction con store)
 
 let do_transaction_end con t domains cons data =
 	let commit =
@@ -852,7 +858,7 @@ let do_output _store _cons _doms con =
 			   info "[%s] <- %s \"%s\""
 			         (Connection.get_domstr con)
 			         (Xenbus.Xb.Op.to_string ty) (sanitize_data data);*)
-			write_answer_log ~ty ~tid ~con:(Connection.get_domstr con) ~data;
+			write_answer_log ~ty ~tid ~con:(Connection.get_domstr con) ~data:(Packet.String data);
 		);
 		try
 			ignore (Connection.do_output con)

@@ -119,9 +119,9 @@ let has_more_work cons =
 		cons.domains []
 
 let key_of_str path =
-	if path.[0] = '@'
-	then [path]
-	else "" :: Store.Path.to_string_list (Store.Path.of_string path)
+	match Store.Path.to_string_list path with
+	| [path] when path.[0] = '@' -> [path]
+	| abspath -> "" :: abspath
 
 let key_of_path path =
 	"" :: Store.Path.to_string_list path
@@ -130,7 +130,8 @@ let add_watch cons con path token =
 	let apath = Connection.get_watch_path con path in
 	(* fail on invalid paths early by calling key_of_str before adding watch *)
 	let key = key_of_str apath in
-	let watch = Connection.add_watch con (path, apath) token in
+	let is_relative = path.[0] <> '/' && path.[0] <> '@' in
+	let watch = Connection.add_watch con ~is_relative apath token in
 	let watches =
  		if Trie.mem cons.watches key
  		then Trie.find cons.watches key
@@ -156,7 +157,6 @@ let del_watches cons con =
 (* path is absolute *)
 let fire_watches ?oldroot ~source root cons path recurse =
 	let key = key_of_path path in
-	let path = Store.Path.to_string path in
 	let roots = oldroot, root in
 	let fire_watch _ = function
 		| None         -> ()

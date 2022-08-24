@@ -46,7 +46,7 @@ type t =
 {
 	backend: backend;
 	pkt_in: Packet.t Queue.t;
-	pkt_out: Packet.t Queue.t;
+	pkt_out: (Packet.t Lazy.t) Queue.t;
 	mutable partial_in: partial_buf;
 	mutable partial_out: string;
 }
@@ -112,7 +112,7 @@ let output con =
 	let s = if String.length con.partial_out > 0 then
 			con.partial_out
 		else if Queue.length con.pkt_out > 0 then
-			Packet.to_string (Queue.pop con.pkt_out)
+			Queue.pop con.pkt_out |> Lazy.force |> Packet.to_string
 		else
 			"" in
 	(* send data from s, and save the unsent data to partial_out *)
@@ -206,7 +206,7 @@ let has_old_output con = String.length con.partial_out > 0
 
 let has_output con = has_new_output con || has_old_output con
 
-let peek_output con = Queue.peek con.pkt_out
+let peek_output con = Queue.peek con.pkt_out |> Lazy.force
 
 let input_len con = Queue.length con.pkt_in
 let has_in_packet con = Queue.length con.pkt_in > 0
@@ -234,4 +234,6 @@ open Size_tracker
 let size t =
 	(* only count data on top of the default empty [t] that every guest gets *)
 	add (string t.partial_out) @@
-	add (Size_tracker.queue Packet.size t.pkt_in) (Size_tracker.queue Packet.size t.pkt_out)
+	add (Size_tracker.queue Packet.size t.pkt_in)
+		(Size_tracker.mul Size_tracker.record_field @@
+		5*(Queue.length t.pkt_out))
