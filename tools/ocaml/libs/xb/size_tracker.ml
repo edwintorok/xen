@@ -30,7 +30,7 @@ let sub a b =
 	r
 
 let mul x c =
-	assert (c > 0);
+	assert (c >= 0);
 	x * c
 
 let zero = 0
