@@ -750,7 +750,9 @@ module IntMap = Map.Make(Int)
 let check_memory_usage_periodic store cons doms =
 	(* DomU get half of xenstored's available memory as soft quota *)
 	let soft_quota =
+	if Domains.number doms > 1 then
 	!Define.maxtotalmemorybytes / (Domains.number doms - 1) / 2
+	else 0
 	in
 	let hard_quota = !Define.maxdomumemory in
 	let soft_quota = min soft_quota (hard_quota * 90 / 100) in
