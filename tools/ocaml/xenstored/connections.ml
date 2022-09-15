@@ -32,12 +32,14 @@ let create () = {
 }
 
 let add_anonymous cons fd =
-	let xbcon = Xenbus.Xb.open_fd fd in
+	let capacity = !Define.maxoutstanding in
+	let xbcon = Xenbus.Xb.open_fd fd ~capacity in
 	let con = Connection.create xbcon None in
 	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con
 
 let add_domain cons dom =
-	let xbcon = Xenbus.Xb.open_mmap (Domain.get_interface dom) (fun () -> Domain.notify dom) in
+	let capacity = !Define.maxoutstanding in
+	let xbcon = Xenbus.Xb.open_mmap ~capacity (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
 	Hashtbl.add cons.domains (Domain.get_id dom) con;
 	match Domain.get_port dom with
@@ -48,7 +50,8 @@ let select ?(only_if = (fun _ -> true)) cons =
 	Hashtbl.fold (fun _ con (ins, outs) ->
 		if (only_if con) then (
 			let fd = Connection.get_fd con in
-			(fd :: ins,  if Connection.has_output con then fd :: outs else outs)
+			(if Connection.can_input con then fd :: ins else ins)
+			,(if Connection.has_output con then fd :: outs else outs)
 		) else (ins, outs)
 	)
 	cons.anonymous ([], [])
