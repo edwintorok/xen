@@ -103,6 +103,7 @@ let parse_config filename =
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("quota-maxrequests", Config.Set_int Define.maxrequests);
+		("quota-maxoutstanding", Config.Set_int Define.maxoutstanding);
 		("quota-path-max", Config.Set_int Define.path_max);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
 		("persistent", Config.Set_bool Disk.enable);

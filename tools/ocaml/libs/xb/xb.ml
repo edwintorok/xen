@@ -85,6 +85,8 @@ type backend = Fd of backend_fd | Xenmmap of backend_mmap
 
 type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 
+module Queue = BoundedQueue
+
 type t =
 {
 	backend: backend;
@@ -108,7 +110,10 @@ let reconnect t = match t.backend with
 		t.partial_in <- init_partial_in ();
 		t.partial_out <- ""
 
-let queue con pkt = Queue.push pkt con.pkt_out
+let queue con pkt =
+	let result = Queue.push pkt con.pkt_out in
+	(* should never happen: we only process an input packet when there is room for an output packet *)
+	assert (result <> None)
 
 let read_fd back _con b len =
 	let rd = Unix.read back.fd b 0 len in
@@ -163,8 +168,12 @@ let output con =
 	(* after sending one packet, partial is empty *)
 	con.partial_out = ""
 
+let can_input con = Queue.can_push con.pkt_out
+
 (* NB: can throw Reconnect *)
 let input con =
+	if not (can_input con) then None
+	else
 	let to_read =
 		match con.partial_in with
 		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
@@ -174,7 +183,6 @@ let input con =
 	let b = Bytes.make to_read '\000' in
 	let sz = if to_read > 0 then read con b to_read else 0 in
 
-	(
 	match con.partial_in with
 	| HaveHdr partial_pkt ->
 		(* we complete the data *)
@@ -192,11 +200,10 @@ let input con =
 		con.partial_in <- if sz = i then
 			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf);
 		None
-	)
 
-let newcon backend = {
+let newcon ~capacity backend = {
 	backend = backend;
-	pkt_out = Queue.create ();
+	pkt_out = Queue.create ~capacity;
 	partial_in = init_partial_in ();
 	partial_out = "";
 	}

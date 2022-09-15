@@ -699,7 +699,8 @@ let process_packet ~store ~cons ~doms ~con ~req =
 let do_input store cons doms con =
 	let newpacket =
 		try
-			Connection.do_input con
+			if Connection.can_input con then Connection.do_input con
+			else None
 		with Xenbus.Xb.Reconnect ->
 			info "%s requests a reconnect" (Connection.get_domstr con);
 			History.reconnect con;

@@ -78,13 +78,14 @@ val write_mmap : backend_mmap -> 'a -> string -> int -> int
 val write : t -> string -> int -> int
 val output : t -> bool
 val input : t -> Packet.t option
-val newcon : backend -> t
-val open_fd : Unix.file_descr -> t
-val open_mmap : Xenmmap.mmap_interface -> (unit -> unit) -> t
+val newcon : capacity:int -> backend -> t
+val open_fd : Unix.file_descr -> capacity:int -> t
+val open_mmap : Xenmmap.mmap_interface -> (unit -> unit) -> capacity:int -> t
 val close : t -> unit
 val is_fd : t -> bool
 val is_mmap : t -> bool
 val output_len : t -> int
+val can_input: t -> bool
 val has_new_output : t -> bool
 val has_old_output : t -> bool
 val has_output : t -> bool

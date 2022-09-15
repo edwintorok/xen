@@ -24,6 +24,7 @@ let default_config_dir = Paths.xen_config_dir
 let maxwatch = ref (100)
 let maxtransaction = ref (10)
 let maxrequests = ref (1024)   (* maximum requests per transaction *)
+let maxoutstanding = ref (1024) (* maximum outstanding requests, i.e. in-flight requests / domain *)
 
 let test_mode = ref false
 let conflict_burst_limit = ref 5.0

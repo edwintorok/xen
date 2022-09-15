@@ -280,6 +280,7 @@ let do_input con = Xenbus.Xb.input con.xb
 let has_partial_input con = Xenbus.Xb.has_partial_input con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
+let can_input con = Xenbus.Xb.can_input con.xb
 let has_output con = Xenbus.Xb.has_output con.xb
 let has_old_output con = Xenbus.Xb.has_old_output con.xb
 let has_new_output con = Xenbus.Xb.has_new_output con.xb
@@ -322,7 +323,7 @@ let prevents_live_update con = not (is_bad con)
 	&& (has_extra_connection_data con || has_transaction_data con)
 
 let has_more_work con =
-	has_more_input con || not (has_old_output con) && has_new_output con
+	(has_more_input con && can_input con) || not (has_old_output con) && has_new_output con
 
 let incr_ops con = con.stat_nb_ops <- con.stat_nb_ops + 1
 

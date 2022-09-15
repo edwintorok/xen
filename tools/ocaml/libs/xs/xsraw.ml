@@ -37,7 +37,7 @@ let close con =
 	Xb.close con.xb
 
 let open_fd fd = {
-	xb = Xb.open_fd fd;
+	xb = Xb.open_fd ~capacity:1 fd;
 	watchevents = Queue.create ();
 }
 
