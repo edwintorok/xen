@@ -26,6 +26,7 @@ type watch = {
 	path: string;
 	base: string;
 	is_relative: bool;
+	mutable deleted: bool;
 }
 
 and t = {
@@ -38,6 +39,7 @@ and t = {
 	anonid: int;
 	mutable stat_nb_ops: int;
 	mutable perm: Perms.Connection.t;
+	overflow: (watch * Xenbus.Xb.Packet.t) Queue.t;
 }
 
 let mark_as_bad con =
@@ -67,7 +69,8 @@ let watch_create ~con ~path ~token = {
 	token = token;
 	path = path;
 	base = get_path con;
-	is_relative = path.[0] <> '/' && path.[0] <> '@'
+	is_relative = path.[0] <> '/' && path.[0] <> '@';
+	deleted = false
 }
 
 let get_con w = w.con
@@ -109,6 +112,7 @@ let create xbcon dom =
 	anonid = id;
 	stat_nb_ops = 0;
 	perm = make_perm dom;
+	overflow = Queue.create ();
 	}
 	in
 	Logging.new_connection ~tid:Transaction.none ~con:(get_domstr con);
@@ -127,11 +131,17 @@ let set_target con target_domid =
 
 let is_backend_mmap con = Xenbus.Xb.is_mmap con.xb
 
-let send_reply con tid rid ty data =
+let packet_of con tid rid ty data =
 	if (String.length data) > xenstore_payload_max && (is_backend_mmap con) then
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000")
+		Xenbus.Xb.Packet.create tid rid Xenbus.Xb.Op.Error "E2BIG\000"
 	else
-		Xenbus.Xb.queue con.xb (Xenbus.Xb.Packet.create tid rid ty data)
+		Xenbus.Xb.Packet.create tid rid ty data
+
+let send_reply con tid rid ty data =
+	let result = Xenbus.Xb.queue con.xb (packet_of con tid rid ty data) in
+	(* should never happen: we only process an input packet when there is room for an output packet *)
+	(* and the limit for replies is different from the limit for watch events *)
+	assert (result <> None)
 
 let send_error con tid rid err = send_reply con tid rid Xenbus.Xb.Op.Error (err ^ "\000")
 let send_ack con tid rid ty = send_reply con tid rid ty "OK\000"
@@ -168,6 +178,9 @@ let add_watch con (path, apath) token =
 	con.nb_watches <- con.nb_watches + 1;
 	watch
 
+let deleted_watch w =
+	w.deleted <- true (* to be able to drop overflowed watchevents *)
+
 let del_watch con path token =
 	let apath = get_watch_path con path in
 	let ws = Hashtbl.find con.watches apath in
@@ -178,14 +191,16 @@ let del_watch con path token =
 	else
 		Hashtbl.remove con.watches apath;
 	con.nb_watches <- con.nb_watches - 1;
+	deleted_watch w;
 	apath, w
 
 let del_watches con =
-  Hashtbl.clear con.watches;
+  Hashtbl.iter (fun _ -> List.iter deleted_watch) con.watches;
+  Hashtbl.reset con.watches;
   con.nb_watches <- 0
 
 let del_transactions con =
-  Hashtbl.clear con.transactions
+  Hashtbl.reset con.transactions
 
 let list_watches con =
 	let ll = Hashtbl.fold
@@ -208,21 +223,63 @@ let lookup_watch_perm path = function
 let lookup_watch_perms oldroot root path =
 	lookup_watch_perm path oldroot @ lookup_watch_perm path (Some root)
 
-let fire_single_watch_unchecked watch =
-	let data = Utils.join_by_null [watch.path; watch.token; ""] in
-	send_reply watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data
+let rec process_overflow con =
+	if not (Queue.is_empty con.overflow) then
+		let watch, pkt = Queue.peek con.overflow in
+		match Xenbus.Xb.queue watch.con.xb pkt with
+		| Some () ->
+				(* ok it is queued, drop from overflow queue *)
+				let (_, _) = Queue.pop con.overflow in
+				process_overflow con
+		| None ->
+				(*
+					still no room, leave it alone, we'll try again next iteration.
+					Although there might be other watch events that we could deliver that would be merely an optimization:
+					the domain would still be blocked as long as it has at least 1 item in its overflow queue
+				*)
+				()
 
-let fire_single_watch (oldroot, root) watch =
+let fire_single_watch_unchecked source watch =
+	let data = Utils.join_by_null [watch.path; watch.token; ""] in
+	let pkt = packet_of watch.con Transaction.none 0 Xenbus.Xb.Op.Watchevent data in
+	match Xenbus.Xb.queue watch.con.xb pkt with
+	| Some () ->
+			(*
+				ok, packet queued.
+				note that we can succeed here even if we otherwise have items in source.overflow,
+				e.g. if we trigger watches owned by different domains, and some have enough room to accept
+				the watchevent, and others do not.
+			*)
+			()
+	| None ->
+			(*
+				no room for watchevent.
+				The other side will eventually get blocked if it doesn't process its ring once its command reply queue becomes full.
+				Queue up the watch event locally, which will block further processing on this domain until empty.
+
+				If we'd have overflow queues per watch or per domain, then it might break causality of watch events with 3 or more communicating domains,
+				(you could see a watch event X for watch A and then a watch event Y for watch B, even if X happened long after Y, but A's queue happened to have more room than B's)
+				We use just a single watchevent queue per domain to avoid breaking causality from that domain's perspective.
+				(Note that causality can still be broken if other communication channels are used, e.g. you could receive a network packet about something something that happened
+				after a watch event, but that is out of scope)
+
+				This queue is unbounded, but we only ever put as many watchevents here as a single packet can trigger and then block the source input until this queue is empty again
+				(which can be a lot if the packet is a commit, and there are lots of watchers registered)
+			*)
+			Queue.push (watch, pkt) source.overflow
+
+let fire_single_watch source (oldroot, root) watch =
 	let abspath = get_watch_path watch.con watch.path |> Store.Path.of_string in
 	let perms = lookup_watch_perms oldroot root abspath in
+	(* TODO: check if node was created, so we record it in our set *)
 	if Perms.can_fire_watch watch.con.perm perms then
-		fire_single_watch_unchecked watch
+		fire_single_watch_unchecked source watch
 	else
 		let perms = perms |> List.map (Perms.Node.to_string ~sep:" ") |> String.concat ", " in
 		let con = get_domstr watch.con in
 		Logging.watch_not_fired ~con perms (Store.Path.to_string abspath)
 
-let fire_watch roots watch path =
+let fire_watch source roots watch path =
 	let new_path =
 		if watch.is_relative && path.[0] = '/'
 		then begin
@@ -232,7 +289,7 @@ let fire_watch roots watch path =
 		end else
 			path
 	in
-	fire_single_watch roots { watch with path = new_path }
+	fire_single_watch source roots { watch with path = new_path }
 
 (* Search for a valid unused transaction id. *)
 let rec valid_transaction_id con proposed_id =
@@ -280,7 +337,7 @@ let do_input con = Xenbus.Xb.input con.xb
 let has_partial_input con = Xenbus.Xb.has_partial_input con.xb
 let has_more_input con = Xenbus.Xb.has_more_input con.xb
 
-let can_input con = Xenbus.Xb.can_input con.xb
+let can_input con = Xenbus.Xb.can_input con.xb && Queue.is_empty con.overflow
 let has_output con = Xenbus.Xb.has_output con.xb
 let has_old_output con = Xenbus.Xb.has_old_output con.xb
 let has_new_output con = Xenbus.Xb.has_new_output con.xb

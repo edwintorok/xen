@@ -26,6 +26,13 @@ let maxtransaction = ref (10)
 let maxrequests = ref (1024)   (* maximum requests per transaction *)
 let maxoutstanding = ref (1024) (* maximum outstanding requests, i.e. in-flight requests / domain *)
 
+let maxwatchevents = ref (1024)
+(*
+	maximum outstanding watch events per watch,
+	recommended >= maxoutstanding to avoid blocking backend transactions due to
+	malicious frontends
+ *)
+
 let conflict_burst_limit = ref 5.0
 let conflict_max_history_seconds = ref 0.05
 let conflict_rate_limit_is_aggregate = ref true

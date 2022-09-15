@@ -31,14 +31,18 @@ let create () = {
 	watches = Trie.create ()
 }
 
+let get_capacity () =
+	(* not multiplied by maxwatch on purpose: 2nd queue in watch itself! *)
+	{ Xenbus.Xb.maxoutstanding = !Define.maxoutstanding; maxwatchevents = !Define.maxwatchevents }
+
 let add_anonymous cons fd =
-	let capacity = !Define.maxoutstanding in
+	let capacity = get_capacity () in
 	let xbcon = Xenbus.Xb.open_fd fd ~capacity in
 	let con = Connection.create xbcon None in
 	Hashtbl.add cons.anonymous (Xenbus.Xb.get_fd xbcon) con
 
 let add_domain cons dom =
-	let capacity = !Define.maxoutstanding in
+	let capacity = get_capacity () in
 	let xbcon = Xenbus.Xb.open_mmap ~capacity (Domain.get_interface dom) (fun () -> Domain.notify dom) in
 	let con = Connection.create xbcon (Some dom) in
 	Hashtbl.add cons.domains (Domain.get_id dom) con;
@@ -144,26 +148,27 @@ let del_watches cons con =
 	cons.watches <- Trie.map (del_watches_of_con con) cons.watches
 
 (* path is absolute *)
-let fire_watches ?oldroot root cons path recurse =
+let fire_watches ?oldroot source root cons path recurse =
 	let key = key_of_path path in
 	let path = Store.Path.to_string path in
 	let roots = oldroot, root in
 	let fire_watch _ = function
 		| None         -> ()
-		| Some watches -> List.iter (fun w -> Connection.fire_watch roots w path) watches
+		| Some watches -> List.iter (fun w -> Connection.fire_watch source roots w path) watches
 	in
 	let fire_rec _x = function
 		| None         -> ()
 		| Some watches ->
-			List.iter (Connection.fire_single_watch roots) watches
+			List.iter (Connection.fire_single_watch source roots) watches
 	in
 	Trie.iter_path fire_watch cons.watches key;
 	if recurse then
 		Trie.iter fire_rec (Trie.sub cons.watches key)
 
 let fire_spec_watches root cons specpath =
+  let source = find_domain cons 0 in
 	iter cons (fun con ->
-		List.iter (Connection.fire_single_watch (None, root)) (Connection.get_watches con specpath))
+		List.iter (Connection.fire_single_watch source (None, root)) (Connection.get_watches con specpath))
 
 let set_target cons domain target_domain =
 	let con = find_domain cons domain in

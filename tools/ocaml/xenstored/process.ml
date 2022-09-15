@@ -57,7 +57,7 @@ let split_one_path data con =
 	| path :: "" :: [] -> Store.Path.create path (Connection.get_path con)
 	| _                -> raise Invalid_Cmd_Args
 
-let process_watch t cons =
+let process_watch source t cons =
 	let oldroot = t.Transaction.oldroot in
 	let newroot = Store.get_root t.Transaction.store in
 	let ops = Transaction.get_paths t |> List.rev in
@@ -67,7 +67,7 @@ let process_watch t cons =
 		| Xenbus.Xb.Op.Rm       -> true, None, oldroot
 		| Xenbus.Xb.Op.Setperms -> false, Some oldroot, newroot
 		| _              -> raise (Failure "huh ?") in
-		Connections.fire_watches ?oldroot root cons (snd op) recurse in
+		Connections.fire_watches ?oldroot source root cons (snd op) recurse in
 	List.iter (fun op -> do_op_watch op cons) ops
 
 let create_implicit_path t perm path =
@@ -342,7 +342,7 @@ let reply_ack fct con t doms cons data =
 	fct con t doms cons data;
 	Packet.Ack (fun () ->
 		if Transaction.get_id t = Transaction.none then
-			process_watch t cons
+			process_watch con t cons
 	)
 
 let reply_data fct con t doms cons data =
@@ -500,7 +500,7 @@ let do_watch con _t _domains cons data =
 	Packet.Ack (fun () ->
 		(* xenstore.txt says this watch is fired immediately,
 		   implying even if path doesn't exist or is unreadable *)
-		Connection.fire_single_watch_unchecked watch)
+		Connection.fire_single_watch_unchecked con watch)
 
 let do_unwatch con _t _domains cons data =
 	let (node, token) =
@@ -531,7 +531,7 @@ let do_transaction_end con t domains cons data =
 	if not success then
 		raise Transaction_again;
 	if commit then begin
-		process_watch t cons;
+		process_watch con t cons;
 		match t.Transaction.ty with
 		| Transaction.No ->
 			() (* no need to record anything *)
@@ -727,6 +727,7 @@ let do_input store cons doms con =
 		Connection.incr_ops con
 
 let do_output _store _cons _doms con =
+  Connection.process_overflow con;
 	if Connection.has_output con then (
 		if Connection.has_new_output con then (
 			let packet = Connection.peek_output con in
