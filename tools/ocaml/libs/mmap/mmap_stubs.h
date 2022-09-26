@@ -30,4 +30,9 @@ struct mmap_interface
 	int len;
 };
 
+/* for compatibility with OCaml 4.02.3 */
+#ifndef Data_abstract_val
+#define Data_abstract_val(v) ((void*) Op_val(v))
+#endif
+
 #endif
