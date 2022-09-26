@@ -37,7 +37,7 @@
 
 #include "mmap_stubs.h"
 
-#define _H(__h) ((xc_interface *)(__h))
+#define _H(__h) *((xc_interface **) Data_abstract_val(__h))
 #define _D(__d) ((uint32_t)Int_val(__d))
 
 #ifndef Val_none
@@ -70,14 +70,15 @@ static void Noreturn failwith_xc(xc_interface *xch)
 CAMLprim value stub_xc_interface_open(void)
 {
 	CAMLparam0();
-        xc_interface *xch;
+	CAMLlocal1(result);
 
+	result = caml_alloc(1, Abstract_tag);
 	/* Don't assert XC_OPENFLAG_NON_REENTRANT because these bindings
 	 * do not prevent re-entrancy to libxc */
-        xch = xc_interface_open(NULL, NULL, 0);
-        if (xch == NULL)
+	_H(result) = xc_interface_open(NULL, NULL, 0);
+	if (_H(result) == NULL)
 		failwith_xc(NULL);
-        CAMLreturn((value)xch);
+	CAMLreturn(result);
 }
 
 
