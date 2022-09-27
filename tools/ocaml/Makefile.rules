@@ -37,7 +37,7 @@ ALL_OCAML_OBJS ?= $(OBJS)
 	$(call quiet-command, $(OCAMLYACC) -q $<,MLYACC,$@)
 
 %.o: %.c
-	$(call quiet-command, $(CC) $(CFLAGS) -c -o $@ $<,CC,$@)
+	$(call quiet-command, $(OCAMLOPT) -verbose $(addprefix -ccopt ,$(CFLAGS)) -c -o $@ $<,CC,$@)
 
 META: META.in
 	sed 's/@VERSION@/$(VERSION)/g' < $< $o
