@@ -14,21 +14,22 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <string.h>
 #include <errno.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
 #include <caml/alloc.h>
+#include <caml/callback.h>
 #include <caml/custom.h>
 #include <caml/fail.h>
-#include <caml/callback.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
 
-#include <xenctrl.h>
 #include <xen/io/xs_wire.h>
+#include <xenctrl.h>
 
 CAMLprim value stub_header_size(void)
 {
@@ -42,10 +43,10 @@ CAMLprim value stub_header_of_string(value s)
     CAMLlocal1(ret);
     const struct xsd_sockmsg *hdr;
 
-    if (caml_string_length(s) != sizeof(struct xsd_sockmsg))
+    if ( caml_string_length(s) != sizeof(struct xsd_sockmsg) )
         caml_failwith("xb header incomplete");
     ret = caml_alloc_tuple(4);
-    hdr = (const struct xsd_sockmsg *) String_val(s);
+    hdr = (const struct xsd_sockmsg *)String_val(s);
     Store_field(ret, 0, Val_int(hdr->tx_id));
     Store_field(ret, 1, Val_int(hdr->req_id));
     Store_field(ret, 2, Val_int(hdr->type));
@@ -65,7 +66,7 @@ CAMLprim value stub_string_of_header(value tid, value rid, value ty, value len)
     };
 
     ret = caml_alloc_string(sizeof(struct xsd_sockmsg));
-    memcpy((char *) String_val(ret), &xsd, sizeof(struct xsd_sockmsg));
+    memcpy((char *)String_val(ret), &xsd, sizeof(struct xsd_sockmsg));
 
     CAMLreturn(ret);
 }

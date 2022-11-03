@@ -12,16 +12,16 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <string.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/custom.h>
-#include <caml/signals.h>
 #include <caml/fail.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
+#include <caml/signals.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 #if defined(HAVE_SYSTEMD)
 

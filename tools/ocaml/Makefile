@@ -37,5 +37,5 @@ build-tools-oxenstored:
 
 .PHONY: format
 format:
-	git ls-files '*.ml' '*.mli' | xargs -n1 ocp-indent -i
-	git ls-files '*.c' '*.h' | xargs -n1 sed -ie 's/\t/    /g'
+	git ls-files '*.ml' '*.mli' | xargs ocp-indent -i
+	git ls-files '*.c' '*.h' | xargs clang-format -i

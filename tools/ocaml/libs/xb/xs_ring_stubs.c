@@ -14,39 +14,38 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
-#include <string.h>
+#include <fcntl.h>
 #include <stdint.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include <xenctrl.h>
 #include <xen/io/xs_wire.h>
+#include <xenctrl.h>
 
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
 #include <caml/alloc.h>
+#include <caml/callback.h>
 #include <caml/custom.h>
 #include <caml/fail.h>
-#include <caml/callback.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
 
-#include <sys/mman.h>
 #include "mmap_stubs.h"
+#include <sys/mman.h>
 
-#define GET_C_STRUCT(a) ((struct mmap_interface *) Data_abstract_val(a))
+#define GET_C_STRUCT(a) ((struct mmap_interface *)Data_abstract_val(a))
 
 /*
  * Bytes_val has been introduced by Ocaml 4.06.1. So define our own version
  * if needed.
  */
 #ifndef Bytes_val
-#define Bytes_val(x) ((unsigned char *) Bp_val(x))
+#define Bytes_val(x) ((unsigned char *)Bp_val(x))
 #endif
 
-CAMLprim value ml_interface_read(value ml_interface,
-                                 value ml_buffer,
+CAMLprim value ml_interface_read(value ml_interface, value ml_buffer,
                                  value ml_len)
 {
     CAMLparam3(ml_interface, ml_buffer, ml_len);
@@ -62,35 +61,37 @@ CAMLprim value ml_interface_read(value ml_interface,
     int total_data, data;
     uint32_t connection;
 
-    cons = *(volatile uint32_t*)&intf->req_cons;
-    prod = *(volatile uint32_t*)&intf->req_prod;
-    connection = *(volatile uint32_t*)&intf->connection;
+    cons = *(volatile uint32_t *)&intf->req_cons;
+    prod = *(volatile uint32_t *)&intf->req_prod;
+    connection = *(volatile uint32_t *)&intf->connection;
 
-    if (connection != XENSTORE_CONNECTED)
+    if ( connection != XENSTORE_CONNECTED )
         caml_raise_constant(*caml_named_value("Xb.Reconnect"));
 
     xen_mb();
 
-    if ((prod - cons) > XENSTORE_RING_SIZE)
+    if ( (prod - cons) > XENSTORE_RING_SIZE )
         caml_failwith("bad connection");
 
     /* Check for any pending data at all. */
     total_data = prod - cons;
-    if (total_data == 0) {
+    if ( total_data == 0 )
+    {
         /* No pending data at all. */
         result = 0;
         goto exit;
     }
-    else if (total_data < len)
+    else if ( total_data < len )
         /* Some data - make a partial read. */
         len = total_data;
 
     /* Check whether data crosses the end of the ring. */
     data = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
-    if (len < data)
+    if ( len < data )
         /* Data within the remaining part of the ring. */
         memcpy(buffer, intf->req + MASK_XENSTORE_IDX(cons), len);
-    else {
+    else
+    {
         /* Data crosses the ring boundary. Read both halves. */
         memcpy(buffer, intf->req + MASK_XENSTORE_IDX(cons), data);
         memcpy(buffer + data, intf->req, len - data);
@@ -104,8 +105,7 @@ exit:
     CAMLreturn(ml_result);
 }
 
-CAMLprim value ml_interface_write(value ml_interface,
-                                  value ml_buffer,
+CAMLprim value ml_interface_write(value ml_interface, value ml_buffer,
                                   value ml_len)
 {
     CAMLparam3(ml_interface, ml_buffer, ml_len);
@@ -121,35 +121,37 @@ CAMLprim value ml_interface_write(value ml_interface,
     int total_space, space;
     uint32_t connection;
 
-    cons = *(volatile uint32_t*)&intf->rsp_cons;
-    prod = *(volatile uint32_t*)&intf->rsp_prod;
-    connection = *(volatile uint32_t*)&intf->connection;
+    cons = *(volatile uint32_t *)&intf->rsp_cons;
+    prod = *(volatile uint32_t *)&intf->rsp_prod;
+    connection = *(volatile uint32_t *)&intf->connection;
 
-    if (connection != XENSTORE_CONNECTED)
+    if ( connection != XENSTORE_CONNECTED )
         caml_raise_constant(*caml_named_value("Xb.Reconnect"));
 
     xen_mb();
 
-    if ((prod - cons) > XENSTORE_RING_SIZE)
+    if ( (prod - cons) > XENSTORE_RING_SIZE )
         caml_failwith("bad connection");
 
     /* Check for space to write the full message. */
     total_space = XENSTORE_RING_SIZE - (prod - cons);
-    if (total_space == 0) {
+    if ( total_space == 0 )
+    {
         /* No space at all - exit having done nothing. */
         result = 0;
         goto exit;
     }
-    else if (total_space < len)
+    else if ( total_space < len )
         /* Some space - make a partial write. */
         len = total_space;
 
     /* Check for space until the ring wraps. */
     space = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
-    if (len < space)
+    if ( len < space )
         /* Message fits inside the remaining part of the ring. */
         memcpy(intf->rsp + MASK_XENSTORE_IDX(prod), buffer, len);
-    else {
+    else
+    {
         /* Message wraps around the end of the ring. Write both halves. */
         memcpy(intf->rsp + MASK_XENSTORE_IDX(prod), buffer, space);
         memcpy(intf->rsp, buffer + space, len - space);
@@ -167,7 +169,7 @@ CAMLprim value ml_interface_set_server_features(value interface, value v)
 {
     CAMLparam2(interface, v);
     struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
-    if (intf == (void*)MAP_FAILED)
+    if ( intf == (void *)MAP_FAILED )
         caml_failwith("Interface closed");
 
     intf->server_features = Int_val(v);
@@ -180,7 +182,7 @@ CAMLprim value ml_interface_get_server_features(value interface)
     CAMLparam1(interface);
     struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
 
-    CAMLreturn(Val_int (intf->server_features));
+    CAMLreturn(Val_int(intf->server_features));
 }
 
 CAMLprim value ml_interface_close(value interface)
@@ -191,11 +193,12 @@ CAMLprim value ml_interface_close(value interface)
 
     intf->req_cons = intf->req_prod = intf->rsp_cons = intf->rsp_prod = 0;
     /* Ensure the unused space is full of invalid xenstore packets. */
-    for (i = 0; i < XENSTORE_RING_SIZE; i++) {
+    for ( i = 0; i < XENSTORE_RING_SIZE; i++ )
+    {
         intf->req[i] = 0xff; /* XS_INVALID = 0xffff */
         intf->rsp[i] = 0xff;
     }
-    xen_mb ();
+    xen_mb();
     intf->connection = XENSTORE_CONNECTED;
     CAMLreturn(Val_unit);
 }

@@ -17,12 +17,12 @@
 #ifndef C_MMAP_H
 #define C_MMAP_H
 
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
 #include <caml/alloc.h>
+#include <caml/callback.h>
 #include <caml/custom.h>
 #include <caml/fail.h>
-#include <caml/callback.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
 
 struct mmap_interface
 {
@@ -32,7 +32,7 @@ struct mmap_interface
 
 /* for compatibility with OCaml 4.02.3 */
 #ifndef Data_abstract_val
-#define Data_abstract_val(v) ((void*) Op_val(v))
+#define Data_abstract_val(v) ((void *)Op_val(v))
 #endif
 
 #endif

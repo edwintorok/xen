@@ -14,33 +14,33 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <xen/xen.h>
 #include <xenevtchn.h>
 
 #define CAML_NAME_SPACE
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
 #include <caml/alloc.h>
-#include <caml/custom.h>
 #include <caml/callback.h>
+#include <caml/custom.h>
 #include <caml/fail.h>
+#include <caml/memory.h>
+#include <caml/mlvalues.h>
 #include <caml/signals.h>
 
 /* We want to close the event channel when it is no longer in use,
    which can only be done safely with a finalizer.
-   Event channels are typically long lived, so we don't need tighter control over resource deallocation.
-   Use a custom block
+   Event channels are typically long lived, so we don't need tighter control
+   over resource deallocation. Use a custom block
 */
 
 /* Access the xenevtchn_t* part of the OCaml custom block */
-#define _H(__h) (*((xenevtchn_handle**)Data_custom_val(__h)))
+#define _H(__h) (*((xenevtchn_handle **)Data_custom_val(__h)))
 
 static void stub_evtchn_finalize(value v)
 {
@@ -51,11 +51,11 @@ static void stub_evtchn_finalize(value v)
 static struct custom_operations xenevtchn_ops = {
     "xenevtchn",
     stub_evtchn_finalize,
-    custom_compare_default, /* raises Failure, cannot compare */
-    custom_hash_default, /* ignored */
-    custom_serialize_default, /* raises Failure, can't serialize */
+    custom_compare_default,     /* raises Failure, cannot compare */
+    custom_hash_default,        /* ignored */
+    custom_serialize_default,   /* raises Failure, can't serialize */
     custom_deserialize_default, /* raises Failure, can't deserialize */
-    custom_compare_ext_default /* raises Failure */
+    custom_compare_ext_default  /* raises Failure */
 };
 
 CAMLprim value stub_eventchn_init(value cloexec)
@@ -90,10 +90,11 @@ CAMLprim value stub_eventchn_fdopen(value fdval)
     xce = xenevtchn_fdopen(NULL, Int_val(fdval), 0);
     caml_leave_blocking_section();
 
-    if (xce == NULL)
+    if ( xce == NULL )
         caml_failwith("open failed");
 
-    /* contains file descriptors, trigger full GC at least every 128 allocations */
+    /* contains file descriptors, trigger full GC at least every 128
+     * allocations */
     result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
     _H(result) = xce;
     CAMLreturn(result);
@@ -106,7 +107,7 @@ CAMLprim value stub_eventchn_fd(value xce)
     int fd;
 
     fd = xenevtchn_fd(_H(xce));
-    if (fd == -1)
+    if ( fd == -1 )
         caml_failwith("evtchn fd failed");
 
     result = Val_int(fd);
@@ -123,7 +124,7 @@ CAMLprim value stub_eventchn_notify(value xce, value port)
     rc = xenevtchn_notify(_H(xce), Int_val(port));
     caml_leave_blocking_section();
 
-    if (rc == -1)
+    if ( rc == -1 )
         caml_failwith("evtchn notify failed");
 
     CAMLreturn(Val_unit);
@@ -137,10 +138,11 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
     xenevtchn_port_or_error_t rc;
 
     caml_enter_blocking_section();
-    rc = xenevtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
+    rc = xenevtchn_bind_interdomain(_H(xce), Int_val(domid),
+                                    Int_val(remote_port));
     caml_leave_blocking_section();
 
-    if (rc == -1)
+    if ( rc == -1 )
         caml_failwith("evtchn bind_interdomain failed");
     port = Val_int(rc);
 
@@ -157,7 +159,7 @@ CAMLprim value stub_eventchn_bind_virq(value xce, value virq_type)
     rc = xenevtchn_bind_virq(_H(xce), Int_val(virq_type));
     caml_leave_blocking_section();
 
-    if (rc == -1)
+    if ( rc == -1 )
         caml_failwith("evtchn bind_virq failed");
     port = Val_int(rc);
 
@@ -173,7 +175,7 @@ CAMLprim value stub_eventchn_unbind(value xce, value port)
     rc = xenevtchn_unbind(_H(xce), Int_val(port));
     caml_leave_blocking_section();
 
-    if (rc == -1)
+    if ( rc == -1 )
         caml_failwith("evtchn unbind failed");
 
     CAMLreturn(Val_unit);
@@ -189,7 +191,7 @@ CAMLprim value stub_eventchn_pending(value xce)
     port = xenevtchn_pending(_H(xce));
     caml_leave_blocking_section();
 
-    if (port == -1)
+    if ( port == -1 )
         caml_failwith("evtchn pending failed");
     result = Val_int(port);
 
@@ -208,7 +210,7 @@ CAMLprim value stub_eventchn_unmask(value xce, value _port)
     rc = xenevtchn_unmask(_H(xce), port);
     caml_leave_blocking_section();
 
-    if (rc)
+    if ( rc )
         caml_failwith("evtchn unmask failed");
     CAMLreturn(Val_unit);
 }
