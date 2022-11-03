@@ -43,6 +43,11 @@ type virq_t =
 
 external notify: handle -> int -> unit = "stub_eventchn_notify"
 external bind_interdomain: handle -> int -> int -> int = "stub_eventchn_bind_interdomain"
+
+let restore_interdomain handle _domid _remote_port local_port =
+  notify handle local_port;
+  local_port
+
 external bind_virq: handle -> virq_t -> int = "stub_eventchn_bind_virq"
 let bind_dom_exc_virq handle = bind_virq handle Dom_exc
 external unbind: handle -> int -> unit = "stub_eventchn_unbind"

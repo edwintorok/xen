@@ -169,10 +169,13 @@ module DB = struct
             event_f ~eventfd
           | "socket" :: fd :: [] ->
             socket_f ~fd:(int_of_string fd)
-          | "dom" :: domid :: mfn :: port :: []->
+          | "dom" :: domid :: mfn :: port :: rest ->
             domain_f (int_of_string domid)
               (Nativeint.of_string mfn)
               (int_of_string port)
+              (match rest with
+               | [] -> None (* backward compat: old version didn't have it *)
+               | localport :: _ -> Some (int_of_string localport))
           | "watch" :: domid :: path :: token :: [] ->
             watch_f (int_of_string domid)
               (unhexify path) (unhexify token)
@@ -232,13 +235,13 @@ module DB = struct
       else
         warn "Ignoring invalid socket FD %d" fd
     in
-    let domain_f domid mfn port =
+    let domain_f domid mfn port restore_localport =
       let doms = require_doms () in
       let ndom =
         if domid > 0 then
-          Domains.create doms domid mfn port
+          Domains.create doms domid mfn ?restore_localport port
         else
-          Domains.create0 doms
+          Domains.create0 ?restore_localport doms
       in
       Connections.add_domain cons ndom;
     in

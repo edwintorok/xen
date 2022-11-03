@@ -123,17 +123,22 @@ let cleanup doms =
 let resume _doms _domid =
   ()
 
-let create doms domid mfn port =
+let maybe_bind_interdomain restore_localport dom =
+  match restore_localport with
+  | None -> Domain.bind_interdomain dom
+  | Some p -> Domain.restore_interdomain dom p
+
+let create doms domid mfn ?restore_localport port =
   let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
   let dom = Domain.make domid mfn port interface doms.eventchn in
   Hashtbl.add doms.table domid dom;
-  Domain.bind_interdomain dom;
+  maybe_bind_interdomain restore_localport dom;
   dom
 
 let xenstored_kva = ref ""
 let xenstored_port = ref ""
 
-let create0 doms =
+let create0 ?restore_localport doms =
   let port, interface =
     (
       let port = Utils.read_file_single_integer !xenstored_port
@@ -147,7 +152,7 @@ let create0 doms =
   in
   let dom = Domain.make 0 Nativeint.zero port interface doms.eventchn in
   Hashtbl.add doms.table 0 dom;
-  Domain.bind_interdomain dom;
+  maybe_bind_interdomain restore_localport dom;
   Domain.notify dom;
   dom
 

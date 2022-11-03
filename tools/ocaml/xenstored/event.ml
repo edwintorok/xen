@@ -29,6 +29,7 @@ let init ?fd () =
 let fd eventchn = Xeneventchn.fd eventchn.handle
 let bind_dom_exc_virq eventchn = eventchn.virq_port <- Some (Xeneventchn.bind_dom_exc_virq eventchn.handle)
 let bind_interdomain eventchn domid port = Xeneventchn.bind_interdomain eventchn.handle domid port
+let restore_interdomain eventchn domid port local_port = Xeneventchn.restore_interdomain eventchn.handle domid port local_port
 let unbind eventchn port = Xeneventchn.unbind eventchn.handle port
 let notify eventchn port = Xeneventchn.notify eventchn.handle port
 let pending eventchn = Xeneventchn.pending eventchn.handle
