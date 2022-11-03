@@ -56,6 +56,7 @@ let exist doms id = Hashtbl.mem doms.table id
 let find doms id = Hashtbl.find doms.table id
 let number doms = Hashtbl.length doms.table
 let iter doms fct = Hashtbl.iter (fun _ b -> fct b) doms.table
+let eventchn doms = doms.eventchn
 
 let rec is_empty_queue q =
   Queue.is_empty q ||
