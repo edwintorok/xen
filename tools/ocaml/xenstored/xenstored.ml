@@ -144,7 +144,7 @@ module DB = struct
 
   let dump_format_header = "$xenstored-dump-format"
 
-  let from_channel_f chan global_f socket_f domain_f watch_f store_f =
+  let from_channel_f chan global_f event_f socket_f domain_f watch_f store_f =
     let unhexify s = Utils.unhexify s in
     let getpath s =
       let u = Utils.unhexify s in
@@ -165,6 +165,8 @@ module DB = struct
             (* there might be more parameters here,
                e.g. a RO socket from a previous version: ignore it *)
             global_f ~rw
+          | "eventchnfd" :: eventfd :: [] ->
+            event_f ~eventfd
           | "socket" :: fd :: [] ->
             socket_f ~fd:(int_of_string fd)
           | "dom" :: domid :: mfn :: port :: []->
@@ -189,10 +191,27 @@ module DB = struct
     done;
     info "Completed loading xenstore dump"
 
-  let from_channel store cons doms chan =
+  let from_channel store cons createdoms chan =
     (* don't let the permission get on our way, full perm ! *)
     let op = Store.get_ops store Perms.Connection.full_rights in
     let rwro = ref (None) in
+    let eventchnfd = ref (None) in
+    let doms = ref (None) in
+
+    let require_doms () =
+      match !doms with
+      | None ->
+        let missing_eventchnfd = !eventchnfd = None in
+        if missing_eventchnfd then
+          warn "No event channel file descriptor available in dump!";
+        let eventchn = Event.init ?fd:!eventchnfd () in
+        let domains = createdoms eventchn in
+        if missing_eventchnfd then
+          Event.bind_dom_exc_virq eventchn;
+        doms := Some domains;
+        domains
+      | Some d -> d
+    in
     let global_f ~rw =
       let get_listen_sock sockfd =
         let fd = sockfd |> int_of_string |> Utils.FD.of_int in
@@ -200,6 +219,10 @@ module DB = struct
         Some fd
       in
       rwro := get_listen_sock rw
+    in
+    let event_f ~eventfd =
+      let fd = eventfd |> int_of_string |> Utils.FD.of_int in
+      eventchnfd := Some fd
     in
     let socket_f ~fd =
       let ufd = Utils.FD.of_int fd in
@@ -210,6 +233,7 @@ module DB = struct
         warn "Ignoring invalid socket FD %d" fd
     in
     let domain_f domid mfn port =
+      let doms = require_doms () in
       let ndom =
         if domid > 0 then
           Domains.create doms domid mfn port
@@ -229,8 +253,8 @@ module DB = struct
       op.Store.write path value;
       op.Store.setperms path perms
     in
-    from_channel_f chan global_f socket_f domain_f watch_f store_f;
-    !rwro
+    from_channel_f chan global_f event_f socket_f domain_f watch_f store_f;
+    !rwro, require_doms ()
 
   let from_file store cons doms file =
     info "Loading xenstore dump from %s" file;
@@ -238,7 +262,7 @@ module DB = struct
     finally (fun () -> from_channel store doms cons channel)
       (fun () -> close_in channel)
 
-  let to_channel store cons rw chan =
+  let to_channel store cons (rw, eventchn) chan =
     let hexify s = Utils.hexify s in
 
     fprintf chan "%s\n" dump_format_header;
@@ -247,6 +271,7 @@ module DB = struct
       Unix.clear_close_on_exec fd;
       Utils.FD.to_int fd in
     fprintf chan "global,%d\n" (fdopt rw);
+    fprintf chan "eventchnfd,%d\n" (Utils.FD.to_int @@ Event.fd eventchn);
 
     (* dump connections related to domains: domid, mfn, eventchn port/ sockets, and watches *)
     Connections.iter cons (fun con -> Connection.dump con chan);
@@ -367,7 +392,6 @@ let _ =
     | None         -> () end;
 
   let store = Store.create () in
-  let eventchn = Event.init () in
   let next_frequent_ops = ref 0. in
   let advance_next_frequent_ops () =
     next_frequent_ops := (Unix.gettimeofday () +. !Define.conflict_max_history_seconds)
@@ -375,16 +399,8 @@ let _ =
   let delay_next_frequent_ops_by duration =
     next_frequent_ops := !next_frequent_ops +. duration
   in
-  let domains = Domains.init eventchn advance_next_frequent_ops in
+  let domains eventchn = Domains.init eventchn advance_next_frequent_ops in
 
-  (* For things that need to be done periodically but more often
-   * than the periodic_ops function *)
-  let frequent_ops () =
-    if Unix.gettimeofday () > !next_frequent_ops then (
-      History.trim ();
-      Domains.incr_conflict_credit domains;
-      advance_next_frequent_ops ()
-    ) in
   let cons = Connections.create () in
 
   let quit = ref false in
@@ -393,15 +409,15 @@ let _ =
   List.iter (fun path ->
       Store.write store Perms.Connection.full_rights path "") Store.Path.specials;
 
-  let rw_sock =
+  let rw_sock, domains =
     if cf.restart && Sys.file_exists Disk.xs_daemon_database then (
-      let rwro = DB.from_file store domains cons Disk.xs_daemon_database in
+      let rw, domains = DB.from_file store domains cons Disk.xs_daemon_database in
       info "Live reload: database loaded";
-      Event.bind_dom_exc_virq eventchn;
       Process.LiveUpdate.completed ();
-      rwro
+      rw, domains
     ) else (
       info "No live reload: regular startup";
+      let domains = domains @@ Event.init () in
       if !Disk.enable then (
         info "reading store from disk";
         Disk.read store
@@ -411,11 +427,21 @@ let _ =
       if not (Store.path_exists store localpath) then
         Store.mkdir store (Perms.Connection.create 0) localpath;
 
+      let eventchn = Event.init () in
       if cf.domain_init then (
         Connections.add_domain cons (Domains.create0 domains);
         Event.bind_dom_exc_virq eventchn
       );
-      rw_sock
+      rw_sock, domains
+    ) in
+
+  (* For things that need to be done periodically but more often
+     	 * than the periodic_ops function *)
+  let frequent_ops () =
+    if Unix.gettimeofday () > !next_frequent_ops then (
+      History.trim ();
+      Domains.incr_conflict_credit domains;
+      advance_next_frequent_ops ()
     ) in
 
   (* required for xenstore-control to detect availability of live-update *)
@@ -433,10 +459,11 @@ let _ =
   Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
   if cf.activate_access_log then begin
-    let post_rotate () = DB.to_file store cons (None) Disk.xs_daemon_database in
+    let post_rotate () = DB.to_file store cons (None, Domains.eventchn domains) Disk.xs_daemon_database in
     Logging.init_access_log post_rotate
   end;
 
+  let eventchn = Domains.eventchn domains in
   let spec_fds =
     (match rw_sock with None -> [] | Some x -> [ x ]) @
     (if cf.domain_init then [ Event.fd eventchn ] else [])
@@ -594,7 +621,7 @@ let _ =
       live_update := Process.LiveUpdate.should_run cons;
       if !live_update || !quit then begin
         (* don't initiate live update if saving state fails *)
-        DB.to_file store cons (rw_sock) Disk.xs_daemon_database;
+        DB.to_file store cons (rw_sock, eventchn) Disk.xs_daemon_database;
         quit := true;
       end
     with exc ->
