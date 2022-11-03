@@ -61,7 +61,7 @@ let string_of_port = function
   | Some x -> string_of_int (Xeneventchn.to_int x)
 
 let dump d chan =
-  fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.remote_port
+  fprintf chan "dom,%d,%nd,%d,%s\n" d.id d.mfn d.remote_port (string_of_port d.port)
 
 let notify dom = match dom.port with
   | None ->
@@ -77,6 +77,10 @@ let bind_interdomain dom =
   dom.port <- Some (Event.bind_interdomain dom.eventchn dom.id dom.remote_port);
   debug "bound domain %d remote port %d to local port %s" dom.id dom.remote_port (string_of_port dom.port)
 
+let restore_interdomain dom localport =
+  assert (dom.port = None);
+  dom.port <- Some (Event.restore_interdomain dom.eventchn dom.id dom.remote_port localport);
+  debug "restored interdomain %d remote port %d to local port %s" dom.id dom.remote_port (string_of_port dom.port)
 
 let close dom =
   debug "domain %d unbound port %s" dom.id (string_of_port dom.port);
