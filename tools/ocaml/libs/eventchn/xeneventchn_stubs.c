@@ -58,14 +58,36 @@ static struct custom_operations xenevtchn_ops = {
     custom_compare_ext_default /* raises Failure */
 };
 
-CAMLprim value stub_eventchn_init(void)
+CAMLprim value stub_eventchn_init(value cloexec)
 {
-    CAMLparam0();
+    CAMLparam1(cloexec);
     CAMLlocal1(result);
     xenevtchn_handle *xce;
 
     caml_enter_blocking_section();
-    xce = xenevtchn_open(NULL, 0);
+    xce = xenevtchn_open(NULL, Bool_val(cloexec) ? 0 : XENEVTCHN_NO_CLOEXEC);
+    caml_leave_blocking_section();
+
+    if ( xce == NULL )
+        caml_failwith("open failed");
+
+    /* contains file descriptors, trigger full GC at least every 128
+     * allocations
+     */
+    result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
+    _H(result) = xce;
+    CAMLreturn(result);
+}
+
+CAMLprim value stub_eventchn_fdopen(value fdval)
+{
+    CAMLparam1(fdval);
+    CAMLlocal1(result);
+    xenevtchn_handle *xce;
+
+    caml_enter_blocking_section();
+    /* having any flags here would raise EINVAL */
+    xce = xenevtchn_fdopen(NULL, Int_val(fdval), 0);
     caml_leave_blocking_section();
 
     if (xce == NULL)
