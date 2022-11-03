@@ -20,7 +20,12 @@ type t = {
   mutable virq_port: Xeneventchn.t option;
 }
 
-let init () = { handle = Xeneventchn.init (); virq_port = None; }
+let init ?fd () =
+  let handle = match fd with
+    | None -> Xeneventchn.init ~cloexec:false ()
+    | Some fd -> Xeneventchn.fdopen fd
+  in
+  { handle; virq_port = None }
 let fd eventchn = Xeneventchn.fd eventchn.handle
 let bind_dom_exc_virq eventchn = eventchn.virq_port <- Some (Xeneventchn.bind_dom_exc_virq eventchn.handle)
 let bind_interdomain eventchn domid port = Xeneventchn.bind_interdomain eventchn.handle domid port
