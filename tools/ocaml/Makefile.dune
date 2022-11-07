@@ -54,6 +54,7 @@ XEN_DEPS+=$(XEN_libxenguest)/libxenguest.so
 
 CLEAN_PATTERNS=.*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa
 CLEAN_PATTERNS+=*.annot *.spot *.spit
+CLEAN_PATTERNS+=xenctrl_abi_check.h
 CLEAN_PATTERNS+=META
 
 # dune would refuse to run if there are build artifacts in the source directory
