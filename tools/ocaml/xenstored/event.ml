@@ -16,8 +16,8 @@
 
 (**************** high level binding ****************)
 type t = {
-	handle: Xeneventchn.handle;
-	mutable virq_port: Xeneventchn.t option;
+  handle: Xeneventchn.handle;
+  mutable virq_port: Xeneventchn.t option;
 }
 
 let init () = { handle = Xeneventchn.init (); virq_port = None; }

@@ -27,9 +27,9 @@ let maxrequests = ref (1024)   (* maximum requests per transaction *)
 let maxoutstanding = ref (1024) (* maximum outstanding requests, i.e. in-flight requests / domain *)
 let maxwatchevents = ref (1024)
 (*
-	maximum outstanding watch events per watch,
-	recommended >= maxoutstanding to avoid blocking backend transactions due to
-	malicious frontends
+    maximum outstanding watch events per watch,
+    recommended >= maxoutstanding to avoid blocking backend transactions due to
+    malicious frontends
  *)
 
 let gc_max_overhead = ref 120 (* 120% see comment in xenstored.ml *)
