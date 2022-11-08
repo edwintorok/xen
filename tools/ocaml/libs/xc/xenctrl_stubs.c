@@ -1019,7 +1019,7 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
 {
     CAMLparam2(xch, domid);
     CAMLlocal1(mb);
-    unsigned int c_mb;
+    unsigned int c_mb = 0;
     int ret;
 
     caml_enter_blocking_section();
@@ -1029,6 +1029,9 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
     caml_leave_blocking_section();
     if (ret != 0)
         failwith_xc(_H(xch));
+    if ( !c_mb )
+        caml_failwith("domctl returned uninitialized data for shadow "
+                      "allocation, dying domain?");
 
     mb = Val_int(c_mb);
     CAMLreturn(mb);
