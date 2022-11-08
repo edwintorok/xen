@@ -39,7 +39,7 @@ while (<C_FILE>) {
         }
     } else {
         $cline++;
-        m{^\s+/\* \s+ ! \s+ (.*?) \s* \*/\s*$}x or
+        m{^\s*/\*\s+! \s+ (.*?) \s* \*/\s*$}x or
             die "at line $cline of annotation, did not expect $_ ?";
         my @vals = split /\s+/, $1;
         if ($cline == 1 && !@vals) {
