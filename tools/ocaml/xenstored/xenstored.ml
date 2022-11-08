@@ -184,9 +184,9 @@ module DB = struct
               (Perms.Node.of_string (unhexify perms ^ "\000"))
               (unhexify value)
           | _ ->
-            info "restoring: ignoring unknown line: %s" line
+            warn "restoring: ignoring unknown line: %s" line
         with exn ->
-          info "restoring: ignoring unknown line: %s (exception: %s)"
+          warn "restoring: ignoring unknown line: %s (exception: %s)"
             line (Printexc.to_string exn);
           ()
       with End_of_file ->
