@@ -72,6 +72,12 @@ after the patch was written.
 Do not split a tag across multiple lines, tags are exempt from the
 "wrap at 75 columns" rule in order to simplify parsing scripts.
 
+Tags can be added on the command-line in the appropriate place by using
+the `--trailer` flag (on a recent enough version of git), e.g.:
+```
+git commit --amend --trailer 'Acked-by: Maintainer <maintainer@example.com>'
+```
+
 ### Origin:
 
 Xen has inherited some source files from other open source projects. In case
