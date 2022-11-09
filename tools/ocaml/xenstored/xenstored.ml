@@ -476,7 +476,6 @@ let _ =
 	let ring_scan_checker dom =
 		(* no need to scan domains already marked as for processing *)
 		if not (Domain.get_io_credit dom > 0) then
-			debug "Looking up domid %d" (Domain.get_id dom);
 			let con = Connections.find_domain cons (Domain.get_id dom) in
 			if not (Connection.has_more_work con) then (
 				Process.do_output store cons domains con;
