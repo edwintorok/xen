@@ -16,15 +16,18 @@ let allow_exit = Array.mem "--help" Sys.argv
 
 let finally () =
     (* don't fork, just replace current program with oxenstored *)
+    (* don't call any other functions, even logging functions here,
+       assume that anything could fail *)
     Unix.execv "/usr/sbin/oxenstored" Sys.argv
+
+let syslog level = Printf.ksprintf @@ Syslog.log Syslog.Daemon level
+
+let error = syslog Syslog.Err
+let info = syslog Syslog.Info
+let debug = syslog Syslog.Debug
 
 module Errors = struct
 	(* exception handling *)
-
-	let syslog level = Printf.ksprintf @@ Syslog.log Syslog.Daemon level
-
-	let error = syslog Syslog.Err
-	let info = syslog Syslog.Info
 
 	let log_exception (exn, bt) =
 		(* if we exit then log as error, otherwise just a warning: we keep going *)
@@ -38,7 +41,12 @@ module Errors = struct
 			Fun.protect ~finally @@ fun () -> log_exception (exn, bt)
 
 	let () =
-		Printexc.set_uncaught_exception_handler uncaught_handler
+		Printexc.set_uncaught_exception_handler uncaught_handler;
+		Sys.catch_break true; (* use regular exception handling cleanup on SIGINT *)
+		Sys.set_signal Sys.sigterm @@ Sys.Signal_handle (fun _ -> finally ());
+		(* Don't die on logrotate and SIGPIPE *)
+		[Sys.sighup; Sys.sigusr1; Sys.sigpipe] |> List.iter @@ fun signal ->
+			Sys.set_signal signal Sys.Signal_ignore
 
 	let wrap f v =
     	try Ok (f v)
@@ -47,6 +55,17 @@ module Errors = struct
     		log_exception exn_bt;
 			Error exn_bt
 
+	let exit_on_error = Result.iter_error @@ fun _ ->
+		error "Exiting on error"; (* we've already logged why *)
+		exit 1
+
+	let log_exceptions f () =
+		let _ : (unit, 'a) result = wrap f () in ()
+
+	let wrap_main f =
+		if allow_exit then wrap f () |> exit_on_error
+		else Fun.protect ~finally @@ log_exceptions f
+
 	let robust_map ~f = ListLabels.rev_map ~f:(wrap f)
 
 	let keep_ok lst =
@@ -54,64 +73,50 @@ module Errors = struct
 		   discard all the errors and keep just the successful ones *)
 		if allow_exit then ListLabels.rev_map ~f:Result.get_ok lst
 		else ListLabels.filter_map ~f:Result.to_option lst
+end
+
+module Query = struct
+	(* event channel querying *)
+	module IntMap = Map.Make(Int)
+
+	type t = { remote_port: int; local_port: int; mfn: int }
+
+	let string_of_evtchnstatus = let open Xenctrl in function
+		| EVTCHNSTAT_interdomain {dom; port} ->
+			Printf.sprintf "Interdomain (Connected) - Remote Domain %u, Port %use" dom port
+		| EVTCHNSTAT_unbound dom ->
+			Printf.sprintf "Interdomain (Waiting connection) - Remote Domain %u" dom
+		| EVTCHNSTAT_pirq pirq ->
+			Printf.sprintf "Physical IRQ %u" pirq
+		| EVTCHNSTAT_virq virq ->
+			Printf.sprintf "Virtual IRQ %u" virq
+		| EVTCHNSTAT_ipi -> "IPI"
+
+	let evtchn xc dominfo =
+    	if not dominfo.Xenctrl.hvm_guest then
+    		failwith "Only HVM guests are supported for live update fixup";
+    	let domid = dominfo.Xenctrl.domid in
+    	debug "Querying HVM params for domain %u" domid;
+    	let hvm_param_get = Xenctrl.hvm_param_get xc domid in
+        let remote_port = hvm_param_get Xenctrl.HVM_PARAM_STORE_EVTCHN in
+        let mfn = hvm_param_get Xenctrl.HVM_PARAM_STORE_PFN in
+        debug "Querying evtchn status for domain %u, remote port %u" domid remote_port;
+		match Xenctrl.evtchn_status xc domid remote_port with
+		| None -> failwith "Domain xenstore evtchn port is closed"
+		| Some { status = EVTCHNSTAT_interdomain {dom=0; port = local_port}; _ } ->
+			domid, { remote_port; local_port; mfn }
+		| Some { status; vcpu } ->
+			error "Domain %u, evtchn %u has unexpected state: %s on vcpu %u"
+				domid remote_port (string_of_evtchnstatus status) vcpu;
+			failwith "Unexpected remote evtchn state"
 
 end
-	(* TODO: GC.compact on success, with safe logging wrapper over regular code *)
 
-(* event channel querying *)
-module IntMap = Map.Make(Int)
-
-let query_store_evtchn xc dominfo =
-    (* TODO best effort per domain *)
-    if dominfo.Xenctrl.hvm_guest then
-        let remote_port = Xenctrl.hvm_param_get xc dominfo.Xenctrl.domid Xenctrl.HVM_PARAM_STORE_EVTCHN in
-        Some (dominfo.Xenctrl.domid, remote_port)
-    else None
-
-    (* TODO: check cmdline args, and if --help is given run in fail fast mode, to reject known problems early
-and when not then in failsafe mode, trying to fix up as many domains as possible and keep going, worst just exec into oxenstored without fixing anything
-is better than exiting!
-     *)
-let best_effort_mode = false
-
-let wrap f v =
-    try Ok (f v)
-    with e ->
-        let bt = Printexc.get_raw_backtrace () in
-        log_exception Syslog.Warn e bt;
-        Error (e, bt)
-
-let handle_best_effort = function
-    | Ok r -> Some r
-    | Error (e, bt) ->
-        if best_effort_mode then None
-        else
-            Printexc.raise_with_backtrace e bt
-
-let run () =
-    (* in best effort mode we try to catch, log and continue on exceptions,
-       if we end up with an uncaught exception that is fatal: the system will not have a running oxenstored anymore
-     *)
-    let level = if best_effort_mode then Syslog.Emerg else Syslog.Warn;
-    Printexc.set_uncaught_exception_handler @@ log_exception level;
-
-    info "OXenstored workaround started";
+let () = Errors.wrap_main @@ fun () ->
     Xenctrl.with_intf @@ fun xc ->
-        let remote2local =
-            Xenctrl.domain_getinfolist xc 1
-            |> List.to_seq |> Seq.map @@ wrap @@ query_store_evtchn xc
-            |> handle_best_effort
-            |> IntMap.of_seq
+    	(* TODO: wrap errors with the domid for better troubleshooting *)
+    	let domains = Xenctrl.domain_getinfolist xc 1
+			|> Errors.robust_map ~f:(Query.evtchn xc)
+    		|> Errors.keep_ok
+    		|> List.to_seq |> Query.IntMap.of_seq
         in ()
-
-let () =
-    if best_effort_mode then
-        Fun.protect ~finally @@ fun () ->
-            try run ()
-            with e ->
-                log_exception Syslog.Warn e @@ Printexc.get_raw_backtrace ()
-    else begin
-        (* --help mode, fail early to prevent live update *)
-        run ();
-        finally ()
-    end

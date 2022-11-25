@@ -641,6 +641,67 @@ CAMLprim value stub_xc_evtchn_reset(value xch, value domid)
     CAMLreturn(Val_unit);
 }
 
+CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
+{
+	CAMLparam3(xch, domid, port);
+	CAMLlocal4(result, status, stat, interdomain);
+    xc_evtchn_status_t status;
+    int rc;
+
+    memset(&status, 0, sizeof(status));
+    status.dom = _D(domid);
+    status.port = Int_val(port);
+
+    caml_enter_blocking_section();
+    rc = xc_evtchn_status(xch, &status);
+    caml_leave_blocking_section();
+
+	if (rc < 0)
+		failwith_xc(xch);
+
+	if (status.status == EVTCHNSTAT_closed)
+		result = Val_none;
+	else {
+		switch (status.status) {
+		case EVTSTAT_unbound:
+			stat = caml_alloc(1, 0); /* 1st non-constant constructor */
+			Store_field(stat, 0, Val_int(status.u.unbound.dom));
+			break;
+
+		case EVTSTAT_interdomain:
+			interdomain = caml_alloc_tuple(2);
+			Store_field(interdomain, 0, Val_int(status.u.interdomain.dom));
+			Store_field(interdomain, 1, Val_int(status.u.interdomain.port));
+			stat = caml_alloc(1, 1); /*  2nd non-constant constructor */
+			Store_field(stat, 0, interdomain);
+			break;
+
+		case EVTSTAT_pirq:
+			stat = caml_alloc(1, 2); /* 3rd non-constant constructor */
+			Store_field(stat, 0, Val_int(status.u.pirq));
+			break;
+
+		case EVTSTAT_virq:
+			stat = caml_alloc(1, 3); /* 4th non-constant constructor */
+			Store_field(stat, 0, Val_int(status.u.virq));
+			break;
+
+		case EVTSTAT_ipi:
+			stat = Val_int(0); /* 1st constant constructor */
+			break;
+
+		default:
+			caml_failwith("Unkown evtchn status");
+		}
+		status = caml_alloc_tuple(2);
+		Store_field(status, 0, Val_int(status.vcpu));
+		Store_field(status, 1, stat);
+		result = caml_alloc_some(status);
+	}
+
+	CAMLreturn(result);
+}
+
 CAMLprim value stub_xc_readconsolering(value xch)
 {
     /* Safe to use outside of blocking sections because of Ocaml GC lock. */
