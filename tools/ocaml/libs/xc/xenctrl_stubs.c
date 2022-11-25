@@ -1171,6 +1171,22 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
     CAMLreturn(Val_unit);
 }
 
+CAMLprim value stub_xc_hvm_param_get(value xch, value domid, value param)
+{
+    CAMLparam3(xch, domid, param);
+    uint64_t result;
+    int ret;
+
+    caml_enter_blocking_section();
+    ret = xc_hvm_param_get(_H(xch), _D(domid), Int_val(param), &result);
+    caml_leave_blocking_section();
+
+    if ( ret )
+        failwith_xc(_H(xch));
+
+    CAMLreturn(caml_copy_int64(result));
+}
+
 static uint32_t encode_sbdf(int domain, int bus, int dev, int func)
 {
     return ((uint32_t)domain & 0xffff) << 16 | ((uint32_t)bus & 0xff) << 8

@@ -302,6 +302,50 @@ external map_foreign_range: handle -> domid -> int
   -> nativeint -> Xenmmap.mmap_interface
   = "stub_map_foreign_range"
 
+type hvm_param =
+  | HVM_PARAM_CALLBACK_IRQ
+  | HVM_PARAM_STORE_PFN
+  | HVM_PARAM_STORE_EVTCHN
+  | HVM_PARAM_UNDEFINED_3
+  | HVM_PARAM_PAE_ENABLED
+  | HVM_PARAM_IOREQ_PFN
+  | HVM_PARAM_BUFIOREQ_PFN
+  | HVM_PARAM_UNDEFINED_7
+  | HVM_PARAM_UNDEFINED_8
+  | HVM_PARAM_VIRIDIAN
+  | HVM_PARAM_TIMER_MODE0
+  | HVM_PARAM_HPET_ENABLED1
+  | HVM_PARAM_IDENT_PT2
+  | HVM_PARAM_UNDEFINED_13
+  | HVM_PARAM_ACPI_S_STATE4
+  | HVM_PARAM_VM86_TSS5
+  | HVM_PARAM_VPT_ALIGN6
+  | HVM_PARAM_CONSOLE_PFN7
+  | HVM_PARAM_CONSOLE_EVTCHN8
+  | HVM_PARAM_ACPI_IOPORTS_LOCATION9
+  | HVM_PARAM_MEMORY_EVENT_CR00
+  | HVM_PARAM_MEMORY_EVENT_CR31
+  | HVM_PARAM_MEMORY_EVENT_CR42
+  | HVM_PARAM_MEMORY_EVENT_INT33
+  | HVM_PARAM_NESTEDHVM4
+  | HVM_PARAM_MEMORY_EVENT_SINGLE_STEP5
+  | HVM_PARAM_UNDEFINED_26
+  | HVM_PARAM_PAGING_RING_PFN7
+  | HVM_PARAM_MONITOR_RING_PFN8
+  | HVM_PARAM_SHARING_RING_PFN9
+  | HVM_PARAM_MEMORY_EVENT_MSR0
+  | HVM_PARAM_TRIPLE_FAULT_REASON1
+  | HVM_PARAM_IOREQ_SERVER_PFN2
+  | HVM_PARAM_NR_IOREQ_SERVER_PAGES3
+  | HVM_PARAM_VM_GENERATION_ID_ADDR4
+  | HVM_PARAM_ALTP2M5
+  | HVM_PARAM_X87_FIP_WIDTH6
+  | HVM_PARAM_VM86_TSS_SIZED7
+  | HVM_PARAM_MCA_CAP8
+
+external hvm_param_get: handle -> domid -> hvm_param -> int64
+  = "stub_xc_hvm_param_get"
+
 external domain_assign_device: handle -> domid -> (int * int * int * int) -> unit
   = "stub_xc_domain_assign_device"
 external domain_deassign_device: handle -> domid -> (int * int * int * int) -> unit
