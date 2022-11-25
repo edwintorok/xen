@@ -644,7 +644,7 @@ CAMLprim value stub_xc_evtchn_reset(value xch, value domid)
 CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
 {
 	CAMLparam3(xch, domid, port);
-	CAMLlocal4(result, status, stat, interdomain);
+	CAMLlocal4(result, result_status, stat, interdomain);
     xc_evtchn_status_t status;
     int rc;
 
@@ -653,22 +653,22 @@ CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
     status.port = Int_val(port);
 
     caml_enter_blocking_section();
-    rc = xc_evtchn_status(xch, &status);
+    rc = xc_evtchn_status(_H(xch), &status);
     caml_leave_blocking_section();
 
 	if (rc < 0)
-		failwith_xc(xch);
+		failwith_xc(_H(xch));
 
 	if (status.status == EVTCHNSTAT_closed)
 		result = Val_none;
 	else {
 		switch (status.status) {
-		case EVTSTAT_unbound:
+		case EVTCHNSTAT_unbound:
 			stat = caml_alloc(1, 0); /* 1st non-constant constructor */
 			Store_field(stat, 0, Val_int(status.u.unbound.dom));
 			break;
 
-		case EVTSTAT_interdomain:
+		case EVTCHNSTAT_interdomain:
 			interdomain = caml_alloc_tuple(2);
 			Store_field(interdomain, 0, Val_int(status.u.interdomain.dom));
 			Store_field(interdomain, 1, Val_int(status.u.interdomain.port));
@@ -676,27 +676,27 @@ CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
 			Store_field(stat, 0, interdomain);
 			break;
 
-		case EVTSTAT_pirq:
+		case EVTCHNSTAT_pirq:
 			stat = caml_alloc(1, 2); /* 3rd non-constant constructor */
 			Store_field(stat, 0, Val_int(status.u.pirq));
 			break;
 
-		case EVTSTAT_virq:
+		case EVTCHNSTAT_virq:
 			stat = caml_alloc(1, 3); /* 4th non-constant constructor */
 			Store_field(stat, 0, Val_int(status.u.virq));
 			break;
 
-		case EVTSTAT_ipi:
+		case EVTCHNSTAT_ipi:
 			stat = Val_int(0); /* 1st constant constructor */
 			break;
 
 		default:
 			caml_failwith("Unkown evtchn status");
 		}
-		status = caml_alloc_tuple(2);
-		Store_field(status, 0, Val_int(status.vcpu));
-		Store_field(status, 1, stat);
-		result = caml_alloc_some(status);
+		result_status = caml_alloc_tuple(2);
+		Store_field(result_status, 0, Val_int(status.vcpu));
+		Store_field(result_status, 1, stat);
+		result = caml_alloc_some(result_status);
 	}
 
 	CAMLreturn(result);
