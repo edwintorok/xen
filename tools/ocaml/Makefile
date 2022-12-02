@@ -34,3 +34,8 @@ build-tools-oxenstored:
 	$(MAKE) -s -C libs/xb
 	$(MAKE) -s -C libs/xc
 	$(MAKE) -C xenstored
+
+.PHONY: format
+format:
+	git ls-files '*.ml' '*.mli' | xargs -n1 ocp-indent -i
+	git ls-files '*.c' '*.h' | xargs -n1 sed -ie 's/\t/    /g'
