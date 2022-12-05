@@ -35,7 +35,14 @@
 #include <sys/mman.h>
 #include "mmap_stubs.h"
 
-#define GET_C_STRUCT(a) ((struct mmap_interface *)Data_abstract_val(a))
+static struct mmap_interface* check_addr(struct mmap_interface *interface)
+{
+    if (!interface->addr || interface->addr == MAP_FAILED)
+        caml_failwith("ring is not mapped");
+    return interface;
+}
+
+#define GET_C_STRUCT(a) check_addr((struct mmap_interface *) Data_abstract_val(a))
 
 /*
  * Bytes_val has been introduced by Ocaml 4.06.1. So define our own version
@@ -167,8 +174,6 @@ CAMLprim value ml_interface_set_server_features(value interface, value v)
 {
     CAMLparam2(interface, v);
     struct xenstore_domain_interface *intf = GET_C_STRUCT(interface)->addr;
-    if (intf == (void*)MAP_FAILED)
-        caml_failwith("Interface closed");
 
     intf->server_features = Int_val(v);
 
