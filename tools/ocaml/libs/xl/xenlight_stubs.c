@@ -53,8 +53,13 @@
 caml_local_roots = caml__frame; \
 }while (0)
 
-#define Ctx_val(x)(*((libxl_ctx **) Data_custom_val(x)))
-#define CTX ((libxl_ctx *) Ctx_val(ctx))
+typedef struct {
+    libxl_ctx* ctx;
+    struct caml_xtl* logger;
+} ctx_val_t;
+
+#define Ctx_val(x) ((ctx_val_t *) Data_custom_val(x))
+#define CTX (Ctx_val(ctx)->ctx)
 
 static char * dup_String_val(value s)
 {
@@ -102,7 +107,9 @@ CAMLprim value stub_raise_exception(value unit)
 
 void ctx_finalize(value ctx)
 {
-    libxl_ctx_free(CTX);
+    stub_xtl_disable(Ctx_val(ctx)->logger);
+    libxl_ctx_free(Ctx_val(ctx)->ctx);
+    stub_xtl_drop_ref(&Ctx_val(ctx)->logger);
 }
 
 static struct custom_operations libxl_ctx_custom_operations = {
@@ -118,15 +125,18 @@ CAMLprim value stub_libxl_ctx_alloc(value logger)
 {
     CAMLparam1(logger);
     CAMLlocal1(handle);
-    libxl_ctx *ctx;
+    ctx_val_t ctxval;
     int ret;
 
-    ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger *) Xtl_val(logger));
-    if (ret != 0) \
+    ctxval.logger = stub_xtl_acquire_ref(logger);
+    ret = libxl_ctx_alloc(&ctxval.ctx, LIBXL_VERSION, 0, &ctxval.logger->vtable);
+    if (ret != 0) {
+        stub_xtl_drop_ref(&ctxval.logger);
         failwith_xl(ERROR_FAIL, "cannot init context");
+    }
 
-    handle = caml_alloc_custom(&libxl_ctx_custom_operations, sizeof(ctx), 0, 1);
-    Ctx_val(handle) = ctx;
+    handle = caml_alloc_custom(&libxl_ctx_custom_operations, sizeof(ctxval), 0, 1);
+    *Ctx_val(handle) = ctxval;
 
     CAMLreturn(handle);
 }

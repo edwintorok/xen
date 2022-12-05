@@ -39,5 +39,12 @@ type logger_cbs = {
 
 external test: handle -> unit = "stub_xtl_test"
 
-val create : string -> logger_cbs -> handle
+(** [create name callbacks] creates a xentoollog logger.
+    It invokes [callbacks] for logging. [callbacks] needs to be alive for as
+    long as the logger is in use, the best way to ensure that is to store
+    the callbacks into a global OCaml value.
 
+    The returned [handle] can be passed to other Xen C library bindings.
+    See [caml_xentoollog.h] for details when implementing those bindings.
+*)
+val create : string -> logger_cbs -> handle

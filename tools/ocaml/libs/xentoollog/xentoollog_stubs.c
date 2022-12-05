@@ -14,6 +14,7 @@
  */
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,8 +32,51 @@
 
 #include "caml_xentoollog.h"
 
+/* not exposed in a header: must use the refcounting functions below instead */
+#define Xtl_val(x)(*((struct caml_xtl **) Data_custom_val(x)))
 
-#define XTL ((xentoollog_logger *) Xtl_val(handle))
+struct caml_xtl* stub_xtl_acquire_ref(value handle)
+{
+    struct caml_xtl* xtl = Xtl_val(handle);
+    assert(xtl);
+    assert(xtl->refs > 0);
+    /* if this is <= 0 then we're already in undefined territory here: use after free */
+
+    xtl->refs++;
+    /* this would overflow only once we have INT_MAX Xen libraries that use a logger,
+     * now we have < 20 */
+
+    return xtl;
+}
+
+void stub_xtl_disable(struct caml_xtl* xtl)
+{
+    assert(xtl);
+    xtl->disabled = 1;
+    /* do not drop ref count yet, closing the Xen C library handle may still
+     * call the logger */
+}
+
+void stub_xtl_drop_ref(struct caml_xtl **xtlp)
+{
+    /* this is called from finalizers - we cannot call back into OCaml code or
+     * raise exceptions */
+    assert(xtlp);
+
+    struct caml_xtl* xtl = *xtlp;
+
+    assert(xtl);
+    assert(xtl->refs > 0);
+    /* if this is <= 0 then we're already in undefined territory here: use after free */
+
+    if (!--xtl->refs) {
+        /* last reference count dropped - free now */
+        free(xtl->vmessage_cb);
+        free(xtl->progress_cb);
+        free(xtl);
+    }
+    *xtlp = NULL;
+}
 
 static char * dup_String_val(value s)
 {
@@ -117,6 +161,12 @@ static void stub_xtl_ocaml_vmessage_locked(struct xentoollog_logger *logger,
     CAMLreturn0;
 }
 
+static int xtl_is_disabled(struct xentoollog_logger *logger)
+{
+    struct caml_xtl *xtl = (struct caml_xtl*)logger;
+    return xtl->disabled;
+}
+
 static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
     xentoollog_level level,
     int errnoval,
@@ -124,6 +174,9 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
     const char *format,
     va_list al)
 {
+    if (xtl_is_disabled(logger))
+        /* must do this before attempting to acquire runtime lock: we might be inside a finalizer */
+        return;
     caml_leave_blocking_section();
     stub_xtl_ocaml_vmessage_locked(logger, level, errnoval, context, format, al);
     caml_enter_blocking_section();
@@ -163,6 +216,9 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
     const char *doing_what /* no \r,\n */,
     int percent, unsigned long done, unsigned long total)
 {
+    if (xtl_is_disabled(logger))
+        /* must do this before attempting to acquire runtime lock: we might be inside a finalizer */
+        return;
     caml_leave_blocking_section();
     stub_xtl_ocaml_progress_locked(logger, context, doing_what, percent, done, total);
     caml_enter_blocking_section();
@@ -170,15 +226,19 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
 
 static void xtl_destroy(struct xentoollog_logger *logger)
 {
-    struct caml_xtl *xtl = (struct caml_xtl*)logger;
-    free(xtl->vmessage_cb);
-    free(xtl->progress_cb);
-    free(xtl);
+    /* Xen C libraries must only call xtl_logger_destroy on loggers they
+       allocate themselves, not on loggers that are passed in as parameters.
+       This is usually done by a separate 'logger_to_free' in C code.
+
+       However rather than crashing if they do call this function, just raise
+       an exception so we can trace where this happened.
+     */
+    caml_raise_sys_error(caml_copy_string("Xen C library error: it must not call xtl_logger_destroy on this logger"));
 }
 
-void xtl_finalize(value handle)
+static void xtl_finalize(value handle)
 {
-    xtl_destroy(XTL);
+    stub_xtl_drop_ref(&Xtl_val(handle));
 }
 
 static struct custom_operations xentoollogger_custom_operations = {
@@ -207,6 +267,7 @@ CAMLprim value stub_xtl_create_logger(value cbs)
 
     xtl->vmessage_cb = dup_String_val(Field(cbs, 0));
     xtl->progress_cb = dup_String_val(Field(cbs, 1));
+    xtl->refs = 1;
 
     handle = caml_alloc_custom(&xentoollogger_custom_operations, sizeof(xtl), 0, 1);
     Xtl_val(handle) = xtl;
@@ -219,6 +280,9 @@ CAMLprim value stub_xtl_test(value handle)
 {
     unsigned long l;
     CAMLparam1(handle);
+    struct caml_xtl *xtl = stub_xtl_acquire_ref(handle);
+    struct xentoollog_logger* XTL = &xtl->vtable;
+
     xtl_log(XTL, XTL_DEBUG, -1, "debug", "%s -- debug", __func__);
     xtl_log(XTL, XTL_INFO, -1, "test", "%s -- test 1", __func__);
     xtl_log(XTL, XTL_INFO, ENOSYS, "test errno", "%s -- test 2", __func__);
@@ -227,6 +291,7 @@ CAMLprim value stub_xtl_test(value handle)
         xtl_progress(XTL, "progress", "testing", l, 100UL);
         usleep(10000);
     }
+    stub_xtl_drop_ref(&xtl);
     CAMLreturn(Val_unit);
 }
 
