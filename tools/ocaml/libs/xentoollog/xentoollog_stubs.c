@@ -31,10 +31,6 @@
 
 #include "caml_xentoollog.h"
 
-/* The following is equal to the CAMLreturn macro, but without the return */
-#define CAMLdone do{ \
-caml_local_roots = caml__frame; \
-}while (0)
 
 #define XTL ((xentoollog_logger *) Xtl_val(handle))
 
@@ -83,16 +79,16 @@ static value Val_context(const char *context)
     return Val_some(caml_copy_string(context));
 }
 
-static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
+static void stub_xtl_ocaml_vmessage_locked(struct xentoollog_logger *logger,
     xentoollog_level level,
     int errnoval,
     const char *context,
     const char *format,
     va_list al)
 {
-    caml_leave_blocking_section();
     CAMLparam0();
     CAMLlocalN(args, 4);
+    CAMLlocal1(res);
     struct caml_xtl *xtl = (struct caml_xtl*)logger;
     const value *func = caml_named_value(xtl->vmessage_cb);
     char *msg;
@@ -110,19 +106,37 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
 
     free(msg);
 
-    caml_callbackN(*func, 4, args);
-    CAMLdone;
+    res = caml_callbackN_exn(*func, 4, args);
+    if (Is_exception_result((res))) {
+        /* according to the manual we must do this immediately to avoid GC crash */
+        res = Extract_exception(res);
+
+        /* TODO: now what? if we throw we'll unwind through C functions and
+         * miss some cleanup code... */
+    }
+    CAMLreturn0;
+}
+
+static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
+    xentoollog_level level,
+    int errnoval,
+    const char *context,
+    const char *format,
+    va_list al)
+{
+    caml_leave_blocking_section();
+    stub_xtl_ocaml_vmessage_locked(logger, level, errnoval, context, format, al);
     caml_enter_blocking_section();
 }
 
-static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
+static void stub_xtl_ocaml_progress_locked(struct xentoollog_logger *logger,
     const char *context,
     const char *doing_what /* no \r,\n */,
     int percent, unsigned long done, unsigned long total)
 {
-    caml_leave_blocking_section();
     CAMLparam0();
     CAMLlocalN(args, 5);
+    CAMLlocal1(res);
     struct caml_xtl *xtl = (struct caml_xtl*)logger;
     const value *func = caml_named_value(xtl->progress_cb);
 
@@ -136,8 +150,21 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
     args[3] = caml_copy_int64(done);
     args[4] = caml_copy_int64(total);
 
-    caml_callbackN(*func, 5, args);
-    CAMLdone;
+    res = caml_callbackN_exn(*func, 5, args);
+    if (Is_exception_result(res)) {
+        res = Extract_exception(res);
+        /* TODO: same as above */
+    }
+    CAMLreturn0;
+}
+
+static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
+    const char *context,
+    const char *doing_what /* no \r,\n */,
+    int percent, unsigned long done, unsigned long total)
+{
+    caml_leave_blocking_section();
+    stub_xtl_ocaml_progress_locked(logger, context, doing_what, percent, done, total);
     caml_enter_blocking_section();
 }
 
