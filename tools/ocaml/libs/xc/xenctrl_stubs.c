@@ -70,15 +70,8 @@ static void Noreturn failwith_xc(xc_interface *xch)
 {
     char error_str[XC_MAX_ERROR_MSG_LEN + 6];
     if (xch) {
-        const xc_error *error = xc_get_last_error(xch);
-        if (error->code == XC_ERROR_NONE)
-            snprintf(error_str, sizeof(error_str),
+        snprintf(error_str, sizeof(error_str),
                  "%d: %s", errno, strerror(errno));
-        else
-            snprintf(error_str, sizeof(error_str),
-                 "%d: %s: %s", error->code,
-                 xc_error_code_to_desc(error->code),
-                 error->message);
     } else {
         snprintf(error_str, sizeof(error_str),
              "Unable to open XC interface");
