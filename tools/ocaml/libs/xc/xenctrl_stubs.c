@@ -191,6 +191,7 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 {
     CAMLparam3(xch, wanted_domid, config);
     CAMLlocal2(l, arch_domconfig);
+    xc_interface *xc = _H(xch);
 
     /* Mnemonics for the named fields inside domctl_create_config */
 #define VAL_SSIDREF             Field(config, 0)
@@ -282,11 +283,11 @@ CAMLprim value stub_xc_domain_create(value xch, value wanted_domid, value config
 #undef VAL_SSIDREF
 
     caml_enter_blocking_section();
-    result = xc_domain_create(_H(xch), &domid, &cfg);
+    result = xc_domain_create(xc, &domid, &cfg);
     caml_leave_blocking_section();
 
     if (result < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_int(domid));
 }
@@ -295,11 +296,14 @@ CAMLprim value stub_xc_domain_max_vcpus(value xch, value domid,
                                         value max_vcpus)
 {
     CAMLparam3(xch, domid, max_vcpus);
+    xc_interface *xc = _H(xch);
     int r;
 
-    r = xc_domain_max_vcpus(_H(xch), _D(domid), Int_val(max_vcpus));
+    caml_enter_blocking_section();
+    r = xc_domain_max_vcpus(xc, _D(domid), Int_val(max_vcpus));
+    caml_leave_blocking_section();
     if (r)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -309,13 +313,16 @@ value stub_xc_domain_sethandle(value xch, value domid, value handle)
 {
     CAMLparam3(xch, domid, handle);
     xen_domain_handle_t h;
+    xc_interface *xc = _H(xch);
     int i;
 
     domain_handle_of_uuid_string(h, String_val(handle));
 
-    i = xc_domain_sethandle(_H(xch), _D(domid), h);
+    caml_enter_blocking_section();
+    i = xc_domain_sethandle(xc, _D(domid), h);
+    caml_leave_blocking_section();
     if (i)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -323,15 +330,16 @@ value stub_xc_domain_sethandle(value xch, value domid, value handle)
 static value dom_op(value xch, value domid, int (*fn)(xc_interface *, uint32_t))
 {
     CAMLparam2(xch, domid);
+    xc_interface *xc = _H(xch);
     int result;
 
     uint32_t c_domid = _D(domid);
 
     caml_enter_blocking_section();
-    result = fn(_H(xch), c_domid);
+    result = fn(xc, c_domid);
     caml_leave_blocking_section();
-        if (result)
-        failwith_xc(_H(xch));
+    if (result)
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -354,26 +362,30 @@ CAMLprim value stub_xc_domain_destroy(value xch, value domid)
 CAMLprim value stub_xc_domain_resume_fast(value xch, value domid)
 {
     CAMLparam2(xch, domid);
+    xc_interface *xc = _H(xch);
     int result;
 
     uint32_t c_domid = _D(domid);
 
     caml_enter_blocking_section();
-    result = xc_domain_resume(_H(xch), c_domid, 1);
+    result = xc_domain_resume(xc, c_domid, 1);
     caml_leave_blocking_section();
-        if (result)
-        failwith_xc(_H(xch));
+    if (result)
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
 CAMLprim value stub_xc_domain_shutdown(value xch, value domid, value reason)
 {
     CAMLparam3(xch, domid, reason);
+    xc_interface *xc = _H(xch);
     int ret;
 
-    ret = xc_domain_shutdown(_H(xch), _D(domid), Int_val(reason));
+    caml_enter_blocking_section();
+    ret = xc_domain_shutdown(xc, _D(domid), Int_val(reason));
+    caml_leave_blocking_section();
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -403,7 +415,7 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
     Store_field(result, 13, Val_int(info->max_vcpu_id));
     Store_field(result, 14, caml_copy_int32(info->ssidref));
 
-        tmp = caml_alloc_small(16, 0);
+    tmp = caml_alloc_small(16, 0);
     for (i = 0; i < 16; i++) {
         Field(tmp, i) = Val_int(info->handle[i]);
     }
@@ -436,11 +448,12 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 CAMLprim value stub_xc_domain_getinfolist(value xch, value first_domain, value nb)
 {
     CAMLparam3(xch, first_domain, nb);
-    CAMLlocal2(result, temp);
+    CAMLlocal3(result, temp, domaininfo);
     xc_domaininfo_t * info;
     int i, ret, toalloc, retval;
     unsigned int c_max_domains;
     uint32_t c_first_domain;
+    xc_interface *xc = _H(xch);
 
     /* get the minimum number of allocate byte we need and bump it up to page boundary */
     toalloc = (sizeof(xc_domaininfo_t) * Int_val(nb)) | 0xfff;
@@ -453,21 +466,19 @@ CAMLprim value stub_xc_domain_getinfolist(value xch, value first_domain, value n
     c_first_domain = _D(first_domain);
     c_max_domains = Int_val(nb);
     caml_enter_blocking_section();
-    retval = xc_domain_getinfolist(_H(xch), c_first_domain,
-                       c_max_domains, info);
+    retval = xc_domain_getinfolist(xc, c_first_domain, c_max_domains, info);
     caml_leave_blocking_section();
 
     if (retval < 0) {
         free(info);
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     }
     for (i = 0; i < retval; i++) {
+        domaininfo = alloc_domaininfo(info + i);
         result = caml_alloc_small(2, Tag_cons);
-        Field(result, 0) = Val_int(0);
+        Field(result, 0) = domaininfo;
         Field(result, 1) = temp;
         temp = result;
-
-        Store_field(result, 0, alloc_domaininfo(info + i));
     }
 
     free(info);
@@ -479,13 +490,16 @@ CAMLprim value stub_xc_domain_getinfo(value xch, value domid)
     CAMLparam2(xch, domid);
     CAMLlocal1(result);
     xc_domaininfo_t info;
+    xc_interface *xc = _H(xch);
     int ret;
 
-    ret = xc_domain_getinfolist(_H(xch), _D(domid), 1, &info);
+    caml_enter_blocking_section();
+    ret = xc_domain_getinfolist(xc, _D(domid), 1, &info);
+    caml_leave_blocking_section();
     if (ret != 1)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     if (info.domain != _D(domid))
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     result = alloc_domaininfo(&info);
     CAMLreturn(result);
@@ -496,16 +510,16 @@ CAMLprim value stub_xc_vcpu_getinfo(value xch, value domid, value vcpu)
     CAMLparam3(xch, domid, vcpu);
     CAMLlocal1(result);
     xc_vcpuinfo_t info;
+    xc_interface *xc = _H(xch);
     int retval;
 
     uint32_t c_domid = _D(domid);
     uint32_t c_vcpu = Int_val(vcpu);
     caml_enter_blocking_section();
-    retval = xc_vcpu_getinfo(_H(xch), c_domid,
-                             c_vcpu, &info);
+    retval = xc_vcpu_getinfo(xc, c_domid, c_vcpu, &info);
     caml_leave_blocking_section();
     if (retval < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     result = caml_alloc_tuple(5);
     Store_field(result, 0, Val_bool(info.online));
@@ -524,10 +538,13 @@ CAMLprim value stub_xc_vcpu_context_get(value xch, value domid,
     CAMLlocal1(context);
     int ret;
     vcpu_guest_context_any_t ctxt;
+    xc_interface *xc = _H(xch);
 
-    ret = xc_vcpu_getcontext(_H(xch), _D(domid), Int_val(cpu), &ctxt);
+    caml_enter_blocking_section();
+    ret = xc_vcpu_getcontext(xc, _D(domid), Int_val(cpu), &ctxt);
+    caml_leave_blocking_section();
     if ( ret < 0 )
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     context = caml_alloc_string(sizeof(ctxt));
     memcpy((char *) String_val(context), &ctxt.c, sizeof(ctxt.c));
@@ -537,13 +554,19 @@ CAMLprim value stub_xc_vcpu_context_get(value xch, value domid,
 
 static int get_cpumap_len(value xch, value cpumap)
 {
+    CAMLparam2(xch, cpumap);
     int ml_len = Wosize_val(cpumap);
-    int xc_len = xc_get_max_cpus(_H(xch));
+    int xc_len;
+    xc_interface *xc = _H(xch);
+
+    caml_enter_blocking_section();
+    xc_len = xc_get_max_cpus(xc);
+    caml_leave_blocking_section();
 
     if (ml_len < xc_len)
-        return ml_len;
+        CAMLreturn(ml_len);
     else
-        return xc_len;
+        CAMLreturn(xc_len);
 }
 
 CAMLprim value stub_xc_vcpu_setaffinity(value xch, value domid,
@@ -552,24 +575,27 @@ CAMLprim value stub_xc_vcpu_setaffinity(value xch, value domid,
     CAMLparam4(xch, domid, vcpu, cpumap);
     int i, len = get_cpumap_len(xch, cpumap);
     xc_cpumap_t c_cpumap;
+    xc_interface *xc = _H(xch);
     int retval;
 
-    c_cpumap = xc_cpumap_alloc(_H(xch));
+    c_cpumap = xc_cpumap_alloc(xc);
     if (c_cpumap == NULL)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     for (i=0; i<len; i++) {
         if (Bool_val(Field(cpumap, i)))
             c_cpumap[i/8] |= 1 << (i&7);
     }
-    retval = xc_vcpu_setaffinity(_H(xch), _D(domid),
+    caml_enter_blocking_section();
+    retval = xc_vcpu_setaffinity(xc, _D(domid),
                      Int_val(vcpu),
                      c_cpumap, NULL,
                      XEN_VCPUAFFINITY_HARD);
     free(c_cpumap);
+    caml_leave_blocking_section();
 
     if (retval < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -579,23 +605,26 @@ CAMLprim value stub_xc_vcpu_getaffinity(value xch, value domid,
     CAMLparam3(xch, domid, vcpu);
     CAMLlocal1(ret);
     xc_cpumap_t c_cpumap;
-    int i, len = xc_get_max_cpus(_H(xch));
+    xc_interface *xc = _H(xch);
+    int i, len = xc_get_max_cpus(xc);
     int retval;
 
     if (len < 1)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
-    c_cpumap = xc_cpumap_alloc(_H(xch));
+    c_cpumap = xc_cpumap_alloc(xc);
     if (c_cpumap == NULL)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
-    retval = xc_vcpu_getaffinity(_H(xch), _D(domid),
+    caml_enter_blocking_section();
+    retval = xc_vcpu_getaffinity(xc, _D(domid),
                      Int_val(vcpu),
                      c_cpumap, NULL,
                      XEN_VCPUAFFINITY_HARD);
+    caml_leave_blocking_section();
     if (retval < 0) {
         free(c_cpumap);
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     }
 
     ret = caml_alloc(len, 0);
@@ -616,9 +645,14 @@ CAMLprim value stub_xc_sched_id(value xch)
 {
     CAMLparam1(xch);
     int sched_id;
+    xc_interface *xc = _H(xch);
+    int ret;
 
-    if (xc_sched_id(_H(xch), &sched_id))
-        failwith_xc(_H(xch));
+    caml_enter_blocking_section();
+    ret = xc_sched_id(xc, &sched_id);
+    caml_leave_blocking_section();
+    if (ret)
+        failwith_xc(xc);
     CAMLreturn(Val_int(sched_id));
 }
 
@@ -627,29 +661,32 @@ CAMLprim value stub_xc_evtchn_alloc_unbound(value xch,
                                             value remote_domid)
 {
     CAMLparam3(xch, local_domid, remote_domid);
+    xc_interface *xc = _H(xch);
     int result;
 
     uint32_t c_local_domid = _D(local_domid);
     uint32_t c_remote_domid = _D(remote_domid);
 
     caml_enter_blocking_section();
-    result = xc_evtchn_alloc_unbound(_H(xch), c_local_domid,
-                                         c_remote_domid);
+    result = xc_evtchn_alloc_unbound(xc, c_local_domid, c_remote_domid);
     caml_leave_blocking_section();
 
     if (result < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_int(result));
 }
 
 CAMLprim value stub_xc_evtchn_reset(value xch, value domid)
 {
     CAMLparam2(xch, domid);
+    xc_interface *xc = _H(xch);
     int r;
 
-    r = xc_evtchn_reset(_H(xch), _D(domid));
+    caml_enter_blocking_section();
+    r = xc_evtchn_reset(xc, _D(domid));
+    caml_leave_blocking_section();
     if (r < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -661,14 +698,15 @@ CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
         .dom = _D(domid),
         .port = Int_val(port),
     };
+    xc_interface *xc = _H(xch);
     int rc;
 
     caml_enter_blocking_section();
-    rc = xc_evtchn_status(_H(xch), &status);
+    rc = xc_evtchn_status(xc, &status);
     caml_leave_blocking_section();
 
     if ( rc < 0 )
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     switch ( status.status )
     {
@@ -718,11 +756,9 @@ CAMLprim value stub_xc_evtchn_status(value xch, value domid, value port)
 
 CAMLprim value stub_xc_readconsolering(value xch)
 {
-    /* Safe to use outside of blocking sections because of Ocaml GC lock. */
-    static unsigned int conring_size = 16384 + 1;
-
-    unsigned int count = conring_size, size = count, index = 0;
+    unsigned int count = 16384 + 1, size = count, index = 0;
     char *str = NULL, *ptr;
+    xc_interface *xc = _H(xch);
     int ret;
 
     CAMLparam1(xch);
@@ -734,13 +770,7 @@ CAMLprim value stub_xc_readconsolering(value xch)
 
     /* Hopefully our conring_size guess is sufficient */
     caml_enter_blocking_section();
-    ret = xc_readconsolering(_H(xch), str, &count, 0, 0, &index);
-    caml_leave_blocking_section();
-
-    if (ret < 0) {
-        free(str);
-        failwith_xc(_H(xch));
-    }
+    ret = xc_readconsolering(xc, str, &count, 0, 0, &index);
 
     while (count == size && ret >= 0) {
         size += count - 1;
@@ -754,21 +784,17 @@ CAMLprim value stub_xc_readconsolering(value xch)
         str = ptr + count;
         count = size - count;
 
-        caml_enter_blocking_section();
-        ret = xc_readconsolering(_H(xch), str, &count, 0, 1, &index);
-        caml_leave_blocking_section();
+        ret = xc_readconsolering(xc, str, &count, 0, 1, &index);
 
         count += str - ptr;
         str = ptr;
     }
+    caml_leave_blocking_section();
 
-    /*
-     * If we didn't break because of an overflow with size, and we have
-     * needed to realloc() ourself more space, update our tracking of the
-     * real console ring size.
-     */
-    if (size > conring_size)
-        conring_size = size;
+    if (ret < 0) {
+        free(str);
+        failwith_xc(xc);
+    }
 
     ring = caml_alloc_string(count);
     memcpy((char *) String_val(ring), str, count);
@@ -780,11 +806,17 @@ CAMLprim value stub_xc_readconsolering(value xch)
 CAMLprim value stub_xc_send_debug_keys(value xch, value keys)
 {
     CAMLparam2(xch, keys);
+    xc_interface *xc = _H(xch);
     int r;
+    /* GC may move, need to copy */
+    char* keys_copy = caml_stat_strdup(String_val(keys));
 
-    r = xc_send_debug_keys(_H(xch), String_val(keys));
+    caml_enter_blocking_section();
+    r = xc_send_debug_keys(xc, keys_copy);
+    caml_leave_blocking_section();
+    caml_stat_free(keys_copy);
     if (r)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -794,13 +826,14 @@ CAMLprim value stub_xc_physinfo(value xch)
     CAMLlocal4(physinfo, cap_list, arch_cap_flags, arch_cap_list);
     xc_physinfo_t c_physinfo;
     int r, arch_cap_flags_tag;
+    xc_interface *xc = _H(xch);
 
     caml_enter_blocking_section();
-    r = xc_physinfo(_H(xch), &c_physinfo);
+    r = xc_physinfo(xc, &c_physinfo);
     caml_leave_blocking_section();
 
     if (r)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     /*
      * capabilities: physinfo_cap_flag list;
@@ -842,6 +875,7 @@ CAMLprim value stub_xc_pcpu_info(value xch, value nr_cpus)
     CAMLparam2(xch, nr_cpus);
     CAMLlocal2(pcpus, v);
     xc_cpuinfo_t *info;
+    xc_interface *xc = _H(xch);
     int r, size;
 
     if (Int_val(nr_cpus) < 1)
@@ -852,12 +886,12 @@ CAMLprim value stub_xc_pcpu_info(value xch, value nr_cpus)
         caml_raise_out_of_memory();
 
     caml_enter_blocking_section();
-    r = xc_getcpuinfo(_H(xch), Int_val(nr_cpus), info, &size);
+    r = xc_getcpuinfo(xc, Int_val(nr_cpus), info, &size);
     caml_leave_blocking_section();
 
     if (r) {
         free(info);
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     }
 
     if (size > 0) {
@@ -877,16 +911,16 @@ CAMLprim value stub_xc_domain_setmaxmem(value xch, value domid,
                                         value max_memkb)
 {
     CAMLparam3(xch, domid, max_memkb);
+    xc_interface *xc = _H(xch);
     int retval;
 
     uint32_t c_domid = _D(domid);
     unsigned int c_max_memkb = Int64_val(max_memkb);
     caml_enter_blocking_section();
-    retval = xc_domain_setmaxmem(_H(xch), c_domid,
-                                     c_max_memkb);
+    retval = xc_domain_setmaxmem(xc, c_domid, c_max_memkb);
     caml_leave_blocking_section();
     if (retval)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -894,13 +928,16 @@ CAMLprim value stub_xc_domain_set_memmap_limit(value xch, value domid,
                                                value map_limitkb)
 {
     CAMLparam3(xch, domid, map_limitkb);
+    xc_interface *xc = _H(xch);
     unsigned long v;
     int retval;
 
     v = Int64_val(map_limitkb);
-    retval = xc_domain_set_memmap_limit(_H(xch), _D(domid), v);
+    caml_enter_blocking_section();
+    retval = xc_domain_set_memmap_limit(xc, _D(domid), v);
+    caml_leave_blocking_section();
     if (retval)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -910,18 +947,19 @@ CAMLprim value stub_xc_domain_memory_increase_reservation(value xch,
                                                           value mem_kb)
 {
     CAMLparam3(xch, domid, mem_kb);
+    xc_interface *xc = _H(xch);
     int retval;
 
     unsigned long nr_extents = ((unsigned long)(Int64_val(mem_kb))) >> (XC_PAGE_SHIFT - 10);
 
     uint32_t c_domid = _D(domid);
     caml_enter_blocking_section();
-    retval = xc_domain_increase_reservation_exact(_H(xch), c_domid,
-                              nr_extents, 0, 0, NULL);
+    retval = xc_domain_increase_reservation_exact(xc, c_domid,
+                                                  nr_extents, 0, 0, NULL);
     caml_leave_blocking_section();
 
     if (retval)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -930,22 +968,24 @@ CAMLprim value stub_xc_version_version(value xch)
     CAMLparam1(xch);
     CAMLlocal1(result);
     xen_extraversion_t extra;
+    xc_interface *xc = _H(xch);
     long packed;
     int retval;
 
     caml_enter_blocking_section();
-    packed = xc_version(_H(xch), XENVER_version, NULL);
+    do {
+        packed = xc_version(xc, XENVER_version, NULL);
+        if (packed < 0)
+            break;
+
+        retval = xc_version(xc, XENVER_extraversion, &extra);
+        if (retval < 0)
+            break;
+    } while(0);
     caml_leave_blocking_section();
 
-    if (packed < 0)
-        failwith_xc(_H(xch));
-
-    caml_enter_blocking_section();
-    retval = xc_version(_H(xch), XENVER_extraversion, &extra);
-    caml_leave_blocking_section();
-
-    if (retval)
-        failwith_xc(_H(xch));
+    if (packed < 0 || retval < 0)
+        failwith_xc(xc);
 
     result = caml_alloc_tuple(3);
 
@@ -962,14 +1002,15 @@ CAMLprim value stub_xc_version_compile_info(value xch)
     CAMLparam1(xch);
     CAMLlocal1(result);
     xen_compile_info_t ci;
+    xc_interface *xc = _H(xch);
     int retval;
 
     caml_enter_blocking_section();
-    retval = xc_version(_H(xch), XENVER_compile_info, &ci);
+    retval = xc_version(xc, XENVER_compile_info, &ci);
     caml_leave_blocking_section();
 
     if (retval)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     result = caml_alloc_tuple(4);
 
@@ -982,7 +1023,7 @@ CAMLprim value stub_xc_version_compile_info(value xch)
 }
 
 
-static value xc_version_single_string(value xch, int code, void *info)
+static value xc_version_single_string(value xch, int code, char *info)
 {
     CAMLparam1(xch);
     xc_interface *xc = _H(xch);
@@ -993,9 +1034,9 @@ static value xc_version_single_string(value xch, int code, void *info)
     caml_leave_blocking_section();
 
     if (retval)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
-    CAMLreturn(caml_copy_string((char *)info));
+    CAMLreturn(caml_copy_string(info));
 }
 
 
@@ -1003,7 +1044,7 @@ CAMLprim value stub_xc_version_changeset(value xch)
 {
     xen_changeset_info_t ci;
 
-    return xc_version_single_string(xch, XENVER_changeset, &ci);
+    return xc_version_single_string(xch, XENVER_changeset, ci);
 }
 
 
@@ -1011,7 +1052,7 @@ CAMLprim value stub_xc_version_capabilities(value xch)
 {
     xen_capabilities_info_t ci;
 
-    return xc_version_single_string(xch, XENVER_capabilities, &ci);
+    return xc_version_single_string(xch, XENVER_capabilities, ci);
 }
 
 
@@ -1032,6 +1073,7 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
     struct mmap_interface *intf;
     uint32_t c_dom;
     unsigned long c_mfn;
+    xc_interface *xc = _H(xch);
 
     result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
     intf = (struct mmap_interface *) result;
@@ -1062,7 +1104,7 @@ CAMLprim value stub_sched_credit_domain_get(value xch, value domid)
     ret = xc_sched_credit_domain_get(xc, _D(domid), &c_sdom);
     caml_leave_blocking_section();
     if (ret != 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     sdom = caml_alloc_tuple(2);
     Store_field(sdom, 0, Val_int(c_sdom.weight));
@@ -1085,7 +1127,7 @@ CAMLprim value stub_sched_credit_domain_set(value xch, value domid,
     ret = xc_sched_credit_domain_set(xc, _D(domid), &c_sdom);
     caml_leave_blocking_section();
     if (ret != 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1096,6 +1138,7 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
     CAMLlocal1(mb);
     xc_interface *xc = _H(xch);
     unsigned int c_mb;
+    xc_interface *xc = _H(xch);
     int ret;
 
     caml_enter_blocking_section();
@@ -1104,7 +1147,7 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
                 &c_mb, 0);
     caml_leave_blocking_section();
     if (ret != 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     mb = Val_int(c_mb);
     CAMLreturn(mb);
@@ -1116,6 +1159,7 @@ CAMLprim value stub_shadow_allocation_set(value xch, value domid,
     CAMLparam3(xch, domid, mb);
     xc_interface *xc = _H(xch);
     unsigned int c_mb;
+    xc_interface *xc = _H(xch);
     int ret;
 
     c_mb = Int_val(mb);
@@ -1125,7 +1169,7 @@ CAMLprim value stub_shadow_allocation_set(value xch, value domid,
                 &c_mb, 0);
     caml_leave_blocking_section();
     if (ret != 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1137,16 +1181,19 @@ CAMLprim value stub_xc_domain_ioport_permission(value xch, value domid,
     CAMLparam5(xch, domid, start_port, nr_ports, allow);
     uint32_t c_start_port, c_nr_ports;
     uint8_t c_allow;
+    xc_interface *xc = _H(xch);
     int ret;
 
     c_start_port = Int_val(start_port);
     c_nr_ports = Int_val(nr_ports);
     c_allow = Bool_val(allow);
 
-    ret = xc_domain_ioport_permission(_H(xch), _D(domid),
+    caml_enter_blocking_section();
+    ret = xc_domain_ioport_permission(xc, _D(domid),
                      c_start_port, c_nr_ports, c_allow);
+    caml_leave_blocking_section();
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1158,16 +1205,19 @@ CAMLprim value stub_xc_domain_iomem_permission(value xch, value domid,
     CAMLparam5(xch, domid, start_pfn, nr_pfns, allow);
     unsigned long c_start_pfn, c_nr_pfns;
     uint8_t c_allow;
+    xc_interface *xc = _H(xch);
     int ret;
 
     c_start_pfn = Nativeint_val(start_pfn);
     c_nr_pfns = Nativeint_val(nr_pfns);
     c_allow = Bool_val(allow);
 
-    ret = xc_domain_iomem_permission(_H(xch), _D(domid),
+    caml_enter_blocking_section();
+    ret = xc_domain_iomem_permission(xc, _D(domid),
                      c_start_pfn, c_nr_pfns, c_allow);
+    caml_leave_blocking_section();
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1178,15 +1228,17 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
     CAMLparam4(xch, domid, pirq, allow);
     uint32_t c_pirq;
     bool c_allow;
+    xc_interface *xc = _H(xch);
     int ret;
 
     c_pirq = Int_val(pirq);
     c_allow = Bool_val(allow);
 
-    ret = xc_domain_irq_permission(_H(xch), _D(domid),
-                       c_pirq, c_allow);
+    caml_enter_blocking_section();
+    ret = xc_domain_irq_permission(xc, _D(domid), c_pirq, c_allow);
+    caml_leave_blocking_section();
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1203,7 +1255,7 @@ CAMLprim value stub_xc_hvm_param_get(value xch, value domid, value param)
     caml_leave_blocking_section();
 
     if ( ret )
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(caml_copy_int64(val));
 }
@@ -1212,14 +1264,15 @@ CAMLprim value stub_xc_hvm_param_set(value xch, value domid, value param, value 
 {
     CAMLparam4(xch, domid, param, val);
     xc_interface *xc = _H(xch);
+    int64_t c_val = Int64_val(val);
     int ret;
 
     caml_enter_blocking_section();
-    ret = xc_hvm_param_set(xc, _D(domid), Int_val(param), Int64_val(val));
+    ret = xc_hvm_param_set(xc, _D(domid), Int_val(param), c_val);
     caml_leave_blocking_section();
 
     if ( ret )
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_unit);
 }
@@ -1238,6 +1291,7 @@ CAMLprim value stub_xc_domain_test_assign_device(value xch, value domid, value d
     int ret;
     int domain, bus, dev, func;
     uint32_t sbdf;
+    xc_interface *xc = _H(xch);
 
     domain = Int_val(Field(desc, 0));
     bus = Int_val(Field(desc, 1));
@@ -1245,7 +1299,9 @@ CAMLprim value stub_xc_domain_test_assign_device(value xch, value domid, value d
     func = Int_val(Field(desc, 3));
     sbdf = encode_sbdf(domain, bus, dev, func);
 
-    ret = xc_test_assign_device(_H(xch), _D(domid), sbdf);
+    caml_enter_blocking_section();
+    ret = xc_test_assign_device(xc, _D(domid), sbdf);
+    caml_leave_blocking_section();
 
     CAMLreturn(Val_bool(ret == 0));
 }
@@ -1261,6 +1317,7 @@ CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc,
     int ret;
     int domain, bus, dev, func;
     uint32_t sbdf, flag;
+    xc_interface *xc = _H(xch);
 
     domain = Int_val(Field(desc, 0));
     bus = Int_val(Field(desc, 1));
@@ -1271,10 +1328,12 @@ CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc,
     ret = Int_val(Field(rflag, 0));
     flag = domain_assign_device_rdm_flag_table[ret];
 
-    ret = xc_assign_device(_H(xch), _D(domid), sbdf, flag);
+    caml_enter_blocking_section();
+    ret = xc_assign_device(xc, _D(domid), sbdf, flag);
+    caml_leave_blocking_section();
 
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -1284,6 +1343,7 @@ CAMLprim value stub_xc_domain_deassign_device(value xch, value domid, value desc
     int ret;
     int domain, bus, dev, func;
     uint32_t sbdf;
+    xc_interface *xc = _H(xch);
 
     domain = Int_val(Field(desc, 0));
     bus = Int_val(Field(desc, 1));
@@ -1291,10 +1351,12 @@ CAMLprim value stub_xc_domain_deassign_device(value xch, value domid, value desc
     func = Int_val(Field(desc, 3));
     sbdf = encode_sbdf(domain, bus, dev, func);
 
-    ret = xc_deassign_device(_H(xch), _D(domid), sbdf);
+    caml_enter_blocking_section();
+    ret = xc_deassign_device(xc, _D(domid), sbdf);
+    caml_leave_blocking_section();
 
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
     CAMLreturn(Val_unit);
 }
 
@@ -1302,6 +1364,7 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 {
     CAMLparam2(xch, idx);
     CAMLlocal1(bitmap_val);
+    xc_interface *xc = _H(xch);
 #if defined(__i386__) || defined(__x86_64__)
 
     /* Safe, because of the global ocaml lock. */
@@ -1309,21 +1372,25 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 
     if (fs_len == 0)
     {
+        /* see comment above, cannot release master lock here */
         int ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
 
         if (ret || (fs_len == 0))
-            failwith_xc(_H(xch));
+            failwith_xc(xc);
     }
 
     {
         /* To/from hypervisor to retrieve actual featureset */
         uint32_t fs[fs_len], len = fs_len;
         unsigned int i;
+        int ret;
 
-        int ret = xc_get_cpu_featureset(_H(xch), Int_val(idx), &len, fs);
+        caml_enter_blocking_section();
+        ret = xc_get_cpu_featureset(xc, Int_val(idx), &len, fs);
+        caml_leave_blocking_section();
 
         if (ret)
-            failwith_xc(_H(xch));
+            failwith_xc(xc);
 
         bitmap_val = caml_alloc(len, 0);
 
@@ -1341,10 +1408,13 @@ CAMLprim value stub_xc_watchdog(value xch, value domid, value timeout)
     CAMLparam3(xch, domid, timeout);
     int ret;
     unsigned int c_timeout = Int32_val(timeout);
+    xc_interface *xc = _H(xch);
 
-    ret = xc_watchdog(_H(xch), _D(domid), c_timeout);
+    caml_enter_blocking_section();
+    ret = xc_watchdog(xc, _D(domid), c_timeout);
+    caml_leave_blocking_section();
     if (ret < 0)
-        failwith_xc(_H(xch));
+        failwith_xc(xc);
 
     CAMLreturn(Val_int(ret));
 }
