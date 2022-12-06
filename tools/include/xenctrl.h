@@ -468,11 +468,11 @@ typedef struct xc_dominfo {
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
 
-typedef union 
+typedef union
 {
 #if defined(__i386__) || defined(__x86_64__)
     vcpu_guest_context_x86_64_t x64;
-    vcpu_guest_context_x86_32_t x32;   
+    vcpu_guest_context_x86_32_t x32;
 #endif
     vcpu_guest_context_t c;
 } vcpu_guest_context_any_t;
@@ -774,7 +774,7 @@ int xc_domain_hvm_getcontext(xc_interface *xch,
  * This function returns one element of the context of a hvm domain
  * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to get information from
- * @parm typecode which type of elemnt required 
+ * @parm typecode which type of elemnt required
  * @parm instance which instance of the type
  * @parm ctxt_buf a pointer to a structure to store the execution context of
  *            the hvm domain
@@ -956,7 +956,7 @@ xc_sched_arinc653_schedule_get(
  * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to send trigger
  * @parm trigger the trigger type
- * @parm vcpu the vcpu number to send trigger 
+ * @parm vcpu the vcpu number to send trigger
  * return 0 on success, -1 on failure
  */
 int xc_domain_send_trigger(xc_interface *xch,
@@ -977,11 +977,11 @@ int xc_domain_setdebugging(xc_interface *xch,
                            unsigned int enable);
 
 /**
- * This function audits the (top level) p2m of a domain 
+ * This function audits the (top level) p2m of a domain
  * and returns the different error counts, if any.
  *
  * @parm xch a handle to an open hypervisor interface
- * @parm domid the domain id whose top level p2m we 
+ * @parm domid the domain id whose top level p2m we
  *       want to audit
  * @parm orphans count of m2p entries for valid
  *       domain pages containing an invalid value
@@ -990,14 +990,14 @@ int xc_domain_setdebugging(xc_interface *xch,
  * @parm p2m_bad count of p2m entries for this domain
  *       mismatching the associated m2p entry
  * return 0 on success, -1 on failure
- * errno values on failure include: 
+ * errno values on failure include:
  *          -ENOSYS: not implemented
  *          -EFAULT: could not copy results back to guest
  */
 int xc_domain_p2m_audit(xc_interface *xch,
                         uint32_t domid,
                         uint64_t *orphans,
-                        uint64_t *m2p_bad,   
+                        uint64_t *m2p_bad,
                         uint64_t *p2m_bad);
 
 /**
@@ -1132,7 +1132,7 @@ typedef int xc_evtchn_port_or_error_t;
  * This function allocates an unbound port.  Ports are named endpoints used for
  * interdomain communication.  This function is most useful in opening a
  * well-known port within a domain to receive events on.
- * 
+ *
  * NOTE: If you are allocating a *local* unbound port, you probably want to
  * use xc_evtchn_bind_unbound_port(). This function is intended for allocating
  * ports *only* during domain creation.
@@ -1200,7 +1200,7 @@ int xc_machphys_mfn_list(xc_interface *xch,
 
 typedef struct xen_sysctl_cpuinfo xc_cpuinfo_t;
 int xc_getcpuinfo(xc_interface *xch, int max_cpus,
-                  xc_cpuinfo_t *info, int *nr_cpus); 
+                  xc_cpuinfo_t *info, int *nr_cpus);
 
 int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
@@ -1428,7 +1428,7 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size);
  * as 4M superpages, or guests using PSE36). Only used for debugging.
  *
  * Translates a virtual address in the context of a given domain and
- * vcpu returning the GFN containing the address (that is, an MFN for 
+ * vcpu returning the GFN containing the address (that is, an MFN for
  * PV guests, a PFN for HVM guests).  Returns 0 for failure.
  *
  * @parm xch a handle on an open hypervisor interface
@@ -1464,7 +1464,7 @@ long xc_get_tot_pages(xc_interface *xch, uint32_t domid);
 /**
  * This function retrieves the the number of bytes available
  * in the heap in a specific range of address-widths and nodes.
- * 
+ *
  * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to query
  * @parm min_width the smallest address width to query (0 if don't care)
@@ -1658,11 +1658,6 @@ int xc_physdev_unmap_pirq(xc_interface *xch,
 
 
 #define XC_MAX_ERROR_MSG_LEN 1024
-typedef struct xc_error {
-  enum xc_error_code code;
-  char message[XC_MAX_ERROR_MSG_LEN];
-} xc_error;
-
 
 /*
  * Convert an error code or level into a text description.  Return values
@@ -1676,18 +1671,6 @@ const char *xc_error_code_to_desc(int code);
  */
 const char *xc_strerror(xc_interface *xch, int errcode);
 
-
-/*
- * Return a pointer to the last error with level XC_REPORT_ERROR. This
- * pointer and the data pointed to are only valid until the next call
- * to libxc in the same thread.
- */
-const xc_error *xc_get_last_error(xc_interface *handle);
-
-/*
- * Clear the last error
- */
-void xc_clear_last_error(xc_interface *xch);
 
 int xc_hvm_param_set(xc_interface *handle, uint32_t dom, uint32_t param, uint64_t value);
 int xc_hvm_param_get(xc_interface *handle, uint32_t dom, uint32_t param, uint64_t *value);
@@ -1897,8 +1880,8 @@ int xc_cpu_offline(xc_interface *xch, int cpu);
 int xc_smt_enable(xc_interface *xch);
 int xc_smt_disable(xc_interface *xch);
 
-/* 
- * cpufreq para name of this structure named 
+/*
+ * cpufreq para name of this structure named
  * same as sysfs file name of native linux
  */
 typedef struct xen_userspace xc_userspace_t;
@@ -2000,7 +1983,7 @@ int xc_altp2m_get_vcpu_p2m_idx(xc_interface *handle, uint32_t domid,
 int xc_altp2m_set_visibility(xc_interface *handle, uint32_t domid,
                              uint16_t view_id, bool visible);
 
-/** 
+/**
  * Mem paging operations.
  * Paging is supported only on the x86 architecture in 64 bit mode, with
  * Hardware-Assisted Paging (i.e. Intel EPT, AMD NPT). Moreover, AMD NPT
@@ -2016,7 +1999,7 @@ int xc_mem_paging_prep(xc_interface *xch, uint32_t domain_id, uint64_t gfn);
 int xc_mem_paging_load(xc_interface *xch, uint32_t domain_id,
                        uint64_t gfn, void *buffer);
 
-/** 
+/**
  * Access tracking operations.
  * Supported only on Intel EPT 64 bit processors.
  */

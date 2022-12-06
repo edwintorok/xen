@@ -32,7 +32,6 @@ struct xc_interface_core *xc_interface_open(xentoollog_logger *logger,
 
     xch->flags = open_flags;
     xch->dombuild_logger_file = 0;
-    xc_clear_last_error(xch);
 
     xch->error_handler   = logger;           xch->error_handler_tofree   = 0;
     xch->dombuild_logger = dombuild_logger;  xch->dombuild_logger_tofree = 0;
@@ -120,17 +119,6 @@ struct xendevicemodel_handle *xc_interface_dmod_handle(xc_interface *xch)
 static pthread_key_t errbuf_pkey;
 static pthread_once_t errbuf_pkey_once = PTHREAD_ONCE_INIT;
 
-const xc_error *xc_get_last_error(xc_interface *xch)
-{
-    return &xch->last_error;
-}
-
-void xc_clear_last_error(xc_interface *xch)
-{
-    xch->last_error.code = XC_ERROR_NONE;
-    xch->last_error.message[0] = '\0';
-}
-
 const char *xc_error_code_to_desc(int code)
 {
     /* Sync to members of xc_error_code enumeration in xenctrl.h */
@@ -171,12 +159,7 @@ void xc_reportv(xc_interface *xch, xentoollog_logger *lg,
         fmt = fmt_nonewline;
     }
 
-    if ( level >= XTL_ERROR ) {
-        msg = xch->last_error.message;
-        xch->last_error.code = code;
-    } else {
-        msg = msgbuf;
-    }
+    msg = msgbuf;
     vsnprintf(msg, XC_MAX_ERROR_MSG_LEN-1, fmt, args);
     msg[XC_MAX_ERROR_MSG_LEN-1] = '\0';
 

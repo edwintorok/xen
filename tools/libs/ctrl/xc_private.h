@@ -77,7 +77,7 @@ struct iovec {
 #define INVALID_PFN ((xen_pfn_t)-1)
 
 /*
-** Define max dirty page cache to permit during save/restore -- need to balance 
+** Define max dirty page cache to permit during save/restore -- need to balance
 ** keeping cache usage down with CPU impact of invalidating too often.
 ** (Currently 16MB)
 */
@@ -87,7 +87,6 @@ struct xc_interface_core {
     int flags;
     xentoollog_logger *error_handler,   *error_handler_tofree;
     xentoollog_logger *dombuild_logger, *dombuild_logger_tofree;
-    struct xc_error last_error; /* for xc_get_last_error */
     FILE *dombuild_logger_file;
     const char *currently_progress_reporting;
 

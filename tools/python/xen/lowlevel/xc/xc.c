@@ -1,6 +1,6 @@
 /******************************************************************************
  * Xc.c
- * 
+ *
  * Copyright (c) 2003-2004, K A Fraser (University of Cambridge)
  */
 
@@ -57,41 +57,7 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
 
 static PyObject *pyxc_error_to_exception(xc_interface *xch)
 {
-    PyObject *pyerr;
-    static xc_error err_buf;
-    const char *desc;
-    const xc_error *err;
-
-    if (xch) {
-        err = xc_get_last_error(xch);
-    } else {
-        snprintf(err_buf.message, sizeof(err_buf.message),
-                 "xc_interface_open failed: %s",
-                 strerror(errno));
-        err_buf.code = XC_INTERNAL_ERROR;
-        err = &err_buf;
-    }
-
-    desc = xc_error_code_to_desc(err->code);
-
-    if ( err->code == XC_ERROR_NONE )
-        return PyErr_SetFromErrno(xc_error_obj);
-
-    if ( err->message[0] != '\0' )
-        pyerr = Py_BuildValue("(iss)", err->code, desc, err->message);
-    else
-        pyerr = Py_BuildValue("(is)", err->code, desc);
-
-    if (xch)
-        xc_clear_last_error(xch);
-
-    if ( pyerr != NULL )
-    {
-        PyErr_SetObject(xc_error_obj, pyerr);
-        Py_DECREF(pyerr);
-    }
-
-    return NULL;
+    return PyErr_SetFromErrno(xc_error_obj);
 }
 
 static PyObject *pyxc_domain_dumpcore(XcObject *self, PyObject *args)
@@ -107,7 +73,7 @@ static PyObject *pyxc_domain_dumpcore(XcObject *self, PyObject *args)
 
     if ( xc_domain_dumpcore(self->xc_handle, dom, corefile) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -142,7 +108,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
         return NULL;
     if ( pyhandle != NULL )
     {
-        if ( !PyList_Check(pyhandle) || 
+        if ( !PyList_Check(pyhandle) ||
              (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
             goto out_exception;
 
@@ -190,7 +156,7 @@ static PyObject *pyxc_domain_max_vcpus(XcObject *self, PyObject *args)
 
     if (xc_domain_max_vcpus(self->xc_handle, dom, max) != 0)
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -225,7 +191,7 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
 
     if ( xc_domain_shutdown(self->xc_handle, dom, reason) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -257,7 +223,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list,
                                       &dom, &vcpu, &cpulist) )
         return NULL;
 
@@ -271,7 +237,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 
     if ( (cpulist != NULL) && PyList_Check(cpulist) )
     {
-        for ( i = 0; i < PyList_Size(cpulist); i++ ) 
+        for ( i = 0; i < PyList_Size(cpulist); i++ )
         {
             long cpu = PyLongOrInt_AsLong(PyList_GetItem(cpulist, i));
             if ( cpu < 0 || cpu >= nr_cpus )
@@ -284,7 +250,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
             cpumap[cpu / 8] |= 1 << (cpu % 8);
         }
     }
-  
+
     if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap,
                              NULL, XEN_VCPUAFFINITY_HARD) != 0 )
     {
@@ -292,7 +258,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         return pyxc_error_to_exception(self->xc_handle);
     }
     Py_INCREF(zero);
-    free(cpumap); 
+    free(cpumap);
     return zero;
 }
 
@@ -306,7 +272,7 @@ static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "iO", &dom, &pyhandle))
         return NULL;
 
-    if ( !PyList_Check(pyhandle) || 
+    if ( !PyList_Check(pyhandle) ||
          (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
     {
         goto out_exception;
@@ -322,7 +288,7 @@ static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
 
     if (xc_domain_sethandle(self->xc_handle, dom, handle) < 0)
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 
@@ -344,7 +310,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     xc_dominfo_t *info;
 
     static char *kwd_list[] = { "first_dom", "max_doms", NULL };
-    
+
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
                                       &first_dom, &max_doms) )
         return NULL;
@@ -417,7 +383,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     int nr_cpus;
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
-    
+
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
                                       &dom, &vcpu) )
         return NULL;
@@ -472,7 +438,7 @@ static PyObject *pyxc_hvm_param_get(XcObject *self,
     int param;
     uint64_t value;
 
-    static char *kwd_list[] = { "domid", "param", NULL }; 
+    static char *kwd_list[] = { "domid", "param", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
                                       &dom, &param) )
         return NULL;
@@ -492,7 +458,7 @@ static PyObject *pyxc_hvm_param_set(XcObject *self,
     int param;
     uint64_t value;
 
-    static char *kwd_list[] = { "domid", "param", "value", NULL }; 
+    static char *kwd_list[] = { "domid", "param", "value", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiL", kwd_list,
                                       &dom, &param, &value) )
         return NULL;
@@ -662,7 +628,7 @@ static PyObject *pyxc_get_device_group(XcObject *self,
 
     if ( rc < 0 )
     {
-        free(sdev_array); 
+        free(sdev_array);
         return pyxc_error_to_exception(self->xc_handle);
     }
 
@@ -785,7 +751,7 @@ static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
 
     static char *kwd_list[] = { "domid", "bus", "dev", "func", "enable", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiii", kwd_list,
                                       &dom, &bus, &dev, &func, &enable) )
         return NULL;
 
@@ -900,7 +866,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "nr_nodes",         pinfo.nr_nodes,
                             "threads_per_core", pinfo.threads_per_core,
                             "cores_per_socket", pinfo.cores_per_socket,
-                            "nr_cpus",          pinfo.nr_cpus, 
+                            "nr_cpus",          pinfo.nr_cpus,
                             "total_memory",     pages_to_kib(pinfo.total_pages),
                             "free_memory",      pages_to_kib(pinfo.free_pages),
                             "scrub_memory",     pages_to_kib(pinfo.scrub_pages),
@@ -1190,13 +1156,13 @@ static PyObject *pyxc_shadow_control(PyObject *self,
 
     static char *kwd_list[] = { "dom", "op", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
                                       &dom, &op) )
         return NULL;
-    
+
     if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0) < 0 )
         return pyxc_error_to_exception(xc->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -1213,26 +1179,26 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
 
     static char *kwd_list[] = { "dom", "mb", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
                                       &dom, &mbarg) )
         return NULL;
-    
-    if ( mbarg < 0 ) 
+
+    if ( mbarg < 0 )
         op = XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION;
-    else 
+    else
     {
         mb = mbarg;
         op = XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION;
     }
     if ( xc_shadow_control(xc->xc_handle, dom, op, &mb, 0) < 0 )
         return pyxc_error_to_exception(xc->xc_handle);
-    
+
     mbarg = mb;
     return Py_BuildValue("i", mbarg);
 }
 
 static PyObject *pyxc_sched_id_get(XcObject *self) {
-    
+
     int sched_id;
     if (xc_sched_id(self->xc_handle, &sched_id) != 0)
         return PyErr_SetFromErrno(xc_error_obj);
@@ -1250,10 +1216,10 @@ static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
     static char *kwd_list[] = { "domid", "weight", "cap", NULL };
     static char kwd_type[] = "I|HH";
     struct xen_domctl_sched_credit sdom;
-    
+
     weight = 0;
     cap = (uint16_t)~0U;
-    if( !PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list, 
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list,
                                      &domid, &weight, &cap) )
         return NULL;
 
@@ -1271,10 +1237,10 @@ static PyObject *pyxc_sched_credit_domain_get(XcObject *self, PyObject *args)
 {
     uint32_t domid;
     struct xen_domctl_sched_credit sdom;
-    
+
     if( !PyArg_ParseTuple(args, "I", &domid) )
         return NULL;
-    
+
     if ( xc_sched_credit_domain_get(self->xc_handle, domid, &sdom) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
@@ -1335,7 +1301,7 @@ static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
 
     if (xc_domain_setmaxmem(self->xc_handle, dom, maxmem_kb) != 0)
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -1348,12 +1314,12 @@ static PyObject *pyxc_domain_set_target_mem(XcObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "ii", &dom, &mem_kb))
         return NULL;
 
-    mem_pages = mem_kb / 4; 
+    mem_pages = mem_kb / 4;
 
     if (xc_domain_set_pod_target(self->xc_handle, dom, mem_pages,
 				 NULL, NULL, NULL) != 0)
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -1368,7 +1334,7 @@ static PyObject *pyxc_domain_set_memmap_limit(XcObject *self, PyObject *args)
 
     if ( xc_domain_set_memmap_limit(self->xc_handle, dom, maplimit_kb) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -1382,7 +1348,7 @@ static PyObject *pyxc_domain_ioport_permission(XcObject *self,
 
     static char *kwd_list[] = { "domid", "first_port", "nr_ports", "allow_access", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiii", kwd_list,
                                       &dom, &first_port, &nr_ports, &allow_access) )
         return NULL;
 
@@ -1405,7 +1371,7 @@ static PyObject *pyxc_domain_irq_permission(PyObject *self,
 
     static char *kwd_list[] = { "domid", "pirq", "allow_access", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list,
                                       &dom, &pirq, &allow_access) )
         return NULL;
 
@@ -1428,7 +1394,7 @@ static PyObject *pyxc_domain_iomem_permission(PyObject *self,
 
     static char *kwd_list[] = { "domid", "first_pfn", "nr_pfns", "allow_access", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illi", kwd_list,
                                       &dom, &first_pfn, &nr_pfns, &allow_access) )
         return NULL;
 
@@ -1479,7 +1445,7 @@ static PyObject *pyxc_domain_send_trigger(XcObject *self,
 
     static char *kwd_list[] = { "domid", "trigger", "vcpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|i", kwd_list,
                                       &dom, &trigger, &vcpu) )
         return NULL;
 
@@ -1533,7 +1499,7 @@ static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
 
     if (xc_memshr_control(self->xc_handle, dom, enable) != 0)
         return pyxc_error_to_exception(self->xc_handle);
-    
+
     Py_INCREF(zero);
     return zero;
 }
@@ -1757,11 +1723,11 @@ static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
     if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
-    
+
     ret = xc_flask_sid_to_context(xc_handle, sid, ctx, ctx_len);
-    
+
     xc_interface_close(xc_handle);
-    
+
     if ( ret != 0 ) {
         errno = -ret;
         return PyErr_SetFromErrno(xc_error_obj);
@@ -1778,7 +1744,7 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
     int ret;
 
     static char *kwd_list[] = { "policy", NULL };
-  
+
     if( !PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwd_list, &policy, &len) )
         return NULL;
 
@@ -1808,11 +1774,11 @@ static PyObject *pyflask_getenforce(PyObject *self)
     if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
-    
+
     ret = xc_flask_getenforce(xc_handle);
-    
+
     xc_interface_close(xc_handle);
-    
+
     if ( ret < 0 ) {
         errno = -ret;
         return PyErr_SetFromErrno(xc_error_obj);
@@ -1838,11 +1804,11 @@ static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
     if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
-    
+
     ret = xc_flask_setenforce(xc_handle, mode);
-    
+
     xc_interface_close(xc_handle);
-    
+
     if ( ret != 0 ) {
         errno = -ret;
         return PyErr_SetFromErrno(xc_error_obj);
@@ -1860,7 +1826,7 @@ static PyObject *pyflask_access(PyObject *self, PyObject *args,
     uint32_t req, allowed, decided, auditallow, auditdeny, seqno;
     int ret;
 
-    static char *kwd_list[] = { "src_context", "tar_context", 
+    static char *kwd_list[] = { "src_context", "tar_context",
                                 "tar_class", "req_permissions",
                                 "decided", "auditallow","auditdeny",
                                 "seqno", NULL };
@@ -1874,10 +1840,10 @@ static PyObject *pyflask_access(PyObject *self, PyObject *args,
     if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
-    
+
     ret = xc_flask_access(xc_handle, scon, tcon, tclass, req, &allowed, &decided,
                         &auditallow, &auditdeny, &seqno);
-        
+
     xc_interface_close(xc_handle);
 
     if ( ret != 0 ) {
@@ -1889,14 +1855,14 @@ static PyObject *pyflask_access(PyObject *self, PyObject *args,
 }
 
 static PyMethodDef pyxc_methods[] = {
-    { "domain_create", 
-      (PyCFunction)pyxc_domain_create, 
+    { "domain_create",
+      (PyCFunction)pyxc_domain_create,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Create a new domain.\n"
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 
-    { "domain_max_vcpus", 
+    { "domain_max_vcpus",
       (PyCFunction)pyxc_domain_max_vcpus,
       METH_VARARGS, "\n"
       "Set the maximum number of VCPUs a domain may create.\n"
@@ -1904,43 +1870,43 @@ static PyMethodDef pyxc_methods[] = {
       " max     [int, 0]:      New maximum number of VCPUs in domain.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_dumpcore", 
-      (PyCFunction)pyxc_domain_dumpcore, 
+    { "domain_dumpcore",
+      (PyCFunction)pyxc_domain_dumpcore,
       METH_VARARGS, "\n"
       "Dump core of a domain.\n"
       " dom [int]: Identifier of domain to dump core of.\n"
       " corefile [string]: Name of corefile to be created.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_pause", 
-      (PyCFunction)pyxc_domain_pause, 
+    { "domain_pause",
+      (PyCFunction)pyxc_domain_pause,
       METH_VARARGS, "\n"
       "Temporarily pause execution of a domain.\n"
       " dom [int]: Identifier of domain to be paused.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_unpause", 
-      (PyCFunction)pyxc_domain_unpause, 
+    { "domain_unpause",
+      (PyCFunction)pyxc_domain_unpause,
       METH_VARARGS, "\n"
       "(Re)start execution of a domain.\n"
       " dom [int]: Identifier of domain to be unpaused.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_destroy", 
-      (PyCFunction)pyxc_domain_destroy, 
+    { "domain_destroy",
+      (PyCFunction)pyxc_domain_destroy,
       METH_VARARGS, "\n"
       "Destroy a domain.\n"
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_destroy_hook", 
-      (PyCFunction)pyxc_domain_destroy_hook, 
+    { "domain_destroy_hook",
+      (PyCFunction)pyxc_domain_destroy_hook,
       METH_VARARGS, "\n"
       "Add a hook for arch stuff before destroy a domain.\n"
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_resume", 
+    { "domain_resume",
       (PyCFunction)pyxc_domain_resume,
       METH_VARARGS, "\n"
       "Resume execution of a suspended domain.\n"
@@ -1948,7 +1914,7 @@ static PyMethodDef pyxc_methods[] = {
       " fast [int]: Use cooperative resume.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_shutdown", 
+    { "domain_shutdown",
       (PyCFunction)pyxc_domain_shutdown,
       METH_VARARGS, "\n"
       "Shutdown a domain.\n"
@@ -1956,8 +1922,8 @@ static PyMethodDef pyxc_methods[] = {
       " reason     [int, 0]:      Reason for shutdown.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "vcpu_setaffinity", 
-      (PyCFunction)pyxc_vcpu_setaffinity, 
+    { "vcpu_setaffinity",
+      (PyCFunction)pyxc_vcpu_setaffinity,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Pin a VCPU to a specified set CPUs.\n"
       " dom [int]:     Identifier of domain to which VCPU belongs.\n"
@@ -1965,7 +1931,7 @@ static PyMethodDef pyxc_methods[] = {
       " cpumap [list, []]: list of usable CPUs.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_sethandle", 
+    { "domain_sethandle",
       (PyCFunction)pyxc_domain_sethandle,
       METH_VARARGS, "\n"
       "Set domain's opaque handle.\n"
@@ -1973,8 +1939,8 @@ static PyMethodDef pyxc_methods[] = {
       " handle [list of 16 ints]: New opaque handle.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_getinfo", 
-      (PyCFunction)pyxc_domain_getinfo, 
+    { "domain_getinfo",
+      (PyCFunction)pyxc_domain_getinfo,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Get information regarding a set of domains, in increasing id order.\n"
       " first_dom [int, 0]:    First domain to retrieve info about.\n"
@@ -1999,8 +1965,8 @@ static PyMethodDef pyxc_methods[] = {
       "reason why it shut itself down.\n"
       " cpupool  [int]   Id of cpupool domain is bound to.\n" },
 
-    { "vcpu_getinfo", 
-      (PyCFunction)pyxc_vcpu_getinfo, 
+    { "vcpu_getinfo",
+      (PyCFunction)pyxc_vcpu_getinfo,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Get information regarding a VCPU.\n"
       " dom  [int]:    Domain to retrieve info about.\n"
@@ -2024,7 +1990,7 @@ static PyMethodDef pyxc_methods[] = {
       " xenstore_domid [int]: \n"
       "Returns: None on success. Raises exception on error.\n" },
 
-    { "hvm_get_param", 
+    { "hvm_get_param",
       (PyCFunction)pyxc_hvm_param_get,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "get a parameter of HVM guest OS.\n"
@@ -2032,7 +1998,7 @@ static PyMethodDef pyxc_methods[] = {
       " param   [int]:      No. of HVM param.\n"
       "Returns: [long] value of the param.\n" },
 
-    { "hvm_set_param", 
+    { "hvm_set_param",
       (PyCFunction)pyxc_hvm_param_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "set a parameter of HVM guest OS.\n"
@@ -2075,12 +2041,12 @@ static PyMethodDef pyxc_methods[] = {
        " dom     [int]:      Domain to deassign device from.\n"
        " pci_str [str]:      PCI devices.\n"
        "Returns: [int] 0 on success, or device bdf that can't be deassigned.\n" },
-  
+
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,
       METH_NOARGS, "\n"
       "Get the current scheduler type in use.\n"
-      "Returns: [int] sched_id.\n" },    
+      "Returns: [int] sched_id.\n" },
 
     { "sched_credit_domain_set",
       (PyCFunction)pyxc_sched_credit_domain_set,
@@ -2118,7 +2084,7 @@ static PyMethodDef pyxc_methods[] = {
       "Returns:   [dict]\n"
       " weight    [short]: domain's scheduling weight\n"},
 
-    { "evtchn_alloc_unbound", 
+    { "evtchn_alloc_unbound",
       (PyCFunction)pyxc_evtchn_alloc_unbound,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Allocate an unbound port that will await a remote connection.\n"
@@ -2126,7 +2092,7 @@ static PyMethodDef pyxc_methods[] = {
       " remote_dom [int]: Remote domain to accept connections from.\n\n"
       "Returns: [int] Unbound event-channel port.\n" },
 
-    { "evtchn_reset", 
+    { "evtchn_reset",
       (PyCFunction)pyxc_evtchn_reset,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Reset all connections.\n"
@@ -2151,9 +2117,9 @@ static PyMethodDef pyxc_methods[] = {
       " func   [int]: PCI function\n"
       " enable [int]: Non-zero means enable access; else disable access\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
- 
-    { "readconsolering", 
-      (PyCFunction)pyxc_readconsolering, 
+
+    { "readconsolering",
+      (PyCFunction)pyxc_readconsolering,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Read Xen's console ring.\n"
       " clear [int, 0]: Bool - clear the ring after reading from it?\n\n"
@@ -2201,40 +2167,40 @@ static PyMethodDef pyxc_methods[] = {
       "Returns [str]: Xen buildid"
       "        [None]: on failure.\n" },
 
-    { "shadow_control", 
-      (PyCFunction)pyxc_shadow_control, 
+    { "shadow_control",
+      (PyCFunction)pyxc_shadow_control,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set parameter for shadow pagetable interface\n"
       " dom [int]:   Identifier of domain.\n"
       " op [int, 0]: operation\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "shadow_mem_control", 
-      (PyCFunction)pyxc_shadow_mem_control, 
+    { "shadow_mem_control",
+      (PyCFunction)pyxc_shadow_mem_control,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set or read shadow pagetable memory use\n"
       " dom [int]:   Identifier of domain.\n"
       " mb [int, -1]: MB of shadow memory this domain should have.\n\n"
       "Returns: [int] MB of shadow memory in use by this domain.\n" },
 
-    { "domain_setmaxmem", 
-      (PyCFunction)pyxc_domain_setmaxmem, 
+    { "domain_setmaxmem",
+      (PyCFunction)pyxc_domain_setmaxmem,
       METH_VARARGS, "\n"
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
       " maxmem_kb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_set_target_mem", 
-      (PyCFunction)pyxc_domain_set_target_mem, 
+    { "domain_set_target_mem",
+      (PyCFunction)pyxc_domain_set_target_mem,
       METH_VARARGS, "\n"
       "Set a domain's memory target\n"
       " dom [int]: Identifier of domain.\n"
       " mem_kb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_set_memmap_limit", 
-      (PyCFunction)pyxc_domain_set_memmap_limit, 
+    { "domain_set_memmap_limit",
+      (PyCFunction)pyxc_domain_set_memmap_limit,
       METH_VARARGS, "\n"
       "Set a domain's physical memory mapping limit\n"
       " dom [int]: Identifier of domain.\n"
@@ -2308,7 +2274,7 @@ static PyMethodDef pyxc_methods[] = {
       "Inject debug keys into Xen.\n"
       " keys    [str]: String of keys to inject.\n" },
 
-    { "dom_set_memshr", 
+    { "dom_set_memshr",
       (PyCFunction)pyxc_dom_set_memshr,
       METH_VARARGS, "\n"
       "Enable/disable memory sharing for the domain.\n"
@@ -2390,20 +2356,20 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Loads a policy into the hypervisor.\n"
       " policy [str]: policy to be load\n"
-      "Returns: [int]: 0 on success; -1 on failure.\n" }, 
-      
+      "Returns: [int]: 0 on success; -1 on failure.\n" },
+
     { "flask_getenforce",
       (PyCFunction)pyflask_getenforce,
       METH_NOARGS, "\n"
       "Returns the current mode of the Flask XSM module.\n"
-      "Returns: [int]: 0 for permissive; 1 for enforcing; -1 on failure.\n" }, 
+      "Returns: [int]: 0 for permissive; 1 for enforcing; -1 on failure.\n" },
 
     { "flask_setenforce",
       (PyCFunction)pyflask_setenforce,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Modifies the current mode for the Flask XSM module.\n"
       " mode [int]: mode to change to\n"
-      "Returns: [int]: 0 on success; -1 on failure.\n" }, 
+      "Returns: [int]: 0 on success; -1 on failure.\n" },
 
     { "flask_access",
       (PyCFunction)pyflask_access,
@@ -2422,7 +2388,7 @@ static PyMethodDef pyxc_methods[] = {
       " auditdeny [int] permissions set to audit on deny\n"
       " seqno [int] not used\n"
       "Returns: [int]: 0 on all permission granted; -1 if any permissions are \
-       denied\n" }, 
+       denied\n" },
 
     { NULL, NULL, 0, NULL }
 };
