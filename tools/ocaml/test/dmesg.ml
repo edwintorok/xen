@@ -1,6 +1,5 @@
 
 let _ =
-  Xenlight.register_exceptions ();
   let logger = Xtl.create_stdio_logger ~level:Xentoollog.Debug () in
   let ctx = Xenlight.ctx_alloc logger in
 

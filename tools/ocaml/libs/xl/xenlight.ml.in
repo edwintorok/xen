@@ -88,7 +88,7 @@ module Async = struct
 		event_register_callbacks' ctx user
 end
 
-let register_exceptions () =
+let () =
 	Callback.register_exception "Xenlight.Error" (Error(ERROR_FAIL, ""));
 	Callback.register_exception "Xenlight.Host.End_of_file" (Host.End_of_file)
 

@@ -21,8 +21,6 @@ type devid = int
 
 exception Error of (error * string)
 
-val register_exceptions: unit -> unit
-
 external ctx_alloc: Xentoollog.handle -> ctx = "stub_libxl_ctx_alloc"
 
 external test_raise_exception: unit -> unit = "stub_raise_exception"
