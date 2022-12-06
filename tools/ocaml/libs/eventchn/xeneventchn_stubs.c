@@ -32,6 +32,7 @@
 #include <caml/callback.h>
 #include <caml/fail.h>
 #include <caml/signals.h>
+#include <caml/unixsupport.h>
 
 #define _H(__h) (*((xenevtchn_handle **)Data_custom_val(__h)))
 
@@ -65,7 +66,7 @@ CAMLprim value stub_eventchn_init(value cloexec)
     caml_leave_blocking_section();
 
     if (xce == NULL)
-        caml_failwith("open failed");
+        uerror("xenevtchn_open", Nothing);
 
     result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
     _H(result) = xce;
@@ -84,7 +85,7 @@ CAMLprim value stub_eventchn_fdopen(value fdval)
     caml_leave_blocking_section();
 
     if (xce == NULL)
-        caml_failwith("evtchn fdopen failed");
+        uerror("xenevtchn_fdopen", Nothing);
 
     result = caml_alloc_custom(&xenevtchn_ops, sizeof(xce), 0, 1);
     _H(result) = xce;
@@ -100,6 +101,7 @@ CAMLprim value stub_eventchn_fd(value xce)
 
     fd = xenevtchn_fd(_H(xce));
     if (fd == -1)
+        /* this just reads a field, errno is not set */
         caml_failwith("evtchn fd failed");
 
     result = Val_int(fd);
@@ -117,7 +119,7 @@ CAMLprim value stub_eventchn_notify(value xce, value port)
     caml_leave_blocking_section();
 
     if (rc == -1)
-        caml_failwith("evtchn notify failed");
+        uerror("xenevtchn_notify", Nothing);
 
     CAMLreturn(Val_unit);
 }
@@ -134,7 +136,7 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
     caml_leave_blocking_section();
 
     if (rc == -1)
-        caml_failwith("evtchn bind_interdomain failed");
+        uerror("xenevtchn_bind_interdomain", Nothing);
     port = Val_int(rc);
 
     CAMLreturn(port);
@@ -151,7 +153,7 @@ CAMLprim value stub_eventchn_bind_virq(value xce, value virq_type)
     caml_leave_blocking_section();
 
     if (rc == -1)
-        caml_failwith("evtchn bind_virq failed");
+        uerror("xenevtchn_bind_virq", Nothing);
     port = Val_int(rc);
 
     CAMLreturn(port);
@@ -167,7 +169,7 @@ CAMLprim value stub_eventchn_unbind(value xce, value port)
     caml_leave_blocking_section();
 
     if (rc == -1)
-        caml_failwith("evtchn unbind failed");
+        uerror("xenevtchn_unbind", Nothing);
 
     CAMLreturn(Val_unit);
 }
@@ -183,7 +185,7 @@ CAMLprim value stub_eventchn_pending(value xce)
     caml_leave_blocking_section();
 
     if (port == -1)
-        caml_failwith("evtchn pending failed");
+        uerror("xenevtchn_pending", Nothing);
     result = Val_int(port);
 
     CAMLreturn(result);
@@ -202,6 +204,6 @@ CAMLprim value stub_eventchn_unmask(value xce, value _port)
     caml_leave_blocking_section();
 
     if (rc)
-        caml_failwith("evtchn unmask failed");
+        uerror("xenevtchn_unmask", Nothing);
     CAMLreturn(Val_unit);
 }
