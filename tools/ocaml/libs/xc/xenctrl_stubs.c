@@ -985,10 +985,11 @@ CAMLprim value stub_xc_version_compile_info(value xch)
 static value xc_version_single_string(value xch, int code, void *info)
 {
     CAMLparam1(xch);
+    xc_interface *xc = _H(xch);
     int retval;
 
     caml_enter_blocking_section();
-    retval = xc_version(_H(xch), code, info);
+    retval = xc_version(xc, code, info);
     caml_leave_blocking_section();
 
     if (retval)
@@ -1027,6 +1028,7 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
 {
     CAMLparam4(xch, dom, size, mfn);
     CAMLlocal1(result);
+    xc_interface *xc = _H(xch);
     struct mmap_interface *intf;
     uint32_t c_dom;
     unsigned long c_mfn;
@@ -1039,7 +1041,7 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
     c_dom = _D(dom);
     c_mfn = Nativeint_val(mfn);
     caml_enter_blocking_section();
-    intf->addr = xc_map_foreign_range(_H(xch), c_dom,
+    intf->addr = xc_map_foreign_range(xc, c_dom,
                                       intf->len, PROT_READ|PROT_WRITE,
                                       c_mfn);
     caml_leave_blocking_section();
@@ -1053,10 +1055,11 @@ CAMLprim value stub_sched_credit_domain_get(value xch, value domid)
     CAMLparam2(xch, domid);
     CAMLlocal1(sdom);
     struct xen_domctl_sched_credit c_sdom;
+    xc_interface *xc = _H(xch);
     int ret;
 
     caml_enter_blocking_section();
-    ret = xc_sched_credit_domain_get(_H(xch), _D(domid), &c_sdom);
+    ret = xc_sched_credit_domain_get(xc, _D(domid), &c_sdom);
     caml_leave_blocking_section();
     if (ret != 0)
         failwith_xc(_H(xch));
@@ -1073,12 +1076,13 @@ CAMLprim value stub_sched_credit_domain_set(value xch, value domid,
 {
     CAMLparam3(xch, domid, sdom);
     struct xen_domctl_sched_credit c_sdom;
+    xc_interface *xc = _H(xch);
     int ret;
 
     c_sdom.weight = Int_val(Field(sdom, 0));
     c_sdom.cap = Int_val(Field(sdom, 1));
     caml_enter_blocking_section();
-    ret = xc_sched_credit_domain_set(_H(xch), _D(domid), &c_sdom);
+    ret = xc_sched_credit_domain_set(xc, _D(domid), &c_sdom);
     caml_leave_blocking_section();
     if (ret != 0)
         failwith_xc(_H(xch));
@@ -1090,11 +1094,12 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
 {
     CAMLparam2(xch, domid);
     CAMLlocal1(mb);
+    xc_interface *xc = _H(xch);
     unsigned int c_mb;
     int ret;
 
     caml_enter_blocking_section();
-    ret = xc_shadow_control(_H(xch), _D(domid),
+    ret = xc_shadow_control(xc, _D(domid),
                 XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION,
                 &c_mb, 0);
     caml_leave_blocking_section();
@@ -1109,12 +1114,13 @@ CAMLprim value stub_shadow_allocation_set(value xch, value domid,
                       value mb)
 {
     CAMLparam3(xch, domid, mb);
+    xc_interface *xc = _H(xch);
     unsigned int c_mb;
     int ret;
 
     c_mb = Int_val(mb);
     caml_enter_blocking_section();
-    ret = xc_shadow_control(_H(xch), _D(domid),
+    ret = xc_shadow_control(xc, _D(domid),
                 XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
                 &c_mb, 0);
     caml_leave_blocking_section();
@@ -1188,11 +1194,12 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
 CAMLprim value stub_xc_hvm_param_get(value xch, value domid, value param)
 {
     CAMLparam3(xch, domid, param);
+    xc_interface *xc = _H(xch);
     uint64_t val;
     int ret;
 
     caml_enter_blocking_section();
-    ret = xc_hvm_param_get(_H(xch), _D(domid), Int_val(param), &val);
+    ret = xc_hvm_param_get(xc, _D(domid), Int_val(param), &val);
     caml_leave_blocking_section();
 
     if ( ret )
@@ -1204,10 +1211,11 @@ CAMLprim value stub_xc_hvm_param_get(value xch, value domid, value param)
 CAMLprim value stub_xc_hvm_param_set(value xch, value domid, value param, value val)
 {
     CAMLparam4(xch, domid, param, val);
+    xc_interface *xc = _H(xch);
     int ret;
 
     caml_enter_blocking_section();
-    ret = xc_hvm_param_set(_H(xch), _D(domid), Int_val(param), Int64_val(val));
+    ret = xc_hvm_param_set(xc, _D(domid), Int_val(param), Int64_val(val));
     caml_leave_blocking_section();
 
     if ( ret )
