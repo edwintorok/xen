@@ -1,0 +1,185 @@
+name: Run OCaml C stub static analyzer on Xen's C stubs
+
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+      - staging
+
+
+jobs:
+  staticanalyzer:
+    name: Build static analyzer, build Xen, analyze Xen
+    runs-on: ubuntu-22.04
+    env:
+      # must match runner's version
+      OCAML: 4.13.1
+      # required for dune cache to work inside opam for now, otherwise it
+      # gets EXDEV and considers it a cache miss
+      DUNE_CACHE_STORAGE_MODE: copy
+      DUNE_CACHE: enabled
+      PACKAGE: xapi-lintcstubs
+
+    steps:
+      # needs to be first or SARIF upload will fail with a 'commit not found'
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Checkout static analyzer
+        uses: actions/checkout@v3
+        with:
+          repository: edwintorok/xen-api
+          ref: private/edvint/static
+          path: analyzer
+
+      - name: Restore opam install cache
+        id: lintcstubs-opam-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            _opam/bin
+            _opam/share
+            _opam/lib/ocaml
+          key: ${{ runner.os }}-22.04-lintcstubs-cache-${{ env.OCAML }}-${{ hashFiles('ocaml/staticanalyzer/**') }}
+
+      - name: Prepare OCaml
+        if: steps.lintcstubs-opam-cache.outputs.cache-hit != 'true'
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ env.OCAML }}
+          dune-cache: true
+          opam-local-packages: analyzer/${{ env.PACKAGE }}.opam
+
+      - name: Build & install static analyzer
+        if: steps.lintcstubs-opam-cache.outputs.cache-hit != 'true'
+        run: opam install ${{ env.PACKAGE }}
+
+      # save even if later steps fails
+      - name: Save opam install cache
+        uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+            _opam/bin
+            _opam/share
+            _opam/lib/ocaml
+          key: ${{ runner.os }}-22.04-lintcstubs-cache-${{ env.OCAML }}-${{ hashFiles('ocaml/staticanalyzer/**') }}
+
+      # we generate compile_commands.json and .cmt files (to extract external)
+      # these depend on build rules and .ml files
+      - name: Restore build cache
+        id: xen-buildcache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+             compile_commands.json
+             tools/ocaml/**/*.cmt
+             tools/ocaml/**/*.ml
+             tools/
+          key: ${{ runner.os }}-xen-ocaml-build-${{ env.OCAML }}${{ hashFiles('tools/ocaml/**/*.ml', 'tools/ocaml/**/Makefile*', 'tools/ocaml/**/common.make') }}
+
+      # based on Xen's coverity.yml + BEAR to generate compile_commands.json
+      - name: Install build dependencies for Xen
+        if: steps.xen-buildcache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install -y wget git gawk \
+            libbz2-dev build-essential \
+            zlib1g-dev libncurses5-dev iasl \
+            libbz2-dev e2fslibs-dev uuid-dev ocaml \
+            ocaml-findlib libyajl-dev \
+            autoconf libtool liblzma-dev \
+            libsystemd-dev \
+            bear
+
+      # based on Xen's coverity.yml
+      - name: Configure Xen (for compilation database)
+        if: steps.xen-buildcache.outputs.cache-hit != 'true'
+        run: |
+          bear -- ./configure --with-system-qemu=/bin/true \
+                      --with-system-seabios=/bin/true \
+                      --with-system-ovmf=/bin/true
+
+      # analyze just the C bindings, not the whole xenctrl for now
+      - name: Build OCaml C stubs (create compilation database)
+        if: steps.xen-buildcache.outputs.cache-hit != 'true'
+        run: |
+            make build-tools-public-headers -j2
+            make -C tools/libs -j2
+            bear -- make -C tools/ocaml build-tools-oxenstored -j2
+
+      # save even if later steps fails
+      - name: Save Xen buildcache
+        uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: |
+             compile_commands.json
+             tools/ocaml/**/*.cmt
+             tools/ocaml/**/*.ml
+             tools/
+          key: ${{ runner.os }}-xen-ocaml-build-${{ env.OCAML }}${{ hashFiles('tools/ocaml/**/*.ml', 'tools/ocaml/**/Makefile*', 'tools/ocaml/**/common.make') }}
+
+# bear -- make -C tools/libs -j2
+#    bear --append -- make -C tools/ocaml build-tools-oxenstored -j2
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: oxenstored-build
+          path: |
+              compile_commands.json
+
+      - name: Use model cache
+        id: xen-modelcache
+        uses: actions/cache@v3
+        with:
+          path: |
+            primitives.h
+            primitives.model.c
+          key: ${{ runner.os }}-xen-ocaml-model-${{ hashFiles('tools/ocaml/**/*.ml') }}
+
+      - name: Generate primitives header
+        if: steps.xen-modelcache.outputs.cache-hit != 'true'
+        run: opam exec -- lintcstubs_arity `find tools/ocaml -name '*.ml'` >primitives.h
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: primitives-header
+          path: primitives.h
+
+      - name: Generate primitives invocation model for static analysis
+        if: steps.xen-modelcache.outputs.cache-hit != 'true'
+        run: opam exec -- lintcstubs_genmain `find tools/ocaml -name '*.cmt'` >primitives.model.c
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: primitives-model
+          path: primitives.model.c
+
+      # if the change in Xen doesn't affect OCaml C stubs then restore previous
+      # analysis result
+      - name: Use analysis result cache
+        id: xen-sarifcache
+        uses: actions/cache@v3
+        with:
+          path: xenstubs.sarif
+          key: xen-sarif-${{ hashFiles('tools/ocaml/**/*.c', 'tools/ocaml/**/*.h', 'tools/include/**/*.h', 'tools/libs/**/*.h', 'tools/libs/**/*.c', 'primitives.model.c', 'primitives.h', '_opam/bin/**', '_opam/share/**') }}
+
+      - name: Run static analyzer on OCaml C stubs
+        if: steps.xen-sarifcache.outputs.cache-hit != 'true'
+        run: |
+          opam exec -- lintcstubs -o xenstubs.sarif --disable warn.info \
+          --disable warn.unsound --disable warn.imprecise \
+          --disable warn.deadcode --disable warn.behavior \
+          --set ana.activated "[\"ocamlcstubs\",\"escape\"]" \
+          --sarif compile_commands.json primitives.model.c \
+          --enable dbg.verbose \
+          -I $(ocamlc -where)
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: xenstubs.sarif
