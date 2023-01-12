@@ -22,50 +22,50 @@
 #include <caml/signals.h>
 
 static int __syslog_level_table[] = {
-	LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
-	LOG_NOTICE, LOG_INFO, LOG_DEBUG
+    LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING,
+    LOG_NOTICE, LOG_INFO, LOG_DEBUG
 };
 
 static int __syslog_facility_table[] = {
-	LOG_AUTH, LOG_AUTHPRIV, LOG_CRON, LOG_DAEMON, LOG_FTP, LOG_KERN,
-	LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2, LOG_LOCAL3,
-	LOG_LOCAL4, LOG_LOCAL5, LOG_LOCAL6, LOG_LOCAL7,
-	LOG_LPR | LOG_MAIL | LOG_NEWS | LOG_SYSLOG | LOG_USER | LOG_UUCP
+    LOG_AUTH, LOG_AUTHPRIV, LOG_CRON, LOG_DAEMON, LOG_FTP, LOG_KERN,
+    LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2, LOG_LOCAL3,
+    LOG_LOCAL4, LOG_LOCAL5, LOG_LOCAL6, LOG_LOCAL7,
+    LOG_LPR | LOG_MAIL | LOG_NEWS | LOG_SYSLOG | LOG_USER | LOG_UUCP
 };
 
 value stub_syslog(value facility, value level, value msg)
 {
-	CAMLparam3(facility, level, msg);
-	char *c_msg = strdup(String_val(msg));
-	char *s = c_msg, *ss;
-	int c_facility = __syslog_facility_table[Int_val(facility)]
-	               | __syslog_level_table[Int_val(level)];
+    CAMLparam3(facility, level, msg);
+    char *c_msg = strdup(String_val(msg));
+    char *s = c_msg, *ss;
+    int c_facility = __syslog_facility_table[Int_val(facility)]
+                   | __syslog_level_table[Int_val(level)];
 
-	if ( !c_msg )
-		caml_raise_out_of_memory();
+    if ( !c_msg )
+        caml_raise_out_of_memory();
 
-	/*
-	 * syslog() doesn't like embedded newlines, and c_msg generally
-	 * contains them.
-	 *
-	 * Split the message in place by converting \n to \0, and issue one
-	 * syslog() call per line, skipping the final iteration if c_msg ends
-	 * with a newline anyway.
-	 */
-	do {
-		ss = strchr(s, '\n');
-		if ( ss )
-			*ss = '\0';
-		else if ( *s == '\0' )
-			break;
+    /*
+     * syslog() doesn't like embedded newlines, and c_msg generally
+     * contains them.
+     *
+     * Split the message in place by converting \n to \0, and issue one
+     * syslog() call per line, skipping the final iteration if c_msg ends
+     * with a newline anyway.
+     */
+    do {
+        ss = strchr(s, '\n');
+        if ( ss )
+            *ss = '\0';
+        else if ( *s == '\0' )
+            break;
 
-		caml_enter_blocking_section();
-		syslog(c_facility, "%s", s);
-		caml_leave_blocking_section();
+        caml_enter_blocking_section();
+        syslog(c_facility, "%s", s);
+        caml_leave_blocking_section();
 
-		s = ss + 1;
-	} while ( ss );
+        s = ss + 1;
+    } while ( ss );
 
-	free(c_msg);
-	CAMLreturn(Val_unit);
+    free(c_msg);
+    CAMLreturn(Val_unit);
 }
