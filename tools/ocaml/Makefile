@@ -39,3 +39,8 @@ build-tools-oxenstored:
 format:
 	git ls-files '*.ml' '*.mli' | xargs -n1 ocp-indent -i
 	git ls-files '*.c' '*.h' | xargs -n1 sed -ie 's/\t/    /g'
+
+# Requires OCaml 4.08+, so don't do it by default yet
+.PHONY: lint
+lint:
+	$(MAKE) -C primitives
