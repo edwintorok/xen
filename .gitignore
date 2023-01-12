@@ -378,6 +378,7 @@ tools/ocaml/libs/xentoollog/xentoollog.ml
 tools/ocaml/libs/xentoollog/xentoollog.mli
 tools/ocaml/libs/xs/paths.ml
 tools/ocaml/libs/xc/xenctrl_abi_check.h
+tools/ocaml/primitives/lintcstubs_arity
 tools/ocaml/xenstored/oxenstored
 tools/ocaml/xenstored/oxenstored.conf
 tools/ocaml/xenstored/paths.ml

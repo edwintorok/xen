@@ -10,6 +10,7 @@ OCAMLYACC ?= ocamlyacc
 OCAMLFIND ?= ocamlfind
 
 CFLAGS += -fPIC -I$(shell ocamlc -where)
+CFLAGS += -include $(OCAML_TOPLEVEL)/primitives/primitives.h
 
 OCAMLOPTFLAG_G := $(shell $(OCAMLOPT) -h 2>&1 | sed -n 's/^  *\(-g\) .*/\1/p')
 OCAMLOPTFLAGS = $(OCAMLOPTFLAG_G) -ccopt "$(LDFLAGS)" -dtypes $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F
