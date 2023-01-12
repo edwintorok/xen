@@ -970,7 +970,7 @@ CAMLprim value stub_xc_version_version(value xch)
     xen_extraversion_t extra;
     xc_interface *xc = _H(xch);
     long packed;
-    int retval;
+    int retval = 0;
 
     caml_enter_blocking_section();
     do {
@@ -1073,7 +1073,6 @@ CAMLprim value stub_map_foreign_range(value xch, value dom,
     struct mmap_interface *intf;
     uint32_t c_dom;
     unsigned long c_mfn;
-    xc_interface *xc = _H(xch);
 
     result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
     intf = (struct mmap_interface *) result;
@@ -1138,7 +1137,6 @@ CAMLprim value stub_shadow_allocation_get(value xch, value domid)
     CAMLlocal1(mb);
     xc_interface *xc = _H(xch);
     unsigned int c_mb;
-    xc_interface *xc = _H(xch);
     int ret;
 
     caml_enter_blocking_section();
@@ -1159,7 +1157,6 @@ CAMLprim value stub_shadow_allocation_set(value xch, value domid,
     CAMLparam3(xch, domid, mb);
     xc_interface *xc = _H(xch);
     unsigned int c_mb;
-    xc_interface *xc = _H(xch);
     int ret;
 
     c_mb = Int_val(mb);
