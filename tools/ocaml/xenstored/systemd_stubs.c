@@ -29,19 +29,19 @@
 
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {
-	CAMLparam1(ignore);
+    CAMLparam1(ignore);
 
-	sd_notify(1, "READY=1");
+    sd_notify(1, "READY=1");
 
-	CAMLreturn(Val_unit);
+    CAMLreturn(Val_unit);
 }
 
 #else
 
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {
-	CAMLparam1(ignore);
+    CAMLparam1(ignore);
 
-	CAMLreturn(Val_unit);
+    CAMLreturn(Val_unit);
 }
 #endif
