@@ -35,6 +35,11 @@ build-tools-oxenstored:
 	$(MAKE) -s -C libs/xc
 	$(MAKE) -C xenstored
 
+# Requires OCaml 4.08+, so don't do it by default yet
+.PHONY: lint
+lint:
+	$(MAKE) -C primitives
+
 .PHONY: format
 format:
 	git ls-files '*.ml' '*.mli' | xargs -n1 ocp-indent -i
