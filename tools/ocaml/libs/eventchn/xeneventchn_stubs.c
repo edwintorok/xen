@@ -110,10 +110,11 @@ CAMLprim value stub_eventchn_fd(value xce)
 CAMLprim value stub_eventchn_notify(value xce, value port)
 {
 	CAMLparam2(xce, port);
+	xenevtchn_handle *xceh = _H(xce);
 	int rc;
 
 	caml_enter_blocking_section();
-	rc = xenevtchn_notify(_H(xce), Int_val(port));
+	rc = xenevtchn_notify(xceh, Int_val(port));
 	caml_leave_blocking_section();
 
 	if (rc == -1)
@@ -127,10 +128,11 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
 {
 	CAMLparam3(xce, domid, remote_port);
 	CAMLlocal1(port);
+	xenevtchn_handle *xceh = _H(xce);
 	xenevtchn_port_or_error_t rc;
 
 	caml_enter_blocking_section();
-	rc = xenevtchn_bind_interdomain(_H(xce), Int_val(domid), Int_val(remote_port));
+	rc = xenevtchn_bind_interdomain(xceh, Int_val(domid), Int_val(remote_port));
 	caml_leave_blocking_section();
 
 	if (rc == -1)
@@ -144,10 +146,11 @@ CAMLprim value stub_eventchn_bind_virq(value xce, value virq_type)
 {
 	CAMLparam2(xce, virq_type);
 	CAMLlocal1(port);
+	xenevtchn_handle *xceh = _H(xce);
 	xenevtchn_port_or_error_t rc;
 
 	caml_enter_blocking_section();
-	rc = xenevtchn_bind_virq(_H(xce), Int_val(virq_type));
+	rc = xenevtchn_bind_virq(xceh, Int_val(virq_type));
 	caml_leave_blocking_section();
 
 	if (rc == -1)
@@ -160,10 +163,11 @@ CAMLprim value stub_eventchn_bind_virq(value xce, value virq_type)
 CAMLprim value stub_eventchn_unbind(value xce, value port)
 {
 	CAMLparam2(xce, port);
+	xenevtchn_handle *xceh = _H(xce);
 	int rc;
 
 	caml_enter_blocking_section();
-	rc = xenevtchn_unbind(_H(xce), Int_val(port));
+	rc = xenevtchn_unbind(xceh, Int_val(port));
 	caml_leave_blocking_section();
 
 	if (rc == -1)
@@ -177,9 +181,10 @@ CAMLprim value stub_eventchn_pending(value xce)
 	CAMLparam1(xce);
 	CAMLlocal1(result);
 	xenevtchn_port_or_error_t port;
+	xenevtchn_handle *xceh = _H(xce);
 
 	caml_enter_blocking_section();
-	port = xenevtchn_pending(_H(xce));
+	port = xenevtchn_pending(xceh);
 	caml_leave_blocking_section();
 
 	if (port == -1)
@@ -193,12 +198,13 @@ CAMLprim value stub_eventchn_unmask(value xce, value _port)
 {
 	CAMLparam2(xce, _port);
 	evtchn_port_t port;
+	xenevtchn_handle *xceh = _H(xce);
 	int rc;
 
 	port = Int_val(_port);
 
 	caml_enter_blocking_section();
-	rc = xenevtchn_unmask(_H(xce), port);
+	rc = xenevtchn_unmask(xceh, port);
 	caml_leave_blocking_section();
 
 	if (rc)
