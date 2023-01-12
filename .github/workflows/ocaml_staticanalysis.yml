@@ -1,0 +1,75 @@
+name: Run OCaml C stub static analyzer on Xen's C stubs
+
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+      - staging
+
+jobs:
+  staticanalyzer:
+    name: Ocaml files
+    runs-on: ubuntu-latest
+    env:
+      # required for dune cache to work inside opam for now, otherwise it
+      # gets EXDEV and considers it a cache miss
+      DUNE_CACHE_STORAGE_MODE: copy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Use ocaml
+        uses: avsm/setup-ocaml@v2
+        with:
+          dune-cache: true
+          opam-pin: false
+          opam-depext: false
+
+      - name: Install dependencies for static analyzer
+        run: |
+          opam update
+          opam pin add xapi-lintcstubs https://github.com/edwintorok/xen-api#private/edvint/static
+
+      # based on Xen's coverity.yml + BEAR to generate compile_commands.json
+      - name: Install build dependencies for Xen
+        run: |
+          sudo apt-get install -y wget git gawk \
+            libbz2-dev build-essential \
+            zlib1g-dev libncurses5-dev iasl \
+            libbz2-dev e2fslibs-dev uuid-dev ocaml \
+            ocaml-findlib libyajl-dev \
+            autoconf libtool liblzma-dev \
+            python3-dev golang python-dev libsystemd-dev \
+            bear
+
+      # based on Xen's coverity.yml
+      - name: Configure Xen (for compilation database)
+        run: |
+          bear -- ./configure --with-system-qemu=/bin/true \
+                      --with-system-seabios=/bin/true \
+                      --with-system-ovmf=/bin/true
+
+      - name: Build OCaml C stubs (create compilation database)
+        run: bear -- make build-tools-oxenstored OCAMLC_FLAGS=-bin-annot -j2
+
+      - name: Generate primitives header
+        run: lintcstubs_arity $(find . -name '*.ml') >primitives.h
+
+      - name: Generate primitives invocation model for static analysis
+        run: lintcstubs_genmain $(find . -name '*.cmt') >primitives.model.c
+
+      - name: Run static analyzer on OCaml C stubs
+        run: |
+          lintcstubs -o xenstubs.sarif --disable warn.info \
+          --disable warn.unsound --disable warn.imprecise \
+          --disable warn.deadcode --disable warn.behavior \
+          --set ana.activated "[\"ocamlcstubs\",\"escape\"]" \
+          --sarif compile_commands.json primitives.model.c \
+          -I $(ocamlc -where)
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: xenstubs.sarif
