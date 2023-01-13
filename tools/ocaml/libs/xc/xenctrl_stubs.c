@@ -622,8 +622,11 @@ CAMLprim value stub_xc_sched_id(value xch)
 	CAMLparam1(xch);
 	int sched_id;
 
-	if (xc_sched_id(_H(xch), &sched_id))
-		failwith_xc(_H(xch));
+	caml_enter_blocking_section();
+	ret = xc_sched_id(xc, &sched_id);
+	caml_leave_blocking_section();
+	if (ret)
+		failwith_xc(xc);
 	CAMLreturn(Val_int(sched_id));
 }
 
@@ -1311,26 +1314,23 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 	CAMLlocal1(bitmap_val);
 #if defined(__i386__) || defined(__x86_64__)
 
-	/* Safe, because of the global ocaml lock. */
-	static uint32_t fs_len;
+	uint32_t fs_len;
+	int ret;
 
-	if (fs_len == 0)
-	{
-		int ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
-
-		if (ret || (fs_len == 0))
-			failwith_xc(_H(xch));
-	}
+	caml_enter_blocking_section();
+	ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
 
 	{
 		/* To/from hypervisor to retrieve actual featureset */
 		uint32_t fs[fs_len], len = fs_len;
 		unsigned int i;
 
-		int ret = xc_get_cpu_featureset(_H(xch), Int_val(idx), &len, fs);
+		if (!ret && fs_len)
+			ret = xc_get_cpu_featureset(xc, Int_val(idx), &len, fs);
+		caml_leave_blocking_section();
 
-		if (ret)
-			failwith_xc(_H(xch));
+		if (ret || !fs_len)
+			failwith_xc(xc);
 
 		bitmap_val = caml_alloc(len, 0);
 
