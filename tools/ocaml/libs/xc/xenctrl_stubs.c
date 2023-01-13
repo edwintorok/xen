@@ -1366,29 +1366,22 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
     xc_interface *xc = _H(xch);
 #if defined(__i386__) || defined(__x86_64__)
 
-    /* Safe, because of the global ocaml lock. */
-    static uint32_t fs_len;
+    uint32_t fs_len;
+    int ret;
 
-    if (fs_len == 0)
-    {
-        /* see comment above, cannot release master lock here */
-        int ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
-
-        if (ret || (fs_len == 0))
-            failwith_xc(xc);
-    }
+    caml_enter_blocking_section();
+    ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
 
     {
         /* To/from hypervisor to retrieve actual featureset */
         uint32_t fs[fs_len], len = fs_len;
         unsigned int i;
-        int ret;
 
-        caml_enter_blocking_section();
-        ret = xc_get_cpu_featureset(xc, Int_val(idx), &len, fs);
+        if (!ret && fs_len)
+            ret = xc_get_cpu_featureset(xc, Int_val(idx), &len, fs);
         caml_leave_blocking_section();
 
-        if (ret)
+        if (ret || !fs_len)
             failwith_xc(xc);
 
         bitmap_val = caml_alloc(len, 0);
