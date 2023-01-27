@@ -622,7 +622,8 @@ CAMLprim value stub_xc_vcpu_getaffinity(value xch, value domid,
 CAMLprim value stub_xc_sched_id(value xch)
 {
 	CAMLparam1(xch);
-	int sched_id;
+	int sched_id, ret;
+	xc_interface *xc = _H(xch);
 
 	caml_enter_blocking_section();
 	ret = xc_sched_id(xc, &sched_id);
@@ -1314,6 +1315,7 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 {
 	CAMLparam2(xch, idx);
 	CAMLlocal1(bitmap_val);
+	xc_interface *xc = _H(xch);
 #if defined(__i386__) || defined(__x86_64__)
 
 	uint32_t fs_len;
