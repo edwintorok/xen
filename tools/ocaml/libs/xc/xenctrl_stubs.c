@@ -1322,7 +1322,7 @@ CAMLprim value stub_xc_get_cpu_featureset(value xch, value idx)
 	int ret;
 
 	caml_enter_blocking_section();
-	ret = xc_get_cpu_featureset(_H(xch), 0, &fs_len, NULL);
+	ret = xc_get_cpu_featureset(xc, 0, &fs_len, NULL);
 
 	{
 		/* To/from hypervisor to retrieve actual featureset */
