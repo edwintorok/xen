@@ -396,6 +396,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
         shift = level * 9 + 3;
         idx_start = ((p2m_vaddr - off) & mask) >> shift;
         idx_end = ((p2m_end - off) & mask) >> shift;
+        assert(idx_start <= idx_end);
         idx = idx_end - idx_start + 1;
         mfns = malloc(sizeof(*mfns) * idx);
         if ( !mfns )
