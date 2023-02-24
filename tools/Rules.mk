@@ -159,6 +159,7 @@ CFLAGS += -O2 -fomit-frame-pointer
 endif
 
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
+CFLAGS += $(call cc-option,$(CC),-fanalyzer)
 
 # Get gcc to generate the dependencies for us.
 CFLAGS += -MMD -MP -MF .$(if $(filter-out .,$(@D)),$(subst /,@,$(@D))@)$(@F).d
