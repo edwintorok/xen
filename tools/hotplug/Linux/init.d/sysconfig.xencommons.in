@@ -52,7 +52,7 @@
 # like "--trace-file @XEN_LOG_DIR@/xenstored-trace.log"
 # See "@sbindir@/xenstored --help" for possible options.
 # Only evaluated if XENSTORETYPE is "daemon".
-XENSTORED_ARGS=--no-fork
+XENSTORED_ARGS=
 
 ## Type: string
 ## Default: Not defined, tracing off
