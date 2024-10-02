@@ -11,8 +11,9 @@ source is generally used (commonly the Linux coding style).
 
 Other parts of the code base may use other coding styles, sometimes
 explicitly (e.g. tools/libxl/CODING_STYLE) but often implicitly (Linux
-coding style is fairly common). In general you should copy the style
-of the surrounding code. If you are unsure please ask.
+coding style is fairly common, e.g. tools/ocaml/libs/CODING_STYLE).
+In general you should copy the style of the surrounding code. If you are unsure
+please ask.
 
 SPDX
 ----

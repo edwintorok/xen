@@ -1,0 +1,10 @@
+For historical reasons the OCaml C stubs follow the Linux coding style to minimize code churn on reformatting.
+
+For more details on the Linux coding style see:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/coding-style.rst
+
+There is also a .clang-format file in this folder, which is a copy of
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/.clang-format
+
+This can be used together with https://github.com/llvm/llvm-project/blob/main/clang/tools/clang-format/git-clang-format
+to format new contributions to these files.
